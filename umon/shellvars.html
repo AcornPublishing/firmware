@@ -1,0 +1,629 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: Shell Variables &amp; Symbols</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a>&nbsp;
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Shell Variables and Symbols</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font></center>
+
+<center>
+<h1>
+
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<p><br><font face="Arial,Helvetica">The monitor supports the ability to
+assign data to or retrieve data from shell variables.&nbsp; The text below
+discusses the implementation of shell variables and symbols within the
+monitor as well as how they can be used and what variables are automatically
+created and/or used by the monitor itself.</font>
+<br>&nbsp;
+<p><font face="Arial,Helvetica"><a href="#shellvar_usage">Shell Variable
+Usage</a></font>
+<br><font face="Arial,Helvetica"><a href="#shells_vs_syms">Shell Variables
+vs Symbols</a></font>
+<br><font face="Arial,Helvetica"><a href="#implementation">Implementation</a></font>
+<br><font face="Arial,Helvetica"><a href="#shellvars_used">Shell Variables
+Created and/or Used by MicroMonitor</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<hr WIDTH="100%">
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="shellvar_usage"></a><font face="Arial,Helvetica">
+Shell Variable Usage</font></h2>
+
+<blockquote>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <font face="Arial,Helvetica">Similar
+to most other shells, shell variable names can contain alphanumerics and
+the underscore ('_').&nbsp; Once assigned, the value within the variable
+can be accessed by preceding the variable name with a dollar sign ($).&nbsp;
+The ${} syntax is also supported.&nbsp; Use of the curly braces tells the
+command line processor to force the start and end point of a shell variable
+name that may otherwise not be seen as a variable because it is embedded
+within a larger string of characters.&nbsp; In addition, the dollar sign
+can be preceded by a backslash to negate its meaning as a shell variable
+starting delimiter.&nbsp; The <a href="commands/set.html">set</a> command
+supports the ability to assign values to variable names and perform some
+basic operation on them.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The MicroMonitor command interpreter supports nested shell variable names.&nbsp;
+This means that the user can build a shell variable name based on other
+shell variables.&nbsp; For example, if NAME_1 contains "Jane",&nbsp; NAME_2
+contains "John" and IDX contains "1"&nbsp; then the statement echo&nbsp;
+${NAME_${IDX}}&nbsp; will output the string "Jane"; likewise if IDX contains
+"2" then that same statement will output the string "John".&nbsp; This
+mechanism of processing nested shell variables within the command line
+interface allows the user to conveniently use shell variables to represent
+n-dimensional arrays, and by default, only the space used by the individual
+members within each dimension take up memory space. For example,&nbsp;
+assume we have an application that is represented by 3 entries in a table
+and the entries may exist in any of the first 100 locations of the table.&nbsp;
+When the entries are created they use the index into the table as part
+of their name: TBL3, TBL48, TBL99.&nbsp; Then the user can"index" into
+the table with a second IDX variable...&nbsp; ${TBL${IDX}} where IDX is
+set to 3, 48 or 99 will retrieve the content of each variable.&nbsp; Note
+that although the application appears to have a table that contains at
+least 100 entries, the shell actually only assigns those that are used.&nbsp;
+A multi-dimensional array is handled the same way... PLOT[3][4][5] can
+be represented with&nbsp; the shell variable PLOT345 ... ${PLOT${X}${Y}${Z}},
+where X=3, Y=4 and Z=5.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+For examples of this usage refer to the <a href="scripts.html#namelist">namelist</a>
+and <a href="scripts.html#why_do_this">why would you ever want to do this?</a>
+script examples.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="shells_vs_syms"></a><font face="Arial,Helvetica">
+Shell Variables vs. Symbols</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The command line processor makes token substitutions based on shell variable
+assignment and symbol table entries.&nbsp; As previously mentioned, shell
+variables are identified by preceding a string with a dollar sign ($).&nbsp;
+Symbol table entries are identified by preceding a string with a percent
+sign (%).&nbsp; The use of shell variables and symbols is similar, but
+the way in which they are stored is different; hence, either may be appropriate
+depending on the situation.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+A shell variable is created on the command line of the monitor using the
+<a href="commands/set.html">set</a>
+command or through the API using the
+<a href="api/setenv.html">setenv()</a>
+function.&nbsp; Retrieval of the content on the command line is done by
+specifying the variable name preceded by a dollar sign ($) or through the
+API using the <a href="api/getenv.html">getenv()</a> function.&nbsp; Refer
+to the discussion on <a href="scripts.html">scripts</a> for some examples
+of shell variable usage.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+A symbol is not created, it exists or it doesn't exist based on the content
+of a symbol table file in TFS.&nbsp; Retrieval of the content of a symbol
+on the command line is done by specifying the symbol name preceded by a
+percent sign (%).&nbsp; There is no "getenv()-like" capability for symbols.&nbsp;
+The default name for the symbol table file is "symtbl".&nbsp; At compile
+time, this can be overridden in config.h, or at runtime if the shell variable
+SYMFILE is set, then the content of that shell variable is used instead
+of the default "symtbl".&nbsp; The format of the symbol table file is simple,
+each line contains one symbol with a value that the symbol represents (each
+of which are whitespace delimited).&nbsp; For example, if the following
+lines were in the file "symtbl"...</font>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote><tt>main&nbsp;&nbsp;&nbsp; 0x14004</tt>
+<br><tt>func&nbsp;&nbsp;&nbsp; 0x14800</tt></blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">then if %main was on the command line, it
+would be replaced with 0x14004; likewise if %func was on the command line,
+it would be replaced with 0x14800.&nbsp;&nbsp; This symbol-table querying
+ability allows the stand-alone monitor to provide symbolic querying of
+the application without the need for a host-resident debugger; plus, when
+it is no longer needed, the symbol file can simply be removed from TFS.&nbsp;
+As an example of symbol table substitution, the following command line&nbsp;
+&ocirc;dm -4d %symname&ouml; would be converted to something like &ocirc;dm
+-4d 0x401008&ouml; if the symbol table file existed and there was an entry
+for &ocirc;symname&ouml;. Likewise, the following command line &ocirc;arp
+$HOSTIP&ouml; would be converted to &ocirc;arp 135.3.94.39&ouml; if the
+shell variable &ocirc;HOSTIP&ouml; was previously set to &ocirc;135.3.94.39&ouml;.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The primary difference between shell variables and symbols is the way in
+which they are stored.&nbsp; Shell variables are allocated onto the heap
+so they use up RAM, symbol table entries are part of a file, so no RAM
+is involved.&nbsp; Also, future versions of MicroMonitor may support more
+complex symbol retrieval by allowing a symbol to have members (a structure).</font>
+<br><b><font face="Arial,Helvetica">NOTE1:</font></b>
+<br><font face="Arial,Helvetica">The command interpreter can be told not
+to process the dollar sign by preceding it with the backslash (\).&nbsp;
+For example, assuming the shell variable $ABC is set to "hello", the command
+line "echo \$ABC = $ABC" could be used to output "$ABC = hello".</font>
+<br><b><font face="Arial,Helvetica">NOTE2:</font></b>
+<br><font face="Arial,Helvetica">At the point in time when the command
+interpreter is making the substitution of the value of a variable in place
+of the variable name itself, if the variable does not exist, then no substitution
+is made.&nbsp; For example, if the shell variable ABC was previously set
+to "hello" then the command line "echo $ABC" would print out "hello"; but
+if the shell variable ABC was not previously set to anything, then the
+line "echo $ABC" would print out "$ABC".&nbsp; For scripting then, a comparison
+can be made to determine if a shell variable exists in the current monitor
+environment:&nbsp; if $ABC seq&nbsp; \$ABC goto VARS_DOESNT_EXIST.</font>
+<br><b><font face="Arial,Helvetica">NOTE3:</font></b>
+<br><font face="Arial,Helvetica">The logic of notes 1 &amp; 2 above applies
+to symbols as well as variables.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="implementation"></a><font face="Arial,Helvetica">
+Implementation</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor stores shell variables in a simple linked list.&nbsp; As each
+variable is created, space is allocated for the list itself (if there is
+no free slot), and the actual shell variable data.&nbsp; If a variable
+is removed, the name and value is freed, but the slot in the linked list
+is just marked as available for storage.&nbsp; There is no practical limitation
+on the size of the variable content or the variable name.&nbsp; Symbols
+are part of a TFS file, so there is similar flexibility as with shell variables.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+When making command line substitution, the shell variable processing is
+done prior to tokenization (building a char *argv[] array) of the command
+string.&nbsp; The expanded command line cannot exceed 127 characters.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="shellvars_used"></a></font>Shell
+Variables Created and/or Used by MicroMonitor</font></h2>
+
+<ul><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+When the monitor starts up, it looks for the presence of certain shell
+variables to configure itself (see description of <a href="startup.html#Stage_1">monrc</a>
+file as an example); also, it sets up some shell variables to be used by
+scripts or application code for various purposes.&nbsp; Following is a
+list of the shell variables intrinsic to the monitor:</font>
+<br>&nbsp;
+<br>&nbsp;
+<ul>
+<li>
+<a NAME="APPRAMBASE"></a><b><font face="Arial,Helvetica">APPRAMBASE</font></b></li>
+
+<br><font face="Arial,Helvetica">This shell variable is loaded with the
+starting point of the RAM space that is made available to the application.&nbsp;
+This typically starts on some modulo 0x100 boundary (or larger), just above
+the end of RAM space that is used by the monitor itself.&nbsp; Note that
+this variable is automatically loaded by the monitor at startup.&nbsp;
+Certain facilities within the monitor use this value as a pointer to memory
+that is assumed to be "accessible".&nbsp; This is important to be aware
+of, so here are the facilities that make this assumption: <i>edit, tftp
+server, tfs cp, xmodem receive, simple version of tfsclean</i>.&nbsp; The
+value can be modified, and the modified value will then be used by these
+facilities, but make sure you know what you're doing!</font>
+<br><font face="Arial,Helvetica">In general, its intent is to provide a
+common means of accessing the address that has been loaded into it by the
+monitor.</font>
+<li>
+<a NAME="ARGC"></a><b><font face="Arial,Helvetica">ARGC</font></b></li>
+
+<br><font face="Arial,Helvetica">Argument count.&nbsp; This variable is
+loaded by the <a href="commands/argv.html">argv</a> command with the current
+argument count.</font>
+<li>
+<a NAME="ARGN"></a><b><font face="Arial,Helvetica">ARG'N'</font></b></li>
+
+<br><font face="Arial,Helvetica">Argument content.&nbsp; The shell variables
+ARG0 thru 'N' are loaded with the argument list by the <a href="commands/argv.html">argv</a>
+command.</font>
+<li>
+<a NAME="APP_EXITONCLEANERROR"></a><b><font face="Arial,Helvetica">APP_EXITONCLEANERROR</font></b></li>
+
+<br><font face="Arial,Helvetica">This shell variable is used for testing
+TFS.&nbsp; It can be set to some value (anything, as long as it is set),
+and this will cause any error in defragmentation to result in a call to
+mon_appexit(0).&nbsp; Useful when testing for defragmentation faults.&nbsp;
+See also: <a href="#SCR_EXITONCLEANERROR">SCR_EXITONCLEANERROR</a></font>
+<li>
+<a NAME="ARPRETRYTUNE"></a><b><font face="Arial,Helvetica">ARPRETRYTUNE</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is set, then the
+ARP retry mechanism is reconfigured to the values specified.&nbsp; The
+format of the content of this variable is XX:YY:ZZ; where XX is the retransmit_delay
+value, YY is the giveup_count and ZZ is the retransmit_delay_max value.&nbsp;
+If the shell variable is not set, the defaults are 1:0:4.&nbsp; Refer to
+discussion of the <a href="commands/tftp.html">tftp command</a> for more
+details.</font>
+<li>
+<a NAME="BOOTFILE"></a><b><font face="Arial,Helvetica">BOOTFILE</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is loaded by the monitor's
+<a href="startup.html#BOOTP">BOOTP/DHCP
+clients</a> based on the content of the "file" member of the BOOTP/DHCP
+response.&nbsp; Refer to <a href="rfcs/rfc951.txt">RFC 951</a> (bootp)
+or&nbsp; <a href="rfcs/rfc2131.txt">RFC 2131</a> (dhcp).</font>
+<li>
+<a NAME="BOOTROMBASE"></a><b><font face="Arial,Helvetica">BOOTROMBASE</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable contains the address that
+the monitor sees as the starting point of the base flash device.&nbsp;
+This is typically used to allow a host-based script to be unaware of where
+the actual starting point of the flash is but still transfer data to it.&nbsp;&nbsp;&nbsp;
+Note that this variable is automatically loaded by the monitor at startup.&nbsp;
+It can be modified by the user, but its intent is to provide a common means
+of accessing the address that has been loaded into it by the monitor; so,
+assume it is read-only.</font>
+<li>
+<a NAME="BOOTSRVR"></a><b><font face="Arial,Helvetica">BOOTSRVR</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is loaded by the monitor's
+<a href="startup.html#BOOTP">BOOTP/DHCP
+clients </a>based on the content of the "siaddr" member of the BOOTP/DHCP
+response.&nbsp; Refer to <a href="rfcs/rfc951.txt">RFC 951</a> (bootp)
+or&nbsp; <a href="rfcs/rfc2131.txt">RFC 2131</a> (dhcp).</font>
+<li>
+<a NAME="CONSOLEBAUD"></a><b><font face="Arial,Helvetica">CONSOLEBAUD</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is used to allow an application
+to run with the same baudrate that the monitor is currently running at.&nbsp;
+Each time the baudrate is set via <a href="commands/mstat.html">mstat -b
+</a>the
+new setting is stored in this variable.</font>
+<li>
+<a NAME="DCLIPORT"></a><b><font face="Arial,Helvetica">DCLIPORT</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present at startup,
+then MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+will use this as the client port number instead of the default of 68.</font>
+<li>
+<a NAME="DHCPCLASSID"></a><b><font face="Arial,Helvetica">DHCPCLASSID</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+if the MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+issues a DHCP_DISCOVER, it will include this string as the DHCP Extension
+"Class-identifier" (refer to <a href="rfcs/rfc2132.txt">RFC 2132</a>).&nbsp;
+Thf format of the content of this variable is a simple string.</font>
+<li>
+<a NAME="DHCPCLIENTID"></a><b><font face="Arial,Helvetica">DHCPCLIENTID</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+if the MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+issues a DHCP_DISCOVER, it will include this string as the DHCP Extension
+"Client-identifier" (refer to <a href="rfcs/rfc2132.txt">RFC 2132</a>).&nbsp;
+The format of the content of this variable, since it represents a <i>type:value</i>
+pair, is #:HHHHHH...; where '#' is a decimal value less than 256, ':' is
+a delimiter, and 'HHHH...' is a string of ascii-coded pairs where each
+'HH' is converted to one 8-bit binary value.</font>
+<li>
+<a NAME="DHCPFLAGS"></a><b><font face="Arial,Helvetica">DHCPFLAGS</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+if the MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+issues a DHCP_DISCOVER,&nbsp; or the <a href="startup.html#BOOTP">BOOTP
+client</a> issues a BOOTP_REQUEST, it will use the value stored here as
+the flags.&nbsp; If not present, then the flags are zero.&nbsp; Note that
+the only valid bit at this point is 0x8000 (enable broadcast reply), and
+it is only applicable to DHCP.</font>
+<li>
+<a NAME="DHCPLEASETIME"></a><b><font face="Arial,Helvetica">DHCPLEASETIME</font></b></li>
+
+<br><font face="Arial,Helvetica">This shell variable serves two purposes
+for the <a href="commands/dhcp.html#dhcpdetails">DHCP client</a> :</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">If set in monrc, then it will be used as a
+minimum requirement lease time if the server sends the client a lease time
+(if the lease time from the server is less than the content of this shell
+variable, then ignore the server's offer);</font></li>
+
+<li>
+<font face="Arial,Helvetica">It will be loaded with the actual lease time
+(if any) specified by the server.&nbsp; The value is in hex, and will only
+be present if the server has sent the client some minimum lease time.</font></li>
+</ul>
+
+<li>
+<a NAME="DHCPOFFRFLTR"></a><b><font face="Arial,Helvetica">DHCPOFFRFLTR</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+if the MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+receives a DHCP_OFFER, it will look to the content of DHCPOFFRFLTR to determine
+if the offer should be accepted or ignored.&nbsp; The format of the content
+of this variable is</font>
+<ul><font face="Arial,Helvetica">DHCP_FIELD_ID,EXPECTED_STRING</font></ul>
+<font face="Arial,Helvetica">where...</font>
+<ul><font face="Arial,Helvetica">DHCP_FIELD_ID can be:</font>
+<br>&nbsp;
+<center><table BORDER COLS=2 WIDTH="70%" >
+<tr>
+<td WIDTH="10%"><font face="Arial,Helvetica">BFN</font></td>
+
+<td><font face="Arial,Helvetica">bootfile name</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">SHN</font></td>
+
+<td><font face="Arial,Helvetica">server-host name</font></td>
+</tr>
+
+<tr>
+<td VALIGN=TOP><font face="Arial,Helvetica">VSO###</font></td>
+
+<td><font face="Arial,Helvetica">vendor-specific option number embedded
+within Vendor Specific Information (opt#43)</font>
+<br><font face="Arial,Helvetica">(valid range: 0 &lt; opt &lt; 255)</font></td>
+</tr>
+
+<tr>
+<td VALIGN=TOP><font face="Arial,Helvetica">SSO###</font></td>
+
+<td><font face="Arial,Helvetica">site-specific option number</font>
+<br><font face="Arial,Helvetica">(valid range: 127 &lt; opt &lt; 255)</font></td>
+</tr>
+</table></center>
+</ul>
+<font face="Arial,Helvetica">and...</font>
+<ul><font face="Arial,Helvetica">EXPECTED_STRING is the ascii string that
+must be within the specified field.&nbsp; Note that "within" means that
+the string may be the entire string returned by the server or a sub-string
+within the string returned by the server.</font></ul>
+<font face="Arial,Helvetica">Refer to the logic in <a href="src/common/monitor/dhcp_00.c.html#ValidDHCPOffer">ValidDHCPOffer()</a>
+for complete details.</font>
+<li>
+<a NAME="DHCPRETRYTUNE"></a><b><font face="Arial,Helvetica">DHCPRETRYTUNE</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is set, then the
+DHCP retry mechanism is reconfigured to the values specified.&nbsp; If
+the shell variable is not set, the defaults are 4:6:64. Refer to description
+of <a href="#ARPRETRYTUNE">ARPRETRYTUNE</a> for syntax.</font>
+<li>
+<a NAME="DHCPRQSTLIST"></a><b><font face="Arial,Helvetica">DHCPRQSTLIST</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+if the MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+issues a DHCP_DISCOVER, it will include the digits extracted from this
+string as the DHCP Paramter Request List (refer to <a href="rfcs/rfc2132.txt">RFC
+2132</a> section 9).&nbsp; The format of the content of this variable is
+#:#:#:#...; where each '#' is a decimal value representing one of possibly
+several parameter requests to be made.</font>
+<li>
+<a NAME="DHCPVSA"></a><b><font face="Arial,Helvetica">DHCPVSA</font></b></li>
+
+<br><font face="Arial,Helvetica">This shell variable will be loaded with
+an ascii-coded hex string that represents the vendor-specific area returned
+by the BOOTP or DHCP server.&nbsp; For BOOTP this array is fixed at 64
+bytes of binary data, so DHCPVSA will contain a 128-byte ascii-coded-hex
+copy of that array.&nbsp; For DHCP the size of the vendor-specific area
+can vary.&nbsp; Since the monitor scans for options itself, the function
+<a href="src/common/monitor/dhcpboot.c.html#DhcpGetOption">DHCPGetOption()</a>
+can be re-used in application space after converting the content of DHCPVSA
+to binary.</font>
+<li>
+<a NAME="DSRVPORT"></a><b><font face="Arial,Helvetica">DSRVPORT</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present at startup,
+then MicroMonitor's <a href="commands/dhcp.html#dhcpdetails">DHCP client</a>
+will use this as the server port number instead of the default of 67.</font>
+<li>
+<a NAME="ENTRYPOINT"></a><b><font face="Arial,Helvetica">ENTRYPOINT</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is set by the <i><a href="commands/tfs.html">tfs
+ld</a></i> command.&nbsp; The value corresponds to the entrypoint address
+of the application just loaded.</font>
+<li>
+<a NAME="ETHERADD"></a><b><font face="Arial,Helvetica">ETHERADD</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is expected to contain the
+MAC address that is to be assigned to the target.&nbsp; The MAC address
+can be retrieved in one of several different ways.&nbsp; Refer to the discussion
+of MicroMonitor <a href="startup.html">startup</a> for details.</font>
+<li>
+<a NAME="EXCEPTION_SCRIPT"></a><b><font face="Arial,Helvetica">EXCEPTION_SCRIPT</font></b></li>
+
+<br><font face="Arial,Helvetica">If set, then the content of this shell
+variable is assumed to contain a script name that is to be executed when
+an exception occurs.</font>
+<li>
+<a NAME="GIPADD"></a><b><font face="Arial,Helvetica">GIPADD</font></b></li>
+
+<br><font face="Arial,Helvetica">The Gateway IP address.&nbsp; This variable
+must be established for systems on a network.&nbsp;&nbsp; It is automatically
+loaded by BOOTP/DHCP from the vendor-specific options&nbsp; if applicable.</font>
+<li>
+<a NAME="HEAPSIZE"></a><b><font face="Arial,Helvetica">HEAPSIZE</font></b></li>
+
+<br><font face="Arial,Helvetica">By default, the monitor has a fixed amount
+of allocated memory dedicated to its own heap.&nbsp; If this variable is
+set, then it tells the monitor how much additional memory space has been
+made available.&nbsp;<i> NOTE that as of July 2, 1999, HEAPSIZE is no longer
+used.&nbsp; Its functionality is replaced by options in the <a href="commands/heap.html">heap</a>
+command.</i></font>
+<li>
+<a NAME="HEAPSPACE"></a><b><font face="Arial,Helvetica">HEAPSPACE</font></b></li>
+
+<br><font face="Arial,Helvetica">By default, the monitor has a fixed amount
+of allocated memory dedicated to its own heap.&nbsp; If this variable is
+set, then it tells the monitor that there is additional memory space that
+can be used by the monitor's allocator and it will start at the address
+specified in this variable.&nbsp;&nbsp;<i> NOTE that as of July 2, 1999,
+HEAPSPACE is no longer used.&nbsp; Its functionality is replaced by options
+in the <a href="commands/heap.html">heap</a> command.</i></font>
+<li>
+<a NAME="IPADD"></a><b><font face="Arial,Helvetica">IPADD</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable is expected to contain the
+IP address that is to be assigned to the target.&nbsp; The IP address can
+be retrieved in one of several different ways.&nbsp; Refer to the discussion
+of MicroMonitor <a href="startup.html">startup</a> for details.</font>
+<li>
+<a NAME="MALLOC"></a><b><font face="Arial,Helvetica">MALLOC</font></b></li>
+
+<br><font face="Arial,Helvetica">The heap -m command returns a block of
+memory from the monitor's heap.&nbsp; It also populates this shell variable
+with the address of the block.</font>
+<li>
+<a NAME="MCMDPORT"></a><b><font face="Arial,Helvetica">MCMDPORT</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present at startup,
+then MicroMonitor's <a href="tools/doc/moncmd.html">MONCMD server</a> will
+use this as its port number instead of the default of 777.</font>
+<li>
+<a NAME="MONFLAGS"></a><b><font face="Arial,Helvetica">MONFLAGS</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is set at startup,&nbsp;
+the monitor will use it to setup some internal flags.&nbsp; The format
+of the content of this variable is xx:yy:zz...; where "xx", "yy" and "zz"
+are ascii strings (flag names) that represent the setting of certain binary
+flags in the monitor...</font>
+<br>&nbsp;
+<center><table BORDER WIDTH="70%" >
+<tr>
+<td><b><font face="Arial,Helvetica">flag name</font></b></td>
+
+<td><b><font face="Arial,Helvetica">flag meaning</font></b></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">nophdr</font></td>
+
+<td><font face="Arial,Helvetica">do not print initial header when monitor
+is reset</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">nopdf</font></td>
+
+<td><font face="Arial,Helvetica">quiet defragmentation when verbosity is
+off</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">noptftp</font></td>
+
+<td><font face="Arial,Helvetica">quiet TFTP when verbosity is off</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">nopmcmd</font></td>
+
+<td><font face="Arial,Helvetica">quiet MONCMD when verbosity is off</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">notftpovw</font></td>
+
+<td><font face="Arial,Helvetica">do not allow incoming TFTP write requests
+to overwrite an existing file</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">moncomv</font></td>
+
+<td><font face="Arial,Helvetica">enable verbosity for accesses to moncom
+through monConnect()</font></td>
+</tr>
+</table></center>
+
+<p><font face="Arial,Helvetica">Note that this shell variable is only read
+at system startup.&nbsp; Changing it in runtime has no affect on the internal
+flag settings.</font>
+<li>
+<a NAME="MONITORBUILT"></a><b><font face="Arial,Helvetica">MONITORBUILT</font></b></li>
+
+<br><font face="Arial,Helvetica">Automatically loaded with the date and
+time of the monitor build.&nbsp; The format is dd/mm/yy@hh:mm:ss and can
+be used to automatically determine if the monitor binary should be updated.</font>
+<li>
+<a NAME="NETMASK"></a><b><font face="Arial,Helvetica">NETMASK</font></b></li>
+
+<br><font face="Arial,Helvetica">The mask of the subnet on which the target
+resides.&nbsp; This variable must be established for systems on a network.&nbsp;
+It is automatically loaded by BOOTP/DHCP from the vendor-specific options&nbsp;
+if applicable.</font>
+<li>
+<a NAME="NO_EXCEPTION_RESTART"></a><b><font face="Arial,Helvetica">NO_EXCEPTION_RESTART</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present, then
+at the time of an exception, the monitor will not reset.&nbsp; The system
+will remain at the monitor level.</font>
+<li>
+<a NAME="PROMPT"></a><b><font face="Arial,Helvetica">PROMPT</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable contains the string that
+the monitor uses as the user prompt.&nbsp; If not set, the default prompt
+is uMON: and this is loaded into the PROMPT shell variable.&nbsp; At any
+time this shell variable can be changed and the prompt used by the monitor
+will change to the content of PROMPT.</font>
+<br><font face="Arial,Helvetica">The subnet mask.&nbsp; This variable must
+be established for systems on a network.</font>
+<li>
+<a NAME="RLYAGNT"></a><b><font face="Arial,Helvetica">RLYAGNT</font></b></li>
+
+<br><font face="Arial,Helvetica">The Relay Agent IP address.&nbsp;&nbsp;
+It is automatically loaded by&nbsp; BOOTP/DHCP from the <i>giaddr</i> field
+of the BOOTP/DHCP response if applicable.</font>
+<li>
+<a NAME="SCR_EXITONCLEANERROR"></a><b><font face="Arial,Helvetica">SCR_EXITONCLEANERROR</font></b></li>
+
+<br><font face="Arial,Helvetica">This shell variable is used for testing
+TFS.&nbsp; It can be set to some value (anything, as long as it is set),
+and this will cause any error in defragmentation to result in setting the
+internal flag that causes a script to terminate.&nbsp; Useful when testing
+for defragmentation faults.&nbsp; See also: <a href="#APP_EXITONCLEANERROR">APP_EXITONCLEANERROR</a></font>
+<li>
+<a NAME="SCRIPTVERBOSE"></a><b><font face="Arial,Helvetica">SCRIPTVERBOSE</font></b></li>
+
+<br><font face="Arial,Helvetica">This variable, if present, is used to
+establish the verbosity level of a script running.&nbsp; Valid values are
+0, 1 &amp; 2.&nbsp; 0 is no verbosity, 1 means the command line is echoed,
+2 means the command line is echoed before and after CLI processing.</font>
+<li>
+<a NAME="SYMFILE"></a><b><font face="Arial,Helvetica">SYMFILE</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is set, then the
+default file name of "symtbl" is overridden with the content of this variable.&nbsp;
+See discussion of <a href="#shells_vs_syms">symbols vs shell variables</a>
+above.</font>
+<li>
+<a NAME="TFTPGET"></a><b><font face="Arial,Helvetica">TFTPGET</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present after
+a tftp get command, it is indication that the file transfer succeeded;
+it will then contain the number of bytes of data that have been transferred
+through tftp.</font>
+<li>
+<a NAME="TFTPPORT"></a><b><font face="Arial,Helvetica">TFTPPORT</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is present at startup,
+then MicroMonitor's <a href="commands/tftp.html">TFTP client/server</a>
+will use this as its port number instead of the default of 69.</font>
+<li>
+<a NAME="TFTPRETRYTUNE"></a><b><font face="Arial,Helvetica">TFTPRETRYTUNE</font></b></li>
+
+<br><font face="Arial,Helvetica">If this shell variable is set, then the
+TFTP retry mechanism is reconfigured to the values specified.&nbsp; If
+the shell variable is not set, the defaults are 4:3:32. Refer to description
+of <a href="#ARPRETRYTUNE">ARPRETRYTUNE</a> for syntax.</font></ul>
+</ul>
+
+</body>
+</html>

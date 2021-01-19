@@ -1,0 +1,287 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/unpack.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* unpack.c:
+ *  This code provides the monitor with huffman decompression used
+ *  primarily by TFS, but also available as a command in the monitor.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+
+#include "config.h"
+#include "genlib.h"
+#if INCLUDE_UNPACK
+#include "stddefs.h"
+#include "cli.h"
+#define NAMELEN 80
+#define SUF0    '.'
+#define SUF1    'z'
+#define US  037
+#define RS  036
+
+#define BUFSIZ  1024
+#define BLKSIZE BUFSIZ
+
+/* variables associated with i/o */
+static char outbuff[BUFSIZ];
+
+/* the dictionary */
+static short    intnodes[25];
+static char     *tree[25];
+static char     characters[256];
+
+static int      UnpackError;
+static char     *lastwrite;
+
+static char     *decode();
+static char     *getdict();
+
+/* getdict():
+ *  Read in the dictionary portion and build decoding structures
+ *  return decode() if successful, 0 otherwise
+ */
+static char *
+<A NAME="getdict">getdict</A>(char *readptr, char *writeptr)
+{
+    int c, i, nchildren;
+    int maxlev, inleft;
+    char    *inp, *eof;
+    long    origsize;
+
+    /*
+     * check two-byte header
+     * get size of original file,
+     * get number of levels in maxlev,
+     * get number of leaves on level i in intnodes[i],
+     * set tree[i] to point to leaves for level i
+     */
+    eof = &characters[0];
+
+    inleft = BUFSIZ;
+    if (readptr[0] != US) {
+        UnpackError = 1;
+        return(0);
+    }
+
+    if (readptr[1] == US) { /* does not support old style packing */
+        UnpackError = 2;
+        return(0);
+    }
+
+    if (readptr[1] != RS) {
+        UnpackError = 3;
+        return(0);
+    }
+
+    inp = (char *)&readptr[2];
+    origsize = 0;
+    for (i=0; i&lt;4; i++)
+        origsize = origsize*256 + ((*inp++) & 0xff);
+    maxlev = *inp++ & 0xff;
+    if (maxlev &gt; 24) {
+        UnpackError = 4;
+        return(0);
+    }
+
+    for (i=1; i&lt;=maxlev; i++)
+        intnodes[i] = *inp++ & 0377;
+
+    for (i=1; i&lt;=maxlev; i++) {
+        tree[i] = eof;
+        for (c=intnodes[i]; c&gt;0; c--) {
+            if (eof &gt;= &characters[255]) {
+                UnpackError = 5;
+                return(0);
+            }
+            *eof++ = *inp++;
+        }
+    }
+    *eof++ = *inp++;
+    intnodes[maxlev] += 2;
+    inleft -= inp - (char *)&readptr[0];
+    if (inleft &lt; 0) {
+        UnpackError = 6;
+        return(0);
+    }
+
+    /*
+         * convert intnodes[i] to be number of
+         * internal nodes possessed by level i
+         */
+
+    nchildren = 0;
+    for (i=maxlev; i&gt;=1; i--) {
+        c = intnodes[i];
+        intnodes[i] = nchildren /= 2;
+        nchildren += c;
+    }
+    readptr += BUFSIZ;
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#decode>decode</A>(readptr,writeptr,inleft,inp,eof,origsize));
+}
+
+/* decode():
+ * unpack the file
+ * return (readptr-inleft) if successful, 0 otherwise
+ */
+static char *
+<A NAME="decode">decode</A>(uchar *rdptr,uchar *wrptr,int inleft,char *inp,char *eof,long origsize)
+{
+    int bitsleft, c, i, j, k, lev;
+    char    *p, *outp;
+
+    outp = &outbuff[0];
+    lev = 1;
+    i = 0;
+    while (1) {
+        if (inleft &lt;= 0) {
+            inleft = BUFSIZ;
+            inp = (char *)rdptr;
+            rdptr += BUFSIZ;
+        }
+        if (--inleft &lt; 0) {
+            if(origsize == 0) {
+                lastwrite = (char *)wrptr;
+                return((char *)(rdptr-inleft));
+            }
+            UnpackError = 7;
+            return(0);
+        }
+        c = *inp++;
+        bitsleft = 8;
+        while (--bitsleft &gt;= 0) {
+            i *= 2;
+            if (c & 0x80)
+                i++;
+            c &lt;&lt;= 1;
+            if ((j = i - intnodes[lev]) &gt;= 0) {
+                p = &tree[lev][j];
+                if (p == eof) {
+                    c = outp - &outbuff[0];
+                    for(k=0;k&lt;c;k++) {
+                        *wrptr++ = outbuff[k];
+                    }
+                    origsize -= c;
+                    if (origsize != 0) {
+                        UnpackError = 8;
+                        return(0);
+                    }
+                    lastwrite = (char *)wrptr;
+                    return((char *)(rdptr-inleft));
+                }
+                *outp++ = *p;
+                if (outp == &outbuff[BUFSIZ]) {
+                    outp = &outbuff[0];
+                    for(k=0;k&lt;BUFSIZ;k++) {
+                        *wrptr++ = outbuff[k];
+                    }
+                    origsize -= BUFSIZ;
+                }
+                lev = 1;
+                i = 0;
+            } else
+                lev++;
+        }
+    }
+}
+
+char *UnpackHelp[] = {
+    "Huffman decompressor",
+    "{src} {dest}",
+    0,
+};
+
+int
+<A NAME="Unpack">Unpack</A>(int argc,char *argv[])
+{
+    char    *src, *dest;
+    char    *ret;
+
+    if (argc != 3)
+        return(CMD_PARAM_ERROR);
+
+    src = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[1],(char **)0,0);
+    dest = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[2],(char **)0,0);
+
+    UnpackError = 0;
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#getdict>getdict</A>(src,dest);
+    if (UnpackError)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Error = %d\n",UnpackError);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("in size = %d\n",ret-src);
+    if (UnpackError)
+        return(CMD_FAILURE);
+    return(CMD_SUCCESS);
+}
+
+int
+<A NAME="unpacker">unpacker</A>(char *src,char *dest,int *insize,int *outsize,int verbose)
+{
+    char    *ret;
+
+    UnpackError = 0;
+
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#getdict>getdict</A>(src,dest);
+    if (UnpackError && verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Unpack error = %d\n",UnpackError);
+
+    if (UnpackError)
+        return(-1);
+
+    if (insize)
+        *insize = (int)(ret - src);
+    if (outsize)
+        *outsize = (int)(lastwrite - dest);
+
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Insize = %d, outsize = %d\n",
+            (int)(ret-src),(int)(lastwrite-dest));
+    return(0);
+}
+
+/* Front end to the rest of the unpack() stuff...
+ *  Return the size of the decompressed data or -1 if failure.
+ *  The same front end API is available if unzip is used instead of unpack.
+ *  Note that for the unpacker, srcsize is not needed; but, since it is
+ *  needed for unzip, we make the interface the same by having it here.
+ */
+int
+<A NAME="decompress">decompress</A>(char *src,int srcsize, char *dest)
+{
+    int  newsize, ret;
+
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#unpacker>unpacker</A>(src,dest,0,&newsize,0);
+    if (ret == 0)
+        return(newsize);
+    return(-1);
+}
+#endif
+
+#if !INCLUDE_DECOMPRESS
+int
+<A NAME="decompress">decompress</A>(char *src,int srcsize, char *dest)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ERROR: decompression utilities not installed.\n");
+    return(-1);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

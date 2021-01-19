@@ -1,0 +1,19 @@
+# 
+# ping: 
+# Uses icmp echo to emulate standard ping.
+# Usage: ping IP_ADDRESS [optional ping count] 
+# 
+argv -v 
+if $ARGC eq 2 goto PING_1 
+if $ARGC eq 3 goto PING_N 
+echo Usage: $ARG0 {IP address} {count} 
+goto END 
+
+# PING_1: 
+icmp echo $ARG1 
+goto END 
+
+# PING_N: 
+icmp -c $ARG2 echo $ARG1 
+
+# END

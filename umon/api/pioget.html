@@ -1,0 +1,76 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: pioget</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_pioget()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<p><br>
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_pioget()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Provide a mechanism for the application
+to retrieve status of CPU-specific parallel IO lines.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_pioget(char
+portname, int bitnum);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This function somewhat CPU specific.&nbsp;
+It provides access to the CPU's parallel IO pins (if any).</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char portname</font></li>
+
+<br><font face="Arial,Helvetica">single-character representing the pio
+port to be accessed (cpu-specifc).</font>
+<li>
+<font face="Arial,Helvetica">int bitnum</font></li>
+
+<br><font face="Arial,Helvetica">the bit within the specified port to be
+checked.</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If successful, return
+1 or 0 depending on the status of the PIO line; else return -1.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/targets/target_dirname/monitor/pio.c.html#pioget">&nbsp;pio.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

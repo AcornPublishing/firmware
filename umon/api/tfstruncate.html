@@ -1,0 +1,85 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en] (Win95; I) [Netscape]">
+   <title>Micro Monitor API: tfstruncate</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfstruncate()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfstruncate()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Truncate the size of a file that
+has been opened for append to a new size.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfstruncate(int
+tfd, int size);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">If a file is opened for writing
+(TFS_APPEND flag passed to tfsopen), and the modifications to this file
+require that the new file size be smaller, then the file size must be truncated.&nbsp;
+This function provides that capability.&nbsp; In early versions of TFS,
+when a file was opened for modification, when it was closed it was closed
+with a size that was dependent on the current position of the write pointer.&nbsp;
+This was wrong, and has been fixed as of Sept 2000 TFS.&nbsp; Code that
+originally depended on this TFS bug must now use mon_tfstruncate() prior
+to doing the call to tfsclose().</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; tfd</font></li>
+
+<br><font face="Arial,Helvetica">the descriptor of the file, returned previously
+by mon_tfsopen().</font>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; size</font></li>
+
+<br><font face="Arial,Helvetica">the new, smaller size of the file.</font></ul>
+<font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFS_OKAY if successful
+else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADARG</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADFD</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfsapi.c.html#tfstruncate">tfsapi.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

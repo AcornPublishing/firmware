@@ -1,0 +1,19 @@
+#
+# Cleanup script:
+# Used to call tfs clean if TFS is running out of space.
+# If argument is present, then use it as the threshold; else
+# use default of 1000000.
+#
+argv -v                         # Load cmd line args into shell vars.
+set SIZE 1000000                # Establish default size.
+if $ARGC eq 1 goto CLEANUP      # If no args, jump to cleanup; else  
+set SIZE $ARG1                  # set size to command line arg value.
+
+# CLEANUP:						
+tfs -v freemem freemem          # Determine amount of free memory left
+                                # in TFS and place that value in $freemem.
+set -i freemem 0                # Change to decimal value.
+if $freemem gt $SIZE goto DONE  # If freemem is less than size, run
+                                # tfs clean to defragment.
+tfs cleanr
+# DONE:

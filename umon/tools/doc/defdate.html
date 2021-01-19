@@ -1,0 +1,157 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: defdate</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>DEFDATE</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">defdate</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Simple utility to generate the
+text to build a header file containing current time &amp; date.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">defdate [-fnV] [macro_name]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool provides an alternative
+to a compiler's __DATE__ and __TIME__ macros.&nbsp; The intent is that
+this be used within a makefile to update the content of a header file whose
+macro is used somewhere in source code to keep track of the time at which
+the code was built.&nbsp; If an argument is present, defdate will print
+out a string that can be part of a header file (#define MACRO "datestring")
+; if no argument is present, then only the date string itself is printed.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-f {format}</font></li>
+
+<br><font face="Arial,Helvetica">override the default format of %b_%d,%Y@%H_%M...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %a:&nbsp;&nbsp;
+abbreviated weekday name</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %A:&nbsp;&nbsp;
+full weekday name</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %b:&nbsp;&nbsp;
+abbreviated month name</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %B:&nbsp;&nbsp;
+full month name</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %c:&nbsp;&nbsp;
+date and time representation appropriate for locale</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %d:&nbsp;&nbsp;
+day of month as decimal number (01-31)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %H:&nbsp;&nbsp;
+hour in 24-hour format (00-23)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %I:&nbsp;&nbsp;&nbsp;&nbsp;
+hour in 12-hour format (01-12)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %j:&nbsp;&nbsp;&nbsp;&nbsp;
+day of year as decimal number (001-366)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %m:&nbsp;&nbsp;
+month as decimal number (01-12)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %M:&nbsp;&nbsp;
+minute as decimal number (00-59)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %p:&nbsp;&nbsp;
+current locale's AM/PM indicator for 12-hour clock</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %S:&nbsp;&nbsp;
+second as decimal number (00-59)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %U:&nbsp;&nbsp;
+week of year as decimal number, with Sunday as first day of week (00-51).</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %w:&nbsp;&nbsp;
+weekday as decimal number (0-6; Sunday=0)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %W:&nbsp;&nbsp;
+week of year as decimal number, with Monday as first day of week (00-51).</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %x:&nbsp;&nbsp;
+date representation of current locale</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %X:&nbsp;&nbsp;
+time representation for current locale</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %y:&nbsp;&nbsp;
+year without centure, as decimal number (00-99)</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %Y:&nbsp;&nbsp;
+year with century, as decimal number</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %z:&nbsp;&nbsp;
+time-zone name or abbreviation; no chars if time zone is unknown</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %Z:&nbsp;&nbsp;
+all-caps version of %z</font>
+<li>
+<font face="Arial,Helvetica">-n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+don't append a newline character to the end of the date string;</font></li>
+
+<li>
+<font face="Arial,Helvetica">-V&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+print the version of defdate.exe</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">defdate DATETIME >info.h</font></li>
+
+<br><font face="Arial,Helvetica">Create a header file with a string formatted
+as follows:&nbsp;&nbsp; #define DATETIME "May_21,1999@1159"</font>
+<li>
+<font face="Arial,Helvetica">defdate</font></li>
+
+<br><font face="Arial,Helvetica">Print the current date in the format May_21,1999@1159.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 if error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/defdate.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/defdate">Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+</ul>
+
+</body>
+</html>

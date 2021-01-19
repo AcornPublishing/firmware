@@ -1,0 +1,263 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: HEAP</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>HEAP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">heap</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Display/modify current heap statistics.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">heap -[cf:m:vX:x]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the user to
+peek into the internal structures allocated by the monitors memory allocator.&nbsp;
+With no options specified, a summary of the heap statistics is printed;
+add -v to dump all structures within the heap.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">clear high-water level and malloc/free
+totals</font>
+<li>
+<font face="Arial,Helvetica">-f {pointer}</font></li>
+
+<br><font face="Arial,Helvetica">call "free" to release the block of memory
+pointed to by "pointer";</font>
+<li>
+<font face="Arial,Helvetica">-m {size}</font></li>
+
+<br><font face="Arial,Helvetica">call "malloc" to allocate a block of memory
+of size "size";</font>
+<br><font face="Arial,Helvetica">This will load the shell variable <a href="../shellvars.html#MALLOC">MALLOC</a>
+with the result.</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode</font>
+<li>
+<font face="Arial,Helvetica">-X {start,size}</font></li>
+
+<br><font face="Arial,Helvetica">extend the monitor's heap using "size"
+bytes beginning at "start";</font>
+<li>
+<font face="Arial,Helvetica">-x</font></li>
+
+<br><font face="Arial,Helvetica">disable the monitor's extended heap (if
+not in use)</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">heap</font></li>
+
+<br><font face="Arial,Helvetica">Dump heap summary, ie...</font>
+<p><tt><font size=+0>Heap summary:</font></tt>
+<br><tt><font size=+0>&nbsp; Malloc/free calls:&nbsp; 106/103 (delta=3)</font></tt>
+<br><tt><font size=+0>&nbsp; Malloc/free totals: 270096/270040</font></tt>
+<br><tt><font size=+0>&nbsp; High-water level:&nbsp;&nbsp; 46876</font></tt>
+<br><tt><font size=+0>&nbsp; Malloc failures:&nbsp;&nbsp;&nbsp; 0</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes overhead:&nbsp;&nbsp;&nbsp;&nbsp; 1020</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes currently allocated:&nbsp;&nbsp; 644</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes free on current heap:&nbsp; 50856</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes left in allocation pool:&nbsp; 479960</font></tt></blockquote>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><font size=+1>heap -v</font></font></li>
+
+<br><font face="Arial,Helvetica"><font size=+1>Verbose listing of heap
+statistics, ie...</font></font></ul>
+
+<ul><tt><font size=+0>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; addr&nbsp;&nbsp;&nbsp;&nbsp;
+size free?&nbsp;&nbsp;&nbsp; mptr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+nxt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; prv&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ascii@addr</font></tt>
+<br><tt><font size=+0>&nbsp; 0: 0x0000288c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002878 0x00002898 0x00000000&nbsp; ......(.....</font></tt>
+<br><tt><font size=+0>&nbsp; 1: 0x000028ac&nbsp;&nbsp;&nbsp; 36&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002898 0x000028d0 0x00002878&nbsp; ENTRYPOINT......</font></tt>
+<br><tt><font size=+0>&nbsp; 2: 0x000028e4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x000028d0 0x000028f0 0x00002898&nbsp; ..) ..)...)&lt;</font></tt>
+<br><tt><font size=+0>&nbsp; 3: 0x00002904&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x000028f0 0x0000290c 0x000028d0&nbsp; PROMPT..</font></tt>
+<br><tt><font size=+0>&nbsp; 4: 0x00002920&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x0000290c 0x00002928 0x000028f0&nbsp; uMON>...</font></tt>
+<br><tt><font size=+0>&nbsp; 5: 0x0000293c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002928 0x00002948 0x0000290c&nbsp; ..)|..)\..).</font></tt>
+<br><tt><font size=+0>&nbsp; 6: 0x0000295c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002948 0x00002968 0x00002928&nbsp; APPRAMBASE..</font></tt>
+<br><tt><font size=+0>&nbsp; 7: 0x0000297c&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002968 0x00002984 0x00002948&nbsp; 0xf000..</font></tt>
+<br><tt><font size=+0>&nbsp; 8: 0x00002998&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002984 0x000029a4 0x00002968&nbsp; ..)...)...).</font></tt>
+<br><tt><font size=+0>&nbsp; 9: 0x000029b8&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x000029a4 0x000029c4 0x00002984&nbsp; BOOTROMBASE.</font></tt>
+<br><tt><font size=+0>&nbsp;10: 0x000029d8&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x000029c4 0x000029e4 0x000029a4&nbsp; 0x80000000..</font></tt>
+<br><tt><font size=+0>&nbsp;11: 0x000029f8&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x000029e4 0x00002a04 0x000029c4&nbsp; ..*8..*...*T</font></tt>
+<br><tt><font size=+0>&nbsp;12: 0x00002a18&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002a04 0x00002a24 0x000029e4&nbsp; CONSOLEBAUD.</font></tt>
+<br><tt><font size=+0>&nbsp;13: 0x00002a38&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002a24 0x00002a40 0x00002a04&nbsp; 19200...</font></tt>
+<br><tt><font size=+0>&nbsp;14: 0x00002a54&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002a40 0x00002a60 0x00002a24&nbsp; ..*...*t..*.</font></tt>
+<br><tt><font size=+0>&nbsp;15: 0x00002a74&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002a60 0x00002a80 0x00002a40&nbsp; ETHERADD....</font></tt>
+<br><tt><font size=+0>&nbsp;16: 0x00002a94&nbsp;&nbsp;&nbsp; 20&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002a80 0x00002aa8 0x00002a60&nbsp; 00:60:1D:02:0b:f</font></tt>
+<br><tt><font size=+0>&nbsp;17: 0x00002abc&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002aa8 0x00002ac8 0x00002a80&nbsp; ..*...*...+.</font></tt>
+<br><tt><font size=+0>&nbsp;18: 0x00002adc&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002ac8 0x00002ae4 0x00002aa8&nbsp; IPADD...</font></tt>
+<br><tt><font size=+0>&nbsp;19: 0x00002af8&nbsp;&nbsp;&nbsp; 16&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002ae4 0x00002b08 0x00002ac8&nbsp; 135.3.94.136....</font></tt>
+<br><tt><font size=+0>&nbsp;20: 0x00002b1c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002b08 0x00002b28 0x00002ae4&nbsp; ..+X..+&lt;..+x</font></tt>
+<br><tt><font size=+0>&nbsp;21: 0x00002b3c&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002b28 0x00002b44 0x00002b08&nbsp; HIPADD..</font></tt>
+<br><tt><font size=+0>&nbsp;22: 0x00002b58&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002b44 0x00002b64 0x00002b28&nbsp; 135.3.94.76.</font></tt>
+<br><tt><font size=+0>&nbsp;23: 0x00002b78&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002b64 0x00002b84 0x00002b44&nbsp; ..+...+...+.</font></tt>
+<br><tt><font size=+0>&nbsp;24: 0x00002b98&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002b84 0x00002ba0 0x00002b64&nbsp; GIPADD..</font></tt>
+<br><tt><font size=+0>&nbsp;25: 0x00002bb4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002ba0 0x00002bc0 0x00002b84&nbsp; 135.3.94.1..</font></tt>
+<br><tt><font size=+0>&nbsp;26: 0x00002bd4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002bc0 0x00002be0 0x00002ba0&nbsp; ..,...+...,4</font></tt>
+<br><tt><font size=+0>&nbsp;27: 0x00002bf4&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002be0 0x00002bfc 0x00002bc0&nbsp; NETMASK.</font></tt>
+<br><tt><font size=+0>&nbsp;28: 0x00002c10&nbsp;&nbsp;&nbsp; 16&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002bfc 0x00002c20 0x00002be0&nbsp; 255.255.255.0...</font></tt>
+<br><tt><font size=+0>&nbsp;29: 0x00002c34&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002c20 0x00002c40 0x00002bfc&nbsp; ..,t..,T..,.</font></tt>
+<br><tt><font size=+0>&nbsp;30: 0x00002c54&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002c40 0x00002c60 0x00002c20&nbsp; DNS_SERVER..</font></tt>
+<br><tt><font size=+0>&nbsp;31: 0x00002c74&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002c60 0x00002c80 0x00002c40&nbsp; 135.3.29.32.</font></tt>
+<br><tt><font size=+0>&nbsp;32: 0x00002c94&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002c80 0x00002ca0 0x00002c60&nbsp; ..,...,...,.</font></tt>
+<br><tt><font size=+0>&nbsp;33: 0x00002cb4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002ca0 0x00002cc0 0x00002c80&nbsp; DNS_DOMAIN..</font></tt>
+<br><tt><font size=+0>&nbsp;34: 0x00002cd4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002cc0 0x00002ce0 0x00002ca0&nbsp; lucent.com..</font></tt>
+<br><tt><font size=+0>&nbsp;35: 0x00002cf4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002ce0 0x00002d00 0x00002cc0&nbsp; ..-4..-...-L</font></tt>
+<br><tt><font size=+0>&nbsp;36: 0x00002d14&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d00 0x00002d20 0x00002ce0&nbsp; TIME_GMTD...</font></tt>
+<br><tt><font size=+0>&nbsp;37: 0x00002d34&nbsp;&nbsp;&nbsp;&nbsp; 4&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d20 0x00002d38 0x00002d00&nbsp; -5..</font></tt>
+<br><tt><font size=+0>&nbsp;38: 0x00002d4c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d38 0x00002d58 0x00002d20&nbsp; ..-...-l..-.</font></tt>
+<br><tt><font size=+0>&nbsp;39: 0x00002d6c&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d58 0x00002d78 0x00002d38&nbsp; TIME_PORT...</font></tt>
+<br><tt><font size=+0>&nbsp;40: 0x00002d8c&nbsp;&nbsp;&nbsp;&nbsp; 4&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d78 0x00002d90 0x00002d58&nbsp; 37..</font></tt>
+<br><tt><font size=+0>&nbsp;41: 0x00002da4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002d90 0x00002db0 0x00002d78&nbsp; ..-...-.....</font></tt>
+<br><tt><font size=+0>&nbsp;42: 0x00002dc4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002db0 0x00002dd0 0x00002d90&nbsp; TIME_SRVR...</font></tt>
+<br><tt><font size=+0>&nbsp;43: 0x00002de4&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002dd0 0x00002df0 0x00002db0&nbsp; 135.3.94.36.</font></tt>
+<br><tt><font size=+0>&nbsp;44: 0x00002e04&nbsp;&nbsp;&nbsp; 12&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002df0 0x00002e10 0x00002dd0&nbsp; ...H...$..(.</font></tt>
+<br><tt><font size=+0>&nbsp;45: 0x00002e24&nbsp;&nbsp;&nbsp; 16&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002e10 0x00002e34 0x00002df0&nbsp; BOOT_LINE_ADRS..</font></tt>
+<br><tt><font size=+0>&nbsp;46: 0x00002e48&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002e34 0x00002e50 0x00002e10&nbsp; 0x17000.</font></tt>
+<br><tt><font size=+0>&nbsp;47: 0x00002e64&nbsp;&nbsp;&nbsp; 80&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002e50 0x00002eb4 0x00002e34&nbsp; ..D ..=P..E...F.</font></tt>
+<br><tt><font size=+0>&nbsp;48: 0x00002ec8&nbsp;&nbsp;&nbsp;&nbsp; 8&nbsp;&nbsp;
+n&nbsp;&nbsp; 0x00002eb4 0x00002ed0 0x00002e50&nbsp; 0x18000.</font></tt>
+<br><tt><font size=+0>&nbsp;49: 0x00002ee4&nbsp; 6548&nbsp;&nbsp; y&nbsp;&nbsp;
+0x00002ed0 0x00200000 0x00002eb4&nbsp; ......8...9x....</font></tt>
+<br><tt><font size=+0>&nbsp;50: 0x00200014 44308&nbsp;&nbsp; y&nbsp;&nbsp;
+0x00200000 0x00000000 0x00002ed0&nbsp; ................</font></tt>
+<p><tt><font size=+0>&nbsp; Malloc/free calls:&nbsp; 106/103 (delta=3)</font></tt>
+<br><tt><font size=+0>&nbsp; Malloc/free totals: 270096/270040</font></tt>
+<br><tt><font size=+0>&nbsp; High-water level:&nbsp;&nbsp; 46876</font></tt>
+<br><tt><font size=+0>&nbsp; Malloc failures:&nbsp;&nbsp;&nbsp; 0</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes overhead:&nbsp;&nbsp;&nbsp;&nbsp; 1020</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes currently allocated:&nbsp;&nbsp; 644</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes free on current heap:&nbsp; 50856</font></tt>
+<br><tt><font size=+0>&nbsp; Bytes left in allocation pool:&nbsp; 479960</font></tt>
+<ul>
+<ul>&nbsp;</ul>
+</ul>
+
+<li>
+<font face="Arial,Helvetica">heap -X 0x200000,0x80000</font></li>
+
+<br><font face="Arial,Helvetica">Extend the monitor's heap by 0x80000 bytes
+using memory at location 0x200000.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTE:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">The functionality of the -h and -H options
+was originally handled by the <a href="mstat.html">mstat</a> command.&nbsp;
+This new command was created to support additional heap control functionality,
+so the options were removed from mstat.&nbsp; The functionality of -h is
+replaced with "heap" and -H is replaced with "heap -v".</font></li>
+
+<li>
+<font face="Arial,Helvetica">Originally there were two shell variables
+used to extend the monitor's heap.&nbsp; This has also been replaced with
+the -X option where "start" is what used to be stored in HEAPSPACE and
+size is what used to be stored in HEAPSIZE.</font></li>
+
+<li>
+<font face="Arial,Helvetica">After an extension is made to the amount of
+memory avaiable for malloc (using -x); that extension can be "undone" with
+-d ONLY if there are no active allocations within the extension space.</font></li>
+
+<br>&nbsp;</blockquote>
+
+</body>
+</html>

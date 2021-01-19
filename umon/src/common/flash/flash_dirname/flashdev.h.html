@@ -1,0 +1,112 @@
+<HTML>
+<HEADER>
+<TITLE>common/flash/flash_dirname/flashdev.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* flash.h:
+   This header file supports the ability to use one source file to build
+   flash operations for 8, 16 and 32 bit width flash banks.
+*/
+#include "config.h"
+
+#define FLASH_LOCK_SUPPORTED    0
+#define FLASH_TIMEOUT           100000000
+#define FLASHFUNCSIZE           400
+
+/* Manufacturer and device ids... */
+#define STM_29F040      0x20e2
+#define STM_M29W040B    0x20e3
+#define AMD_29F040      0x01a4
+#define AMD_29F010      0x0120
+#define AMD_29LV040     0x014f
+
+#if WIDTH8  /* Macros used if bank width is 8 bits */
+
+#define WIDTH   1
+#define ftype               volatile unsigned char
+#define FLASHERASE          Flasherase8
+#define ENDFLASHERASE       EndFlasherase8
+#define FLASHWRITE          Flashwrite8
+#define ENDFLASHWRITE       EndFlashwrite8
+#define FLASHEWRITE         Flashewrite8
+#define ENDFLASHEWRITE      EndFlashewrite8
+#define FLASHTYPE           Flashtype8
+#define ENDFLASHTYPE        EndFlashtype8
+#define <A NAME="Write_aa_to_5555">Write_aa_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)) = 0xaa)
+#define <A NAME="Write_55_to_2aaa">Write_55_to_2aaa</A>()  (*(ftype *)(fdev-&gt;base+(0x2aaa&lt;&lt;0)) = 0x55)
+#define <A NAME="Write_80_to_5555">Write_80_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)) = 0x80)
+#define <A NAME="Write_a0_to_5555">Write_a0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)) = 0xa0)
+#define <A NAME="Write_f0_to_5555">Write_f0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)) = 0xf0)
+#define <A NAME="Write_90_to_5555">Write_90_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)) = 0x90)
+#define <A NAME="Write_30_to_">Write_30_to_</A>(add)   (*(ftype *)add = 0x30)
+#define <A NAME="Read_0000">Read_0000</A>()         (*(ftype *)(fdev-&gt;base+(0x0000&lt;&lt;0)))
+#define <A NAME="Read_0001">Read_0001</A>()         (*(ftype *)(fdev-&gt;base+(0x0001&lt;&lt;0)))
+#define <A NAME="Read_5555">Read_5555</A>()         (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;0)))
+#define <A NAME="Is_ff">Is_ff</A>(add)          (*(ftype *)add == 0xff)
+#define <A NAME="Is_not_ff">Is_not_ff</A>(add)      (*(ftype *)add != 0xff)
+#define <A NAME="D5_Timeout">D5_Timeout</A>(add)     ((*(ftype *)add & 0xdf) == 0x20)
+
+#elif WIDTH16   /* Macros used if bank width is 16 bits */
+
+#define WIDTH   2
+#define ftype               volatile unsigned short
+#define FLASHERASE          Flasherase16
+#define ENDFLASHERASE       EndFlasherase16
+#define FLASHWRITE          Flashwrite16
+#define ENDFLASHWRITE       EndFlashwrite16
+#define FLASHEWRITE         Flashewrite16
+#define ENDFLASHEWRITE      EndFlashewrite16
+#define FLASHTYPE           Flashtype16
+#define ENDFLASHTYPE        EndFlashtype16
+#define <A NAME="Write_aa_to_5555">Write_aa_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)) = 0xaaaa)
+#define <A NAME="Write_55_to_2aaa">Write_55_to_2aaa</A>()  (*(ftype *)(fdev-&gt;base+(0x2aaa&lt;&lt;1)) = 0x5555)
+#define <A NAME="Write_80_to_5555">Write_80_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)) = 0x8080)
+#define <A NAME="Write_a0_to_5555">Write_a0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)) = 0xa0a0)
+#define <A NAME="Write_f0_to_5555">Write_f0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)) = 0xf0f0)
+#define <A NAME="Write_90_to_5555">Write_90_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)) = 0x9090)
+#define <A NAME="Write_30_to_">Write_30_to_</A>(add)   (*(ftype *)add = 0x3030)
+#define <A NAME="Read_0000">Read_0000</A>()         (*(ftype *)(fdev-&gt;base+(0x0000&lt;&lt;1)))
+#define <A NAME="Read_0001">Read_0001</A>()         (*(ftype *)(fdev-&gt;base+(0x0001&lt;&lt;1)))
+#define <A NAME="Read_5555">Read_5555</A>()         (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;1)))
+#define <A NAME="Is_ff">Is_ff</A>(add)          (*(ftype *)add == 0xffff)
+#define <A NAME="Is_not_ff">Is_not_ff</A>(add)      (*(ftype *)add != 0xffff)
+#define <A NAME="D5_Timeout">D5_Timeout</A>(add)     ((*(ftype *)add & 0xdfdf) == 0x2020)
+
+#elif WIDTH32   /* Macros used if bank width is 32 bits */
+
+#define WIDTH   4
+#define ftype               volatile unsigned long
+#define FLASHERASE          Flasherase32
+#define ENDFLASHERASE       EndFlasherase32
+#define FLASHWRITE          Flashwrite32
+#define ENDFLASHWRITE       EndFlashwrite32
+#define FLASHEWRITE         Flashewrite32
+#define ENDFLASHEWRITE      EndFlashewrite32
+#define FLASHTYPE           Flashtype32
+#define ENDFLASHTYPE        EndFlashtype32
+#define <A NAME="Write_aa_to_5555">Write_aa_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)) = 0xaaaaaaaa)
+#define <A NAME="Write_55_to_2aaa">Write_55_to_2aaa</A>()  (*(ftype *)(fdev-&gt;base+(0x2aaa&lt;&lt;2)) = 0x55555555)
+#define <A NAME="Write_80_to_5555">Write_80_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)) = 0x80808080)
+#define <A NAME="Write_a0_to_5555">Write_a0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)) = 0xa0a0a0a0)
+#define <A NAME="Write_f0_to_5555">Write_f0_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)) = 0xf0f0f0f0)
+#define <A NAME="Write_90_to_5555">Write_90_to_5555</A>()  (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)) = 0x90909090)
+#define <A NAME="Write_30_to_">Write_30_to_</A>(add)   (*(ftype *)add = 0x30303030)
+#define <A NAME="Read_0000">Read_0000</A>()         (*(ftype *)(fdev-&gt;base+(0x0000&lt;&lt;2)))
+#define <A NAME="Read_0001">Read_0001</A>()         (*(ftype *)(fdev-&gt;base+(0x0001&lt;&lt;2)))
+#define <A NAME="Read_5555">Read_5555</A>()         (*(ftype *)(fdev-&gt;base+(0x5555&lt;&lt;2)))
+#define <A NAME="Is_ff">Is_ff</A>(add)          (*(ftype *)add == 0xffffffff)
+#define <A NAME="Is_not_ff">Is_not_ff</A>(add)      (*(ftype *)add != 0xffffffff)
+#define <A NAME="D5_Timeout">D5_Timeout</A>(add)     ((*(ftype *)add & 0xdfdfdfdf) == 0x20202020)
+
+#else
+Width specification illegal or undefined.
+#endif
+
+#define <A NAME="Fwrite">Fwrite</A>(to,frm)      (*(ftype *)to = *(ftype *)frm)
+#define <A NAME="Is_Equal">Is_Equal</A>(p1,p2)     (*(ftype *)p1 == *(ftype *)p2)
+#define <A NAME="Is_Not_Equal">Is_Not_Equal</A>(p1,p2) (*(ftype *)p1 != *(ftype *)p2)
+</HTML>
+</PRE>
+</BODY>

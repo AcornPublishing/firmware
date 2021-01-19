@@ -1,0 +1,192 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: Commands</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>The Command Set</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica">The functionality of the monitor accessible
+by the user is through the user interface.&nbsp; The user interface is
+made up of a simple command interpreter, command line editor and command
+table.&nbsp; This section categorizes each of the commands, provides a
+brief description of the command, and points to a more detailed page describing
+the complete usage of the command in the monitor.</font>
+<br>&nbsp;
+<p><font face="Arial,Helvetica"><a href="#memory_commands">Memory Display
+and Modification Commands</a></font>
+<br><font face="Arial,Helvetica"><a href="#script_commands">Commands Primarily
+Used Within Scripts</a></font>
+<br><font face="Arial,Helvetica"><a href="#ethernet_commands">Ethernet
+Interface Commands</a></font>
+<br><font face="Arial,Helvetica"><a href="#debug_commands">Debugging Commands</a></font>
+<br><font face="Arial,Helvetica"><a href="#filexfer_commands">File Transfer
+Commands</a></font>
+<br><font face="Arial,Helvetica"><a href="#misc_commands">Miscellaneous</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<hr WIDTH="100%">
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="memory_commands"></a><font face="Arial,Helvetica">Memory
+Display and Modification Commands</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/cast.html">cast</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; overlay a structure
+definition onto a block of&nbsp; memory for display</font>
+<br><font face="Arial,Helvetica"><a href="commands/cm.html">cm</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; copy memory</font>
+<br><font face="Arial,Helvetica"><a href="commands/dm.html">dm</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; display memory</font>
+<br><font face="Arial,Helvetica"><a href="commands/flash.html">flash</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; flash memory operations</font>
+<br><font face="Arial,Helvetica"><a href="commands/fm.html">fm</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; fill memory</font>
+<br><font face="Arial,Helvetica"><a href="commands/mt.html">mt</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; memory test</font>
+<br><font face="Arial,Helvetica"><a href="commands/pm.html">pm</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; put (or patch) memory</font>
+<br><font face="Arial,Helvetica"><a href="commands/sm.html">sm</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; search memory</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="script_commands"></a></font>Commands
+Primarily Used Within Scripts</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/argv.html">argv</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; build argv list</font>
+<br><font face="Arial,Helvetica"><a href="commands/echo.html">echo</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; print string to console
+port</font>
+<br><font face="Arial,Helvetica"><a href="commands/exit.html">exit</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; exit from the execution
+path of a script</font>
+<br><font face="Arial,Helvetica"><a href="commands/gosub.html">gosub</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; call a subroutine</font>
+<br><font face="Arial,Helvetica"><a href="commands/goto.html">goto</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; branch to specified
+file tag</font>
+<br><font face="Arial,Helvetica"><a href="commands/if.html">if</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; conditional branching</font>
+<br><font face="Arial,Helvetica"><a href="commands/item.html">item</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; process a list of strings
+or items</font>
+<br><font face="Arial,Helvetica"><a href="commands/read.html">read</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; interactive shell variable
+entry</font>
+<br><font face="Arial,Helvetica"><a href="commands/return.html">return</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; return from a subroutine</font>
+<br><font face="Arial,Helvetica"><a href="commands/set.html">set</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; shell variable operations</font>
+<br><font face="Arial,Helvetica"><a href="commands/sleep.html">sleep</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; second or millisecond
+delay</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="ethernet_commands"></a></font>Ethernet
+Interface Commands</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/arp.html">arp</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; address resolution
+protocol support</font>
+<br><font face="Arial,Helvetica"><a href="commands/dhcp.html">dhcp</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; dynamic host configuration
+protocol support</font>
+<br><font face="Arial,Helvetica"><a href="commands/ether.html">ether</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; ethernet interface
+support</font>
+<br><font face="Arial,Helvetica"><a href="commands/icmp.html">icmp</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; internet control message
+protocol support</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="debug_commands"></a></font>Debug
+Commands</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/at.html">at</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; set complex breakpoints</font>
+<br><font face="Arial,Helvetica"><a href="commands/call.html">call</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; call embedded function</font>
+<br><font face="Arial,Helvetica"><a href="commands/dr.html">dr</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; display registers</font>
+<br><font face="Arial,Helvetica"><a href="commands/go.html">go</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; transfer control to
+application</font>
+<br><font face="Arial,Helvetica"><a href="commands/pr.html">pr</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; put (or patch) register</font>
+<br><font face="Arial,Helvetica"><a href="commands/prof.html">prof</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; configure (or dump
+statistics gathered from) runtime profiling through the monitor</font>
+<br><font face="Arial,Helvetica"><a href="commands/ss.html">ss</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; single step</font>
+<br><font face="Arial,Helvetica"><a href="commands/strace.html">strace</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; stack trace</font>
+<p><font face="Arial,Helvetica"><font size=+0>Note that some of the commands
+within this set may not be ported to all targets.&nbsp; Verify that the
+port to your target contains the commands from this set that you need.</font></font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="filexfer_commands"></a></font>File
+Transfer Commands</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/tftp.html">tftp</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFTP client/server
+support</font>
+<br><font face="Arial,Helvetica"><a href="commands/xmodem.html">xmodem</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; XMODEM file transfer</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="misc_commands"></a></font>Miscellaneous</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><a href="commands/edit.html">edit</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; edit ascii TFS file</font>
+<br><font face="Arial,Helvetica"><a href="commands/help.html">help</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; display information
+about command</font>
+<br><font face="Arial,Helvetica"><a href="commands/heap.html">heap</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; display information
+about the monitor heap</font>
+<br><font face="Arial,Helvetica"><a href="commands/history.html">history</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; display most recently
+issued commands</font>
+<br><font face="Arial,Helvetica"><a href="commands/help.html">?</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; same as help</font>
+<br><font face="Arial,Helvetica"><a href="commands/idev.html">idev</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; device interface</font>
+<br><font face="Arial,Helvetica"><a href="commands/mstat.html">mstat</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; monitor status</font>
+<br><font face="Arial,Helvetica"><a href="commands/pio.html">pio</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; parallel io interface</font>
+<br><font face="Arial,Helvetica"><a href="commands/reset.html">reset</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; firmware generated
+reset</font>
+<br><font face="Arial,Helvetica"><a href="commands/tfs.html">tfs</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; tiny file system support</font>
+<br><font face="Arial,Helvetica"><a href="commands/ulvl.html">ulvl</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; user-level support</font>
+<br><font face="Arial,Helvetica"><a href="commands/version.html">version</a></font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; version of monitor
+build</font></blockquote>
+
+</body>
+</html>

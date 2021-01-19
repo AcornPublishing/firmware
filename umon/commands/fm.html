@@ -1,0 +1,97 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: FM</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>FM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">fm</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Fill a memory range with a specified
+value.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">fm -[c24] {source address} {destination
+address | byte-count} {value}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Fill a block of memory with a
+specified value.&nbsp; Note that the count is always a byte-count regardless
+of the width specification.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-2</font></li>
+
+<br><font face="Arial,Helvetica">Access data as 16-bit (2 bytes) wide units.;</font>
+<li>
+<font face="Arial,Helvetica">-4</font></li>
+
+<br><font face="Arial,Helvetica">Access data as 32-bit (4 bytes) wide units;</font>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">Arg2 is count, in bytes.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">fm -2 0x400000 0x402000 0x400</font></li>
+
+<br><font face="Arial,Helvetica">Fill memory range from 0x400000 thru 0x402000
+with 0x400.&nbsp; Access as 16-bit memory.</font>
+<li>
+<font face="Arial,Helvetica">fm -c 0x400000 0x2000 0x99</font></li>
+
+<br><font face="Arial,Helvetica">Fill 0x2000 bytes of memory starting at
+0x400000 with 0x99.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">All command arguments in the monitor are assumed
+to be of the syntax requiring that hex data be entered with a leading 0x,
+octal with a leading 0 else assume decimal.</font></li>
+</blockquote>
+
+</body>
+</html>

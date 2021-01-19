@@ -1,0 +1,348 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: dhcpsrvr</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>DHCPSRVR</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">dhcpsrvr</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Run a basic dhcp or bootp server.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">dhcpsrvr [-A:a:bDdc:Chq:TvVw]
+{target ip-address} "target command string"</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool provides a basic DHCP
+or BOOTP server for MicroMonitor clients.&nbsp; For DHCP, 'automatic allocation'
+mode is supported (no lease expiration).&nbsp; The intent of the program
+is STRICTLY for basic support of MicroMonitor clients.&nbsp; It expects
+to interact with only one client at a time, and simply provides a convenient
+alternative to setting up a "real" server somewhere.&nbsp; The server requires
+a configuration file to startup.&nbsp; It can be automatically generated
+via <i>dhcpsrvr -C.
+</i>Refer to notes in that output for syntax information.</font>
+<br><font face="Arial,Helvetica">Complete documentation on the dhcpsrvr
+tool can be dumped to a file via <i>dhcpsrvr -h</i>.&nbsp; Where differences
+are detected, assume dhcpsrvr -h output is more accurate.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-A {arpcmdname}</font></li>
+
+<br><font face="Arial,Helvetica">self-extract and build an arp command
+for use by this server if not available on the system already;</font>
+<li>
+<font face="Arial,Helvetica">-a {arpcmdname}</font></li>
+
+<br><font face="Arial,Helvetica">use the specified string as the command
+name replacement for "arp";</font>
+<li>
+<font face="Arial,Helvetica">-b</font></li>
+
+<br><font face="Arial,Helvetica">broadcast reply to client (eliminates
+need for arp);</font>
+<li>
+<font face="Arial,Helvetica">-C</font></li>
+
+<br><font face="Arial,Helvetica">dump a template config file to stdout;</font>
+<li>
+<font face="Arial,Helvetica">-c {cfgfile_name}</font></li>
+
+<br><font face="Arial,Helvetica">override the default (dhcpsrvr.cfg) config
+file name;</font>
+<li>
+<font face="Arial,Helvetica">-D</font></li>
+
+<br><font face="Arial,Helvetica">don't issue the arp;</font>
+<li>
+<font face="Arial,Helvetica">-d</font></li>
+
+<br><font face="Arial,Helvetica">don't check for the existence of an arp
+entry, just execute arp -d regardless;;</font>
+<li>
+<font face="Arial,Helvetica">-h</font></li>
+
+<br><font face="Arial,Helvetica">dump more help information to stdout;</font>
+<li>
+<font face="Arial,Helvetica">-q {n}</font></li>
+
+<br><font face="Arial,Helvetica">quit after 'n' discover/request handshakes;</font>
+<li>
+<font face="Arial,Helvetica">-T</font></li>
+
+<br><font face="Arial,Helvetica">start up a TFTP server (recommendation:
+use <i><a href="ttftp.html">ttftp</a> srvr </i>because this is soon to
+be eliminated from dhcpsrvr<i>);</i></font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode;</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">print version of dhcpsrvr tool (build
+date);</font>
+<li>
+<font face="Arial,Helvetica">-w</font></li>
+
+<br><font face="Arial,Helvetica">don't print warnings of incomplete .cfg
+entries;</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">dhcpsrvr</font></li>
+
+<br><font face="Arial,Helvetica">Based on the file "dhcpsrvr.cfg" in the
+current working directory; start up a dhcp/bootp server.</font>
+<li>
+<font face="Arial,Helvetica">dhcpsrvr -C >dhcpsrvr.cfg</font></li>
+
+<br><font face="Arial,Helvetica">Create a template dhcpsrvr config file.</font>
+<li>
+<font face="Arial,Helvetica">dhcpsrvr -A myarp; dhcpsrvr -a myarp</font></li>
+
+<br><font face="Arial,Helvetica">Build an "arp" tool called myarp and then
+tell the dhcp server to run with that version of arp.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>WARNING:</font></font></h1>
+
+<ul><font face="Arial,Helvetica">When a DHCP server is to respond to a
+client that is making a request it has a catch-22 to deal with...&nbsp;
+The server's TCP/IP stack wants to talk to the client through the clients
+IP address, but the client doesn't have an IP address assigned to it yet
+(that's what the server is trying to give it).&nbsp; The server has two
+alternatives: one is to force an entry into the server's ARP cache (using
+the arp command mentioned above); the other is to broadcast the response.&nbsp;
+Ideally, the arp-cache modification is used because it reduces traffic
+on the network.&nbsp; This is the default mechanism used by this server.&nbsp;
+Users of this dhcp server may not have Administrator privileges on the
+machine (required to do an arp cache modification), so the broadcast method
+can be used (see -D &amp; -b options above).&nbsp; On most NT/Win95 systems,
+if the server is not able to modify the arp cache, an error is returned
+when the attempt is made.&nbsp; The user sees this error message and knows
+that the server must be reconfigured for broadcast.&nbsp; Some users have
+found that on some NT/Win95 boxes the arp fails but there is no warning.&nbsp;
+Be aware of this, it appears to be an inconsistency across various Window's
+platforms.&nbsp; The resolution is to just use broadcast mode (-Db options)
+so that the server is not dependent on the arp cache entry being made.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 if error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLE CONFIG FILE (output
+of dhcpsrvr -C):</font></font></h1>
+
+<blockquote><tt># Configuration File Template....</tt>
+<br><tt># Notes:</tt>
+<br><tt># * Each line consists of an ID string followed by a PARAMETER
+string.</tt>
+<br><tt>#&nbsp;&nbsp; ID and PARAMETER must be white space delimited.</tt>
+<br><tt># * Blank lines are ignored, and lines starting with a '#' are
+ignored.</tt>
+<br><tt># * Specifying a client MAC address of 00:00:00:00:00:00 tells
+the server</tt>
+<br><tt>#&nbsp;&nbsp; to use this as a default.&nbsp; Note that this should
+be the last entry in</tt>
+<br><tt>#&nbsp;&nbsp; the config file because the server will scan this
+file from top to</tt>
+<br><tt>#&nbsp;&nbsp; bottom searching for a matching CLIENT_MAC entry,
+if a match is not</tt>
+<br><tt>#&nbsp;&nbsp; found by the time this entry is scanned, the default
+will be used.</tt>
+<br><tt># * A complete entry begins with the CLIENT_MAC ID.&nbsp; The server
+expects to</tt>
+<br><tt>#&nbsp;&nbsp; find all other entries associated with that MAC prior
+to finding the</tt>
+<br><tt>#&nbsp;&nbsp; next CLIENT_MAC ID.</tt>
+<br><tt># * The server will respond to BOOTP requests also.&nbsp; To signify</tt>
+<br><tt>#&nbsp;&nbsp; a BOOTP (instead of a DHCP) entry, use BOOTP_CLIENT_MAC
+instead of.</tt>
+<br><tt>#&nbsp;&nbsp; DHCP_CLIENT_MAC.</tt>
+<br><tt># * The subnet of the PC that is running this server must be the
+same</tt>
+<br><tt>#&nbsp;&nbsp; subnet that the CLIENT_IP entries are set to.</tt>
+<br><tt># * The XXX_OPTNO_NNN entries below demonstrate the fact that the
+server</tt>
+<br><tt>#&nbsp;&nbsp; can be told to load any option with a hex, ascii
+or IP type of value.</tt>
+<br><tt># * The XXX_VSOPTNO_NNN entries below demonstrate the fact that
+the server</tt>
+<br><tt>#&nbsp;&nbsp; can be told to load any vendor-specific option (#43)
+with a hex, ascii</tt>
+<br><tt>#&nbsp;&nbsp; or IP type of value.</tt>
+<p><tt># Valid DHCP entry:</tt>
+<br><tt>DHCP_CLIENT_MAC:&nbsp; 00:60:1D:02:0B:FE</tt>
+<br><tt>CLIENT_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.136</tt>
+<br><tt>SERVER_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.76</tt>
+<br><tt>RLYAGNT_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.3</tt>
+<br><tt>GATEWAY:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+135.3.94.1</tt>
+<br><tt>NETMASK:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+255.255.255.0</tt>
+<br><tt>SERVER_NAME:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server_name_here</tt>
+<br><tt>BOOTFILE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; some_filename_here</tt>
+<br><tt>STR_OPTNO_131:&nbsp;&nbsp;&nbsp; some_ascii-string_here</tt>
+<br><tt>HEX_OPTNO_132:&nbsp;&nbsp;&nbsp; AABBCCDDEEFF</tt>
+<br><tt>IPA_OPTNO_133:&nbsp;&nbsp;&nbsp; 4.8.12.16</tt>
+<br><tt>STR_VSOPTNO_11:&nbsp;&nbsp; ascii_string</tt>
+<br><tt>HEX_VSOPTNO_132:&nbsp; 112233</tt>
+<br><tt>IPA_VSOPTNO_13:&nbsp;&nbsp; 1.2.3.4</tt>
+<br><tt>#</tt>
+<br><tt># Note that in the above example, NETMASK is the same as IPA_OPTNO_1</tt>
+<br><tt># and GATEWAY is the same as IPA_OPTNO_3</tt>
+<br><tt>#</tt>
+<br><tt># Valid BOOTP entry:</tt>
+<br><tt>BOOTP_CLIENT_MAC: 00:60:1D:02:0B:FC</tt>
+<br><tt>CLIENT_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.131</tt>
+<br><tt>SERVER_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.76</tt>
+<br><tt>RLYAGNT_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.1</tt>
+<br><tt>GATEWAY:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+135.3.94.1</tt>
+<br><tt>NETMASK:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+255.255.255.0</tt>
+<br><tt>SERVER_NAME:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server_name_here_too</tt>
+<br><tt>BOOTFILE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; some_other_filename_here</tt>
+<p><tt># Default..</tt>
+<br><tt># Uncomment this entire entry if a default is to be specified.</tt>
+<br><tt># It is shown here for example purposes only.</tt>
+<br><tt>#DHCP_CLIENT_MAC: 00:00:00:00:00:00</tt>
+<br><tt>#CLIENT_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.148</tt>
+<br><tt>#SERVER_IP:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.76</tt>
+<br><tt>#GATEWAY:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 135.3.94.1</tt>
+<br><tt>#NETMASK:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 255.255.255.0</tt>
+<br><tt>#SERVER_NAME:&nbsp;&nbsp;&nbsp;&nbsp; servername_again</tt>
+<br><tt>#BOOTFILE:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; yet_another_filename_here</tt></blockquote>
+
+<p><br><b><font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></b>
+<blockquote><font face="Arial,Helvetica">This tool was originally written
+to support PPA development; but has since been updated to be a more generic
+server.&nbsp; The older, PPA-centric, version of dhcpsrvr.exe is available
+if needed...</font></blockquote>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/dhcpsrvr.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../win95/o_dhcpsrvr.exe">old_version
+(PPA-centric)</a></font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>Old-to-new Configuration File
+Translation:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">If there is a need to use the
+new server, but still be able to configure an older PPA application, the
+following translation applies to the configuration file:</font>
+<br>&nbsp;
+<br>&nbsp;
+<center><table BORDER COLS=2 WIDTH="70%" >
+<tr>
+<td><font face="Arial,Helvetica">PROXY_IP</font></td>
+
+<td><font face="Arial,Helvetica">IPA_VSOPT_1:&nbsp;&nbsp; 1.2.3.4</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">PROXY_IP &amp; BPROXY_IP</font></td>
+
+<td><font face="Arial,Helvetica">HEX_VSOPT_1:&nbsp;&nbsp; 0102030405060708</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">LINE1_NUMBER</font> <font face="Arial,Helvetica">&amp;LINE2_NUMBER</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_2:&nbsp;&nbsp; 9085821234 9085825678</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">CODER</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_3:&nbsp;&nbsp; PCM</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">CODERCTL</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_8:&nbsp;&nbsp; 1101</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">APPINFO</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_7:&nbsp;&nbsp; app_info_here</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">MIN_NET_DELAY</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_5:&nbsp;&nbsp; 50</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">MAX_NET_DELAY</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_6:&nbsp;&nbsp; 150</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">NAMEVAL</font></td>
+
+<td><font face="Arial,Helvetica">STR_VSOPT_99:&nbsp; NAME,VALUE</font></td>
+</tr>
+</table></center>
+</blockquote>
+
+</body>
+</html>

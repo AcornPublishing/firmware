@@ -1,0 +1,102 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: CM</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>CM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">cm</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Copy memory from one target address
+to another.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">cm -[24fv] {source address} {destination
+address} {byte-count}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Copy memory from one location
+in memory space to another.&nbsp; The size of the copy is specified by
+the count, which is always considered a byte-count regardless of the width
+specification.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-2</font></li>
+
+<br><font face="Arial,Helvetica">assume the width of the memory accesses
+is x2;</font>
+<li>
+<font face="Arial,Helvetica">-4</font></li>
+
+<br><font face="Arial,Helvetica">assume the width of the memory accesses
+is x4;</font>
+<li>
+<font face="Arial,Helvetica">-f</font></li>
+
+<br><font face="Arial,Helvetica">assume the destination address is a FIFO;</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verify that &aelig;count&AElig; bytes
+of data starting at the source address match those at the destination address.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">cm -2 0x400000 0x402000 0x400</font></li>
+
+<br><font face="Arial,Helvetica">Copy 1024 bytes of data from 0x400000
+to 0x402000 using a memory access width of 2 bytes.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">The command assumes that the memory writes
+are simple.&nbsp; All memory written to is RAM.&nbsp; Attempts to write
+to flash or other non-volatile memory will fail.&nbsp; Be aware that this
+is true for all memory access commands except the "flash" command.</font></li>
+</blockquote>
+
+</body>
+</html>

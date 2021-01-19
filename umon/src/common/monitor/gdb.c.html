@@ -1,0 +1,210 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/gdb.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* gdb.c:
+ *  The code in this file allows a gdb debugger on a host to connect to the
+ *  monitor.
+ *  Unlike the typical commands in the monitor's command set, the gdb serial
+ *  line protocol does not break the line up into whitespace delimited tokens
+ *  so the monitor's command interpreter must pass all lines that start with
+ *  a '$' to gdb_cmd() and let it do the rest.
+ *  NOTE: this is a VERY basic and incomplete implementation of the gdb
+ *  interface.  My intent was to simply have the ability to peek and poke
+ *  memory with gdb.
+ *
+ *  I got the information for this out of ESP magazine Sept 1999 issue also
+ *  had some discussion with Dave Thomas.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "ether.h"
+#include "stddefs.h"
+#include "cli.h"
+
+/* gdb_m():
+ *  GDB memory read command...
+ *      mADDR,LEN
+ */
+int
+<A NAME="gdb_m">gdb_m</A>(char *line)
+{
+    int     len, i;
+    uchar   *addr, *lp, csum;
+    
+    addr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(line+1,(char **)&lp,16);
+    len = (int)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(lp+1,0,16);
+    csum = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$");
+    for(i=0;i&lt;len;i++,addr++) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%02x",*addr);
+        csum += *addr;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("#%02x",csum);
+    return(0);
+}
+
+int
+<A NAME="gdb_M">gdb_M</A>(char *line)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("gdb_M: %s\n",line);
+    return(0);
+}
+
+/* gdb_cmd():
+ *  First function called out of the monitor's command interpreter.  It
+ *  does a basic syntax verification and then passes parameters to the
+ *  appropriate handler above.
+ *  Incoming syntax is
+ *
+ *      $ CMD # CSUM (of CMD)
+ *
+ *  where:
+ *      $       is the ascii '$' character (0x24)
+ *      #       is the ascii '#' character (0x23)
+ *      CMD     is some command line consisting of a command and arguments
+ *      CSUM    is the checksum of the characters in CMD
+ *
+ *  for example:
+ *      
+ *      $m4015bc,2#5a
+ *
+ *  Returns...
+ *       0 if command is not processed;
+ *       1 if command is processed;
+ *      -1 if command is processed but has an error;
+ *
+ *  If this code detects an error, then send an error code back to GDB.
+ *  According to the article, there are no defined error codes in GDB so
+ *  we will use the following...
+ *      E01     indicates a missing '#' at the end of the string.
+ *      E02     indicates a bad checksum calculation.
+ *      E03     indicates some command processing error.
+ */
+int
+<A NAME="gdb_cmd">gdb_cmd</A>(uchar *line)
+{
+    int len, clen, err, i;
+    uchar   mycsum, incsum;
+
+    len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(line);
+
+    if (line[len-3] != '#') {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$E01#a6");     /* Missing ending '#' */
+        return(-1);
+    }
+
+    clen = len - 3;
+    mycsum = 0;
+    for(i=1;i&lt;clen;i++)
+        mycsum += line[i];
+
+    incsum = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(line+len-2,(char **)0,16);
+    if (mycsum != incsum) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$E02#a7");     /* Checksum failure */
+        return(-1);
+    }
+    
+    err = 0;
+    line++;
+    switch(*line) {
+        case 'm':       /* Memory read */
+            err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/gdb.c.html#gdb_m>gdb_m</A>(line);
+            break;
+        case 'M':       /* Memory write */
+            err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/gdb.c.html#gdb_M>gdb_M</A>(line);
+            break;
+        case 's':       /* step */
+        case 'c':       /* continue */
+        case '?':       /* last signal */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$S05#b8");
+            break;
+        case 'g':       /* get all registers */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$00000000#80");
+            break;
+        case 'q':       /* */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$Text=0;Data=0;Bss=0#04");
+            break;
+        case 'H':       /* */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$OK#9a");
+            break;
+        default:        /* Unknown... return empty response. */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$#00");
+            break;
+    }
+    if (err)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+$E03#a8");     /* Command processing error */
+    return(1);
+}
+
+char *GdbHelp[] = {
+        "Enter gdb mode",
+        "(no options)",
+        0,
+};
+
+int
+<A NAME="Gdb">Gdb</A>(int argc, char *argv)
+{
+    int     state;
+    char    line[64], *lp, c;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Entering gdb mode, type ctrl-a to exit.\n");
+
+    state = -1;
+    while(1) {
+        c = <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        if (c == '$') {
+            lp = line;
+            state = 0;
+        }
+        if (c == 0x01)              /* ctrl-a terminates */
+            break;
+        switch(state) {
+            case 0:
+                if (c == '#')
+                    state = 1;
+                *lp++ = c;
+                break;
+            case 1:
+                *lp++ = c;
+                state = 2;
+                break;
+            case 2:
+                *lp++ = c;
+                *lp = 0;
+                state = -1;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/gdb.c.html#gdb_cmd>gdb_cmd</A>(line);
+                break;
+            default:
+                break;
+        }
+#if INCLUDE_ETHERNET
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+#endif
+    }
+    return(CMD_SUCCESS);
+}
+</HTML>
+</PRE>
+</BODY>

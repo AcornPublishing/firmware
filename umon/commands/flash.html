@@ -1,0 +1,206 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: FLASH</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>FLASH</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">flash</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Flash memory operations.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">flash {operation} [args]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Flash is writeable non-volatile
+memory.&nbsp; This command supports the handshaking necessary to erase
+and write to the flash devices on the target.&nbsp; The code that makes
+up the flash command in the monitor supports multiple banks of flash, and
+also allows each bank to be a different bus width.&nbsp; This, of course,
+is dependent on the underlying hardware.</font>
+<br><font face="Arial,Helvetica">The flash commands support the idea of
+sector protection.&nbsp; This is different than the sector protection supported
+by the flash device.&nbsp; The protection provided by the flash command
+is simply a 1-command window that is opened with the "flash opw" command.&nbsp;
+This allows the next command to execute operations on the flash ignoring
+the fact that the particular sector may be protected.&nbsp; Typically,
+the monitor configures the sectors that are used by the monitor's text
+and data space as protected; all other sectors are left unprotected.</font>
+<br><font face="Arial,Helvetica">There are several operations supported...</font>
+<br>&nbsp;
+<ul>
+<li>
+<font face="Arial,Helvetica">"bank [#]"</font></li>
+
+<br><font face="Arial,Helvetica">If no argument is specified, this command
+returns the currently active bank; if an argument is provided, then that
+value becomes the new default bank. Note that the number of banks supported
+is hardware-platform dependent.</font>
+<li>
+<font face="Arial,Helvetica">"init"</font></li>
+
+<br><font face="Arial,Helvetica">Initializes all internal flash operation
+data structures (monitor development only).</font>
+<li>
+<font face="Arial,Helvetica">"info"</font></li>
+
+<br><font face="Arial,Helvetica">Queries each bank configured in the hardware
+and displays the state that the monitor is assuming valid for the flash
+on board.</font>
+<li>
+<font face="Arial,Helvetica">"opw"</font></li>
+
+<br><font face="Arial,Helvetica">Enables a flag that allows the very next
+command to the monitor to be a flash operation that will modify the protected
+sectors of the flash.&nbsp; By default the monitor knows what parts of
+the flash must be protected from random writes.&nbsp; This command provides
+the user with a "1-command-window" to override that protection.&nbsp; Must
+be in user-level 3 mode to do this.</font>
+<li>
+<font face="Arial,Helvetica">"erase {sector # | all}"</font></li>
+
+<br><font face="Arial,Helvetica">Allows the user to erase a specified sector
+of the flash or all of the non-protected sectors (all).&nbsp; The erasure
+brings all bits to 1; hence the data would be read as 0xffs.</font>
+<li>
+<font face="Arial,Helvetica">"ewrite {dest} {src} {bytecnt}"</font></li>
+
+<br><font face="Arial,Helvetica">This command allows the user (typically
+only the owner of the monitor code) to re-write the protected sectors with
+a new code.&nbsp; This essentially allows the monitor to re-write itself.&nbsp;
+The arguments are a destination address where the data is to be written
+in flash, the source address of the data to be placed in flash and the
+number of bytes to be written.</font>
+<li>
+<font face="Arial,Helvetica">"write {dest} {src} {bytecnt}"</font></li>
+
+<br><font face="Arial,Helvetica">This command allows the user write to
+the flash.&nbsp; Like the ewrite command, it assumes that the data to be
+written is at the location specified by "src" and the number of bytes is
+specified by "bytecnt".</font></ul>
+</blockquote>
+<a NAME="flash_protection"></a><b><font face="Arial,Helvetica"><font size=+1>Some
+Discussion on Flash Protection:</font></font></b>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor does not require any hardware-implemented flash protection;
+yet it still provides a reasonably secure means of protecting the flash
+from accidental overwrite or erasure.&nbsp; The flash operations, as implemented
+by the manufacturer,&nbsp; make it extremely unlikely that random code
+would do any damage to flash; however, if you have flash on your system,
+it is likely that somewhere in your instruction space there is a function
+that is written to do these modifications.&nbsp; This means that a corrupt
+function pointer, could potentially call the block of code that will do
+damage (corrupt data) to the device.&nbsp; Obviously, the monitor has these
+functions.&nbsp; But with the functions comes a requirement that a previous
+function be called to modify a flag that must be set for the "dangerous"
+function to do the damage.&nbsp; This means that two things must "accidentally"
+happen in the proper sequence:</font>
+<ol>
+<li>
+<font face="Arial,Helvetica">The flag must be modified</font></li>
+
+<li>
+<font face="Arial,Helvetica">The function that does the flash operation
+must be called</font></li>
+</ol>
+<font face="Arial,Helvetica">The likelihood of this occurring greatly decreases
+the chances of messing up your flash.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+There is the option of using some kind of hardware protection, and there
+are several different ways this can be implemented.&nbsp; A lot of the
+variation is caused by the fact that different devices offer different
+types of protection and mechanisms to temporarily "unprotect" sectors.&nbsp;&nbsp;
+The following list is in order based on the amount of the flash device
+that actually needs the hardware protection and does not consider the temporary
+"unprotect" mode that some newer devices now have...</font>
+<ul>
+<li>
+<b><font face="Arial,Helvetica">Protect the entire device</font></b></li>
+
+<br><font face="Arial,Helvetica">This is obviously the safest, but it also
+defeats the whole purpose behind using flash.&nbsp;&nbsp; The device would
+be programmed in the factory with a monitor and the files to be in TFS
+space.&nbsp; The monitor and TFS files would be unchangeable.&nbsp; If
+there is no intent to ever change things, then do this.</font>
+<li>
+<b><font face="Arial,Helvetica">Protect the monitor space and the first
+few sectors of TFS space</font></b></li>
+
+<br><font face="Arial,Helvetica">Similar to the above case, the monitor
+and some of the space allocated to TFS (based on a sector boundary) can
+be protected.&nbsp; Perhaps a backup application and the monrc file would
+be in the protected TFS space, then the remaining space would be open for
+update.&nbsp; This locks in some base application that could run if all
+else failed.</font>
+<li>
+<b><font face="Arial,Helvetica">Protect the monitor space only</font></b></li>
+
+<br><font face="Arial,Helvetica">This would allow the application to be
+upgradeable in the field, without fear of ever losing total control of
+a system because worst case scenerio the monitor would be able take over
+and allow the system to be re-established regardless of the level of corruption
+that has occurred in the non-protected sectors of the flash.&nbsp; The
+only disadvantage to this (as with the one above this) is that the monitor
+itself cannot be updated.</font>
+<li>
+<b><font face="Arial,Helvetica">Protect a boot-sector</font></b></li>
+
+<br><font face="Arial,Helvetica">With this model, the monitor is built
+as two separate pieces: a boot-sector startup and the monitor itself.&nbsp;
+Here the only piece of code that is hardware protected is a small boot-sector
+that would contain a crc32 checker and xmodem (or a not-yet-implemented
+tftp) downloader...&nbsp; It would boot the hardware and immediatly do
+a check to see if the monitor is sane... If it is, then jump into it; if
+it isn't, then prompt the user for a new monitor and wait there forever.&nbsp;
+Once a new monitor is downloaded into RAM it can be used to rebuild the
+corrupted flash. This allows the monitor to be safely upgraded in the field
+without fear of losing the system if the upgrade fails for some reason.&nbsp;
+It also allows the flash to be programmed and protected in bulk without
+losing the ability to upgrade the monitor and all the applications in TFS.</font>
+<li>
+<b><font face="Arial,Helvetica">No hardware protection at all</font></b></li>
+
+<br><font face="Arial,Helvetica">This model works fine, but it is a little
+risky.&nbsp; There is the chance that the boot code can be corrupted (and
+if it was, the system would need to come back to the factory or lab); but,
+as discussed above, it is extremely unlikely and depending on the project,
+the above options may not be worth the added overhead of sector-protecting
+some of the device in the factory.</font></ul>
+<font face="Arial,Helvetica">For more discussion on this topic, refer to
+the <a href="../appnotes/bootblock.html">Boot Sector Safety appnote</a>.</font></blockquote>
+
+</body>
+</html>

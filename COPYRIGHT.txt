@@ -1,0 +1,26 @@
+Embedded Systems Firmware Demystified
+
+By Ed Sutter
+
+CMP Books, CMP Media LLC
+Copyright 2002 by Lucent Technologies
+ISBN 1-57820-099-7
+
+CMP Books
+CMP Media LLC
+1601 West 23rd Street, Suite 200
+Lawrence, KS 66046
+785-841-1631
+email: books@cmp.com
+www.cmpbooks.com
+
+The Software on this disk is protected by various copyrights. 
+See individual packets for details.
+
+The programs and applications on this disk have been carefully 
+tested, but are not guaranteed for any particular purpose. The 
+publisher does not offer any warranties and does not guarantee 
+the accuracy, adequacy, or completeness of any information and 
+is not responsible for any errors or omissions or the results 
+obtained from use of such information.
+

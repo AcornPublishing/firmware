@@ -1,0 +1,325 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/wiggler/reset.s</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+    .file "reset.s"
+
+/*
+ * General notice:
+ * This code is part of a boot-monitor package developed as a generic base
+ * platform for embedded system designs.  As such, it is likely to be
+ * distributed to various projects beyond the control of the original
+ * author.  Please notify the author of any enhancements made or bugs found
+ * so that all may benefit from the changes.  In addition, notification back
+ * to the author will allow the new user to pick up changes that may have
+ * been made by other users after this version of the code was distributed.
+ *
+ * Author:  Ed Sutter
+ * email:   esutter@lucent.com      (home: lesutter@worldnet.att.net)
+ * phone:   908-582-2351            (home: 908-889-5161)
+ * 
+ *
+ * reset.s:
+ * Start-up the MPC860DB evaulation platform:
+ * This is for an MPC860 daughter board.  The platform also supports an 860SAR
+ * and 860T.  This is only known to work with the 860.
+ *
+ * The LXT970 Power Up HW Configuration is determined by DS1 on the
+ * daughter card.  This assumes the default with bit 1 on and all others off.
+ * This enables auto-negotation, DTE mode, Nibble, scrambler enabled.
+ *
+ * NOTE1: I got the masks860.h, netcomm.h and mpc860.h files from moto's
+ * website: http://www/mot/com/SPS/RISC/netcomm/tools/#ppc_group 
+ * then click on DOWNLOAD for MPC860 Header Files for IMMR and Reg masks. 
+ *
+ * NOTE2: Page numbers in the comments are referencing the MPC860 PowerQUICC
+ * User's Manual, Rev1.
+ * 
+ */
+
+/* Chip Select Assignments:
+ *
+ * From the MPC8XXFADS User's Manual...
+ *
+ *  CS0:    Flash card
+ *          BR0/OR0: 0x02800001/0xffe00d34
+ *          The Flash card has 4 29F040 devices configured 32-bit wide.
+ *          Base is 0x2800000 32-bit, GPCM.
+ *  CS1:    BCSR
+ *          Base at 0x2100000, 32-bit, GPCM.
+ *  CS2:    DRAM SIMM (4Mg EDO)
+ *          Base at 0x0, 32-bit, no parity, UPMA.
+ */
+#include "arch_ppc.h"
+#include "masks860.h"
+
+#define CS0_BR_VAL      0x02800001  /* Boot flash SIMM: 32-bit, GPCM */
+#define CS0_OR_VAL      0xffe00d30
+#define CS1_BR_VAL      0x02100001  /* BCSR: 32-bit, GPCM */
+#define CS1_OR_VAL      0xffff8110
+#define CS2_BR_VAL      0x00000081  /* EDO DRAM SIMM: 32-bit, UPMA */
+#define CS2_OR_VAL      0xffc00800
+
+#define MAMR_VAL        0x60a21114
+#define MAR_VALUE       0x00000088
+#define MCR_VALUE       0x80002036
+#define PHYSICAL_RESET  0x02800100
+
+    .comm   MonStack,512
+
+    .globl  coldstart
+    .globl  SPInit
+    .extern start
+
+    .text
+
+coldstart:
+    /* Disable I&D Cache before accesing any registers
+     */
+    mfspr   r5,DC_CST
+    lis     r5,0x0400
+    mtspr   DC_CST,r5
+    isync
+    mfspr   r5,IC_CST
+    lis     r5,0x0400
+    mtspr   IC_CST,r5
+    isync
+
+    /* Initialize MSR & SRR1 (pg 5-6):
+     */
+    lis     r5,(MSR_ME|MSR_RI)@h
+    addi    r5,r5,(MSR_ME|MSR_RI)@l
+    mtmsr   r5
+    isync
+    mtspr   srr1,r5
+    isync
+
+    /* Initialize ICTRL, ICR & DEC:
+     */
+    lis     r5,(ISCT_SER7)@ha
+    addi    r5,r5,(ISCT_SER7)@l
+    mtspr   ICTRL,r5
+    lis     r5,(0)@ha
+    addi    r5,r5,(0)@l
+    mtspr   ICR,r5
+    lis     r5,(0x7FFFFFFF)@ha
+    addi    r5,r5,(0x7FFFFFFF)@l
+    mtspr   dec,r5
+
+    /* Initialize IMMR (Internal Memory Map Reg pg 11-4):
+     * Only the upper 16 bites of this register are writeable.
+     * Note that R4 is used throughout this reset code for
+     * IMMR-relative addressing, so don't use it anywhere else prior
+     * to jumping into C-code.
+     */
+IMMRInit:
+    lis     r4, (0xff000000)@ha
+    addi    r4, r4, (0xff000000)@l
+    mtspr   IMMR, r4
+
+    /* SIUMCR: SIU Module Config Reg (pg 11-5)
+     */
+    lwz     r5,<A NAME="SIUMCR_BASE">SIUMCR_BASE</A>(r4)
+    oris    r5,r5,(SIUMCR_DBGC3|SIUMCR_FRC|SIUMCR_DLK|SIUMCR_GB5E)@ha
+    ori     r5,r5,(SIUMCR_DBGC3|SIUMCR_FRC|SIUMCR_DLK|SIUMCR_GB5E)@l
+    stw     r5,<A NAME="SIUMCR_BASE">SIUMCR_BASE</A>(r4)
+
+    /* ignore assembler warning on following line
+     * SYPCR: System Protection Ctrl (pg 11-9)
+     */
+    addis   r5,r0,(SYPCR_SWTC|SYPCR_BMT|SYPCR_BME|SYPCR_SWF)@h
+    addi    r5,r5,(SYPCR_SWTC|SYPCR_BMT|SYPCR_BME|SYPCR_SWF)@l
+    stw     r5,<A NAME="SYPCR_BASE">SYPCR_BASE</A>(r4)
+
+    /* Prevent SWT timeout SWSR (pg 11-22):
+     */
+    ori     r5,r0,0x556C
+    sth     r5,<A NAME="SWSR_BASE">SWSR_BASE</A>(r4)
+    ori     r5,r0,0xAA39
+    sth     r5,<A NAME="SWSR_BASE">SWSR_BASE</A>(r4)
+
+    /* Take care of CPIC and CPM...
+     * CPM: Communication Processor Module (Chap 18)
+     * CPCR: CPM Command Reg (pg 19-6)
+     * SIMASK: SIU Interrupt Mask (pg 11-17)
+     * CIPR: CPM Interrupt Pending Register (pg 35-8)
+     * CIMR: CPM Interrupt Mask Register (pg 35-9)
+     * SICR: Serial Interface Clock Route Register (pg 21-23)
+     * SDCR: Serial DMA Config Register (pg 20-3)
+     */
+    ori     r5,r0,0x8001
+    sth     r5,<A NAME="CPCR_BASE">CPCR_BASE</A>(r4)            /* Reset CPM through CPCR */
+    addi    r5,r0,0x0000
+    stw     r5,<A NAME="SIMASK_BASE">SIMASK_BASE</A>(r4)          /* Clear SIMASK */
+    stw     r5,<A NAME="CIPR_BASE">CIPR_BASE</A>(r4)            /* Clear CIPR */
+    stw     r5,<A NAME="CIMR_BASE">CIMR_BASE</A>(r4)            /* Clear CIMR */
+    stw     r5,<A NAME="SICR_BASE">SICR_BASE</A>(r4)            /* Clear SICR */
+    stw     r5,<A NAME="SDCR_BASE">SDCR_BASE</A>(r4)            /* Clear SDCR */
+
+    /* Init PISCR: Periodic Interrupt Status and Ctrl reg:
+     */
+    lis     r5,(PISCR_PS|PISCR_PITF)@ha
+    addi    r5,r5,(PISCR_PS|PISCR_PITF)@l
+    stw     r5,<A NAME="PISCR_BASE">PISCR_BASE</A>(r4)
+
+    /* Init BCSR ChipSelect (CS1):
+     * Note for all OR/BR programming...
+     *   OR should be loaded prior to BR.
+     */
+BCSR_CSInit:
+    lis     r5,(CS1_OR_VAL)@h
+    ori     r5,r5,(CS1_OR_VAL)@l
+    stw     r5,<A NAME="OR1_BASE">OR1_BASE</A>(r4)
+    lis     r5,(CS1_BR_VAL)@h
+    ori     r5,r5,(CS1_BR_VAL)@l
+    stw     r5,<A NAME="BR1_BASE">BR1_BASE</A>(r4)
+
+    /* Init UPMA for EDO DRAM access
+     * This must be done prior to configuring the chip-select regs OR2/BR2.
+     *
+     * R6:  loaded with base of table
+     * R7:  loaded with end of table.
+     * R5:  contains number of words in table (based on R7 - R6).
+     * R9:  contains the address/command for MemoryCommandRegister (MCR)
+     *      which is incremented for each word written.
+     * R10: contains the data from the table that is stored into
+     *      the MemoryDataRegister (MDR).
+     */
+UPMInit:
+    lis     r6, (UpmTable20)@ha         /* point R6 to parameter table */
+    ori     r6, r6, (UpmTable20)@l
+
+    lis     r7, (UpmTable20End)@ha      /* point R7 to end parameter table */
+    ori     r7, r7, (UpmTable20End)@l
+
+    sub     r5, r7, r6                  /* set R5 to # of words in param tbl */
+    srawi   r5, r5, 2                   /* /4 */
+
+    li      r9, 0x0000                  /* Command: OP=Write, UPMA, MAD=0 */
+
+UpmWriteLoop:
+    lwz     r10, <A NAME="0">0</A>(r6)                  /* get data from table */
+    stw     r10, <A NAME="MDR_BASE">MDR_BASE</A>(r4)           /* store the data to MD register */
+
+    stw     r9, <A NAME="MCR_BASE">MCR_BASE</A>(r4)            /* issue command to MCR register */
+
+    addi    r6,r6,4                     /* next entry in the table */
+    addi    r9,r9,1                     /* next MAD address */
+    cmpw    r9,r5                       /* done yet ? */
+    blt     UpmWriteLoop
+
+    /* Set up the memory controller registers - minimal init */
+    lis     r5, (MAMR_VAL)@ha 
+    addi    r5, r5, (MAMR_VAL)@l
+    stw     r5, <A NAME="MAMR_BASE">MAMR_BASE</A>(r4)
+
+    /* Set DRAM refresh rate */
+    li      r5, MPTPR_PTP_DIV16
+    sth     r5, <A NAME="MPTPR_BASE">MPTPR_BASE</A>(r4)
+
+    lis     r5, MAR_VALUE@ha
+    addi    r5, r5, MAR_VALUE@l
+    stw     r5, <A NAME="MAR_BASE">MAR_BASE</A>(r4)
+    lis     r5, MCR_VALUE@ha
+    addi    r5, r5, MCR_VALUE@l
+    stw     r5, <A NAME="MCR_BASE">MCR_BASE</A>(r4)
+
+    /*  CS2 = DRAM SIMM */
+Dram_CSInit:
+    lis     r5,(CS2_OR_VAL)@ha
+    ori     r5,r5,(CS2_OR_VAL)@l
+    stw     r5,<A NAME="OR2_BASE">OR2_BASE</A>(r4)
+    lis     r5,(CS2_BR_VAL)@ha
+    ori     r5,r5,(CS2_BR_VAL)@l
+    stw     r5,<A NAME="BR2_BASE">BR2_BASE</A>(r4)
+
+SPInit:
+    /* initialize the stack pointer, and be assured that it is mod16 */
+    lis     sp, (MonStack+508)@ha
+    ori     sp, sp, (MonStack+508)@l
+    addis   r5, r0, 0xffff
+    ori     r5, r5, 0xfff8
+    and     r1, r1, r5
+
+GoToC:
+    lis     r7,(start)@ha
+    addi    r7,r7,(start)@l
+    mtlr    r7                          /* move C entry point to LR */
+    blr                                 /* jump to the C entry point */
+
+UpmTable20:
+    /* UPM initialization table, 60ns EDO, 20Mhz  */
+    /* Taken from MPC8XXFADS manual (pg 26) */
+    /* Single read. (offset 0x0 in upm RAM) */
+    .long      0x8fffcc04, 0x08ffcc00, 0x33ffcc47, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Burst read. (offset 0x8 in upm RAM) */
+    .long      0x8fffcc04, 0x08ffcc08, 0x08ffcc08, 0x08ffcc08
+    .long      0x08ffcc00, 0x3fffcc47, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Single write. (offset 0x18 in upm RAM) */
+    .long      0x8fefcc00, 0x39bfcc47, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Burst write. (offset 0x20 in upm RAM) */
+    .long      0x8fefcc00, 0x09afcc48, 0x09afcc48, 0x09afcc48
+    .long      0x39bfcc47, 0xffffffff, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Refresh (offset 0x30 in upm RAM) */
+    .long      0x80ffcc84, 0x17ffcc04, 0xffffcc86, 0xffffcc05
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Exception (offset 0x3c in upm RAM) */
+    .long      0x33ffcc07, 0xffffffff, 0xffffffff, 0xffffffff
+UpmTable20End:
+
+UpmTable50:
+    /* UPM initialization table, 60ns EDO, 50Mhz  */
+    /* Taken from MPC8XXFADS manual */
+    /* Single read. (offset 0 in upm RAM) */
+    .long      0x8ffbec24, 0x0ff3ec04, 0x0cf3ec04, 0x00f3ec04
+    .long      0x00f3ec00, 0x37f7ec47, 0xffffffff, 0xffffffff
+    /* Burst read. (offset 8 in upm RAM) */
+    .long      0x8fffec24, 0x0ffbec04, 0x0cf3ec04, 0x00f3ec0c
+    .long      0x0cf3ec00, 0x00f3ec4c, 0x0cf3ec00, 0x00f3ec4c
+    .long      0x0cf3ec00, 0x00f3ec44, 0x03f3ec00, 0x3ff7ec47
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Single write. (offset 18 in upm RAM) */
+    .long      0x8fffcc24, 0x0fefcc04, 0x0cafcc00, 0x11bfcc47
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Burst write. (offset 20 in upm RAM) */
+    .long      0x8fffcc24, 0x0fefcc04, 0x0cafcc00, 0x03afcc4c
+    .long      0x0cafcc00, 0x03afcc4c, 0x0cafcc00, 0x03afcc4c
+    .long      0x0cafcc00, 0x33bfcc4f, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Refresh 70ns. (offset 30 in upm RAM) */
+    .long      0xc0ffcc84, 0x00ffcc04, 0x07ffcc04, 0x3fffcc06
+    .long      0xffffcc85, 0xffffcc05, 0xffffffff, 0xffffffff
+    .long      0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff
+    /* Exception. (offset 3c in upm RAM) */
+    .long      0x33ffcc07, 0xffffffff, 0xffffffff, 0xffffffff
+UpmTable50End:
+
+
+
+
+    .text
+    .align  2
+    .globl  ppcMtimmr
+ppcMtimmr:
+    mtdcr   immr,r3
+    blr
+
+    .text
+    .align  2
+    .globl  ppcMfimmr
+ppcMfimmr:
+    mfdcr   r3,immr
+    blr
+</HTML>
+</PRE>
+</BODY>

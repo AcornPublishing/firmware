@@ -1,0 +1,93 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Moncmd Server in Application Space</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center><b><font face="Arial,Helvetica"><font size=+2>Moncmd Support in
+Application Space</font></font></b>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">When the monitor is running standalone,
+it has its own server running to respond to the moncmd tool running on
+the host.&nbsp; The moncmd tool (refer to <a href="../tools/docs/moncmd.html">moncmd</a>
+for complete details), provides the host side of the interface used by
+the monitor to allow the monitor to be communicated with through UDP.&nbsp;
+Once the application is running, then typically it takes of the ethernet
+driver and the moncmd server on the target is no longer operational.&nbsp;
+To overcome this, there is a small task that can be added to any application
+to allow it to still process incoming moncmd operations.&nbsp; Following
+is the code that supports this.</font></blockquote>
+
+<blockquote><tt>/* monSrvr():</tt>
+<br><tt>&nbsp;&nbsp; This is a task that is started as part of the base
+BSP.&nbsp; This is done</tt>
+<br><tt>&nbsp;&nbsp; so that the BSP can be installed a an auto-boot file
+in TFS but still</tt>
+<br><tt>&nbsp;&nbsp; allow communication between a host and this application
+to issue</tt>
+<br><tt>&nbsp;&nbsp; monitor commands.</tt>
+<br><tt>&nbsp;&nbsp; Note that the default port number used by moncmd on
+the host is 777.</tt>
+<br><tt>*/</tt>
+<blockquote><tt>void</tt>
+<br><tt>monSrvr()</tt>
+<br><tt>{</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; int sfd;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; struct&nbsp; sockaddr_in server;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; unsigned char&nbsp;&nbsp; rcvmsg[256];</tt>
+<br>&nbsp;
+<p><tt>&nbsp;&nbsp;&nbsp; /* Get a socket: */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; sfd = socket(AF_INET,SOCK_DGRAM,0);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; if (sfd &lt; 0) {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("socket failed");</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit(1);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; }</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; /* Bind the socket to the port. */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; bzero((char *)&amp;server,sizeof(struct sockaddr));</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; server.sin_family = AF_INET;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; server.sin_port = htons(777);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; server.sin_addr.s_addr = htonl(INADDR_ANY);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; if (bind(sfd,(struct sockaddr *)&amp;server,</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sizeof(struct sockaddr))
+&lt; 0) {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; perror("bind");</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit(1);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; }</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; while(1) {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int msglen;</tt>
+<p><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; msglen = sizeof(server);</tt>
+<p><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; recvfrom(sfd,rcvmsg,sizeof(rcvmsg),0,</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(struct sockaddr *)&amp;server,&amp;msglen);</tt>
+<p><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; sendto(sfd,rcvmsg,(int)strlen(rcvmsg)+1,0,</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(struct sockaddr *)&amp;server,sizeof(server));</tt>
+<p><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("MonSrvr: &lt;%s>\n",rcvmsg);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; taskDelay(sysClkRateGet());&nbsp;&nbsp;
+/* VxWorksish */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; mon_docommand(rcvmsg,0);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; }</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; exit(0);</tt>
+<br><tt>}</tt></blockquote>
+</blockquote>
+
+</body>
+</html>

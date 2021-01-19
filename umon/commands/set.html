@@ -1,0 +1,94 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: SET</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>SET</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">set</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Set, clear or adjust a shell variable
+within the monitor.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">set -[adiox] [varname] [value]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">The monitor allows the user to
+set up shell variables that can then be used by other commands with the
+monitor or by the client application through the<i> <a href="../api/getenv.html">getenv()</a></i>
+shared library call.&nbsp; This capability provides a clean interface between
+monitor scripts and applications; thus, allowing the script to define operating
+characteristics that are activated by the application through the applications
+use of getenv().</font>
+<br><font face="Arial,Helvetica">Keep in mind that the shell variables
+are generic in nature, so they can be used for general-purpose command
+line substitution as well.</font>
+<br><font face="Arial,Helvetica">If no arguments are present,
+<i>set</i>
+will simply dump the current set of environment variables.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a</font></li>
+
+<br><font face="Arial,Helvetica">logically AND the content of the shell
+variable with the value specified;</font>
+<li>
+<font face="Arial,Helvetica">-i</font></li>
+
+<br><font face="Arial,Helvetica">increment the content of the shell variable
+by the value specified (or 1 if value is not specified);</font>
+<li>
+<font face="Arial,Helvetica">-d</font></li>
+
+<br><font face="Arial,Helvetica">decrement the content of the shell variable
+by the value specified (or 1 if value is not specified);</font>
+<li>
+<font face="Arial,Helvetica">-o</font></li>
+
+<br><font face="Arial,Helvetica">logically OR the content of the shell
+variable with the value specified;</font>
+<li>
+<font face="Arial,Helvetica">-x</font></li>
+
+<br><font face="Arial,Helvetica">output the result of the -i or -d operation
+in hex (else decimal).</font></ul>
+
+</body>
+</html>

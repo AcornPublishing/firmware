@@ -1,0 +1,141 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: newmon</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>NEWMON</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">newmon</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Automatically update a monitor's
+boot flash to a new version.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">newmon -[A:B:p:w:vV] {target ip-address}
+{binary filename}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool allows the user to upgrade
+a target's boot monitor.&nbsp;&nbsp; <blink><font color="#CC0000"><b><u>WARNING</u></b>!!!</font></blink>
+This command will take the requested file and assume it is a binary file
+destined for the boot sector of the target device.&nbsp; If you give it
+the wrong file, you will destroy your boot sector!!!</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+<font face="Arial,Helvetica"><font size=+1>&nbsp;&nbsp;&nbsp;&nbsp;</font>&nbsp;&nbsp;&nbsp;
+Note that these options only apply to the .exe version.&nbsp; The script
+does not have any options.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">-A {###}</font></li>
+
+<br><font face="Arial,Helvetica">override default use of $APPRAMBASE shell
+variable as location for tftp transfer and source for flash ewrite.</font>
+<li>
+<font face="Arial,Helvetica">-B {###}</font></li>
+
+<br><font face="Arial,Helvetica">override default use of $BOOTROMBASE shell
+variable as target for flash ewrite.</font>
+<li>
+<font face="Arial,Helvetica">-p {##}</font></li>
+
+<br><font face="Arial,Helvetica">override default port number of 777;</font>
+<li>
+<font face="Arial,Helvetica">-w {##}</font></li>
+
+<br><font face="Arial,Helvetica">number of seconds to wait for response,
+after which a timeout will occur (default is 10 seconds);</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode (print the 'Sending...' string);</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">display the version (build date) of the
+tool</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLE:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">newmon 135.3.94.136 mon403.bin</font></li>
+
+<br><font face="Arial,Helvetica">Place the content of mon403.bin into the
+boot flash of the target at address 135.3.94.136</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+<font face="Arial,Helvetica"><font size=+1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font>&nbsp;&nbsp;
+Note that these exit status apply to the.exe version only.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<br><font face="Arial,Helvetica">Command was received, executed and completed.</font>
+<li>
+<font face="Arial,Helvetica">1 if timeout waiting for command completion</font></li>
+
+<br><font face="Arial,Helvetica">In this case, moncmd verified that the
+command was received by the target, but there was no command completion
+handshake.&nbsp; This would be the type of timeout that would occur if
+moncmd was used to issue a target reset.</font>
+<li>
+<font face="Arial,Helvetica">2 if error</font></li>
+
+<br><font face="Arial,Helvetica">Some kind of usage error typically.</font>
+<li>
+<font face="Arial,Helvetica">3 if timeout waiting for command reception</font></li>
+
+<br><font face="Arial,Helvetica">In this case, moncmd could not even verify
+that the command was received by the target.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/newmon">SUN Solaris (script)</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../win95/newmon.exe">PC Win95</a></font></li>
+</ul>
+
+</body>
+</html>

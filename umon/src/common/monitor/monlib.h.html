@@ -1,0 +1,157 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/monlib.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* monlib.h:
+ *  This header file is used by both the monitor and the application that
+ *  may reside on top of the monitor.
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#ifndef _monlib_h
+#define _monlib_h
+
+#include "cli.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monConnect>monConnect</A>(int (*monptr)(), void (*lock)(), void (*unlock)());
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_com>mon_com</A>(int cmd,void *arg1,void *arg2,void *arg3);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_putchar>mon_putchar</A>(unsigned char c);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_getchar>mon_getchar</A>(void);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_gotachar>mon_gotachar</A>(void);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_getbytes>mon_getbytes</A>(char *buf,int count,int block);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_printf>mon_printf</A>();
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_cprintf>mon_cprintf</A>();
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_sprintf>mon_sprintf</A>();
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_restart>mon_restart</A>(int restart_value);
+extern char *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_getenv>mon_getenv</A>(char *varname);
+extern char *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_version>mon_version</A>(void);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_setenv>mon_setenv</A>(char *varname,char *value);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsinit>mon_tfsinit</A>(void);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsadd>mon_tfsadd</A>(char *filename, char *info, char *flags,
+        unsigned char *src, int size);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsunlink>mon_tfsunlink</A>(char *filename);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfslink>mon_tfslink</A>(char *source, char *target);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsrun>mon_tfsrun</A>(char **arglist,int verbosity);
+extern struct tfshdr *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsnext>mon_tfsnext</A>(struct tfshdr *tfp);
+extern struct tfshdr *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsstat>mon_tfsstat</A>(char *filename);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsfstat>mon_tfsfstat</A>(char *filename,struct tfshdr *tfp);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfseof>mon_tfseof</A>(int file_descriptor);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfstruncate>mon_tfstruncate</A>(int file_descriptor,long length);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsread>mon_tfsread</A>(int file_descriptor,char *buffer,int size);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfswrite>mon_tfswrite</A>(int file_descriptor,char *buffer,int size);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsopen>mon_tfsopen</A>(char *filename,long mode,char *buffer);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsclose>mon_tfsclose</A>(int file_descriptor,char *info);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsseek>mon_tfsseek</A>(int file_descriptor,int offset,int whence);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsgetline>mon_tfsgetline</A>(int file_descriptor,char *buffer,int bufsize);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsipmod>mon_tfsipmod</A>(char *name,char *buffer,int offset,int size);
+extern long <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfsctrl>mon_tfsctrl</A>(int command,long arg1,long arg2);
+extern long <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_tfstell>mon_tfstell</A>(int file_descriptor);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_addcommand>mon_addcommand</A>(struct monCommand *command_list);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_docommand>mon_docommand</A>(char *cmdline,int verbosity);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_getargv>mon_getargv</A>(int *argc,char ***argv);
+extern unsigned short <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_xcrc16>mon_xcrc16</A>(char *buffer,long length);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_pioget>mon_pioget</A>(char port,int bit);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_pioset>mon_pioset</A>(char port,int bit);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_pioclr>mon_pioclr</A>(char port,int bit);
+extern unsigned long <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_intsoff>mon_intsoff</A>(void);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_intsrestore>mon_intsrestore</A>(unsigned long oldval);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_appexit>mon_appexit</A>(int exit_value);
+extern char *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_malloc>mon_malloc</A>(int size);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_free>mon_free</A>(char *buffer);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_getline>mon_getline</A>(char *buffer,int max,int ledit);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_decompress>mon_decompress</A>(char *src,int srcsize,char *dest);
+extern int <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_heapxtend>mon_heapxtend</A>(char *base,int size);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_profiler>mon_profiler</A>(void *pdata);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_bbc>mon_bbc</A>(char *filename, int linenum);
+extern void <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#mon_memtrace>mon_memtrace</A>();
+
+#ifdef __cplusplus
+}
+#endif
+
+
+#define GETMONFUNC_PUTCHAR              1
+#define GETMONFUNC_GETCHAR              2
+#define GETMONFUNC_GOTACHAR             3
+#define GETMONFUNC_GETBYTES             4
+#define GETMONFUNC_PRINTF               5
+#define GETMONFUNC_CPRINTF              6
+#define GETMONFUNC_SPRINTF              7
+#define GETMONFUNC_RESTART              8
+#define GETMONFUNC_GETENV               9
+#define GETMONFUNC_SETENV               10
+#define GETMONFUNC_TFSINIT              11
+#define GETMONFUNC_TFSADD               12
+#define GETMONFUNC_TFSUNLINK            13
+#define GETMONFUNC_TFSRUN               14
+#define GETMONFUNC_TFSNEXT              15
+#define GETMONFUNC_TFSSTAT              16
+#define GETMONFUNC_TFSREAD              17
+#define GETMONFUNC_TFSWRITE             18
+#define GETMONFUNC_TFSOPEN              19
+#define GETMONFUNC_TFSCLOSE             20
+#define GETMONFUNC_TFSSEEK              21
+#define GETMONFUNC_TFSGETLINE           22
+#define GETMONFUNC_TFSIPMOD             23
+#define GETMONFUNC_TFSCTRL              24
+#define GETMONFUNC_ADDCOMMAND           25
+#define GETMONFUNC_DOCOMMAND            26
+#define GETMONFUNC_GETARGV              27
+#define GETMONFUNC_CRC16                28
+#define GETMONFUNC_CRC32                29
+#define GETMONFUNC_PIOGET               30
+#define GETMONFUNC_PIOSET               31
+#define GETMONFUNC_PIOCLR               32
+#define GETMONFUNC_INTSOFF              33
+#define GETMONFUNC_INTSRESTORE          34
+#define GETMONFUNC_APPEXIT              35
+#define GETMONFUNC_MALLOC               36
+#define GETMONFUNC_FREE                 37
+#define GETMONFUNC_GETLINE              38
+#define GETMONFUNC_TFSFSTAT             39
+#define GETMONFUNC_TFSEOF               40
+#define GETMONFUNC_DECOMPRESS           41
+#define GETMONFUNC_TFSTRUNCATE          42
+#define GETMONFUNC_HEAPXTEND            43
+#define GETMONFUNC_PROFILER             44
+#define GETMONFUNC_TFSLINK              45
+#define GETMONFUNC_BBC                  46
+#define GETMONFUNC_MEMTRACE             47
+#define GETMONFUNC_TFSTELL              48
+#define GETMONFUNC_VERSION              49
+
+#define CACHEFTYPE_DFLUSH               200
+#define CACHEFTYPE_IINVALIDATE          201
+
+#define CHARFUNC_PUTCHAR                300
+#define CHARFUNC_GETCHAR                301
+#define CHARFUNC_GOTACHAR               302
+#define CHARFUNC_RAWMODEON              303
+#define CHARFUNC_RAWMODEOFF             304
+
+#define ASSIGNFUNC_GETUSERLEVEL         400
+#endif
+</HTML>
+</PRE>
+</BODY>

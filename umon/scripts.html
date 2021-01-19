@@ -1,0 +1,461 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: SCRIPTS</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Writing Scripts to Run Under
+MicroMonitor</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica">Since there is a file system and a command
+interpreter, there is an ability to create executables as simple ascii
+files that invoke the commands that are part of the monitor's command table.&nbsp;
+Note that it is not the intent of this page to go into full detail on each
+of the commands used within a script (refer to command listing for that
+detail); rather to provide an overall understanding of how to use/write
+scripts to be run under the monitor.&nbsp; The best way to learn how to
+take advantage of this capability is through example...</font>
+<br>&nbsp;
+<p><font face="Arial,Helvetica"><a href="#invocation">Script Invocation</a></font>
+<br><font face="Arial,Helvetica"><a href="#commands">Script-Specific Commands</a></font>
+<br><font face="Arial,Helvetica"><a href="#nesting">Script Nesting</a></font>
+<br><font face="Arial,Helvetica"><a href="#cleanup">Example 1: cleanup</a></font>
+<br><font face="Arial,Helvetica"><a href="#ping">Example 2: ping</a></font>
+<br><font face="Arial,Helvetica"><a href="#namelist">Example 3: lists using
+shell variables</a></font>
+<br><font face="Arial,Helvetica"><a href="#item">Example 4: lists using
+"item" command</a></font>
+<br><font face="Arial,Helvetica"><a href="#example5">Example 5: processing
+a variable number of command line arguments</a></font>
+<br><font face="Arial,Helvetica"><a href="#why_do_this">Example 6: why
+would you ever want to do this??</a></font>
+<br><font face="Arial,Helvetica"><a href="#example7">Example 7: startup
+script using subroutines, if/else and file decompression</a></font>
+<br><font face="Arial,Helvetica"><a href="#docommand">Overriding default
+command interpreter</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<hr WIDTH="100%">
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="invocation"></a><font face="Arial,Helvetica">Script
+Invocation</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+A file is recognized by TFS as a script if it has the executable (e) attribute
+set with no other file format attributes (E, C or A) set.&nbsp; Scripts
+can be started up in two different ways.&nbsp; Like Unix SH, the script
+name can be typed on the command line directly and the command interpreter
+will find it.&nbsp; This implies that a script should not have the same
+name as any of the built-in commands in the command table because the command
+interpreter will first look through its own list of built-ins for a match.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Alternatively, the <i>tfs run</i> command can be used.&nbsp; Running the
+script this way eliminates the concern of an executable having the same
+name as an internal built-in, but it also allows the user to specify that
+the script run in verbose mode.&nbsp; There are two levels of verbosity
+useful for script analysis:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><b>level 1</b> (<i>tfs -v run scriptname</i>):&nbsp;&nbsp;&nbsp;
+each line is printed out with shell variables replaced by their actual
+value.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><b>level 2 </b>(<i>tfs -vv run scriptname)</i>:&nbsp;
+same as level 1 plus, prior to the level 1 print, the original line is
+printed, preceded by a '+ ' (plus sign and space), and the shell variables
+are not replaced.</font></li>
+</ul>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Either method (direct invocation through command interpreter, or using
+tfs run) has its purpose.&nbsp; The use of verbosity with tfs run makes
+the script somewhat run-time debuggable.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="commands"></a><font face="Arial,Helvetica">Script-Specific
+Commands</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The following commands within the monitor's command line interface are
+applicable only within the context of a script: <a href="commands/if.html">if</a>,
+<a href="commands/goto.html">goto</a>,
+<a href="commands/gosub.html">gosub</a>,
+<a href="commands/exit.html">exit</a>,
+<a href="commands/return.html">return</a>,
+<a href="commands/read.html">read</a>,
+<a href="commands/argv.html">argv</a>,
+<a href="commands/echo.html">echo</a>,
+<a href="commands/item.html">item</a>
+and <a href="commands/sleep.html">sleep</a>.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="nesting"></a><font face="Arial,Helvetica">Script
+Nesting</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Script nesting (one script calling another script) is supported and is
+limited only by the amount of stack that has been allocated to the monitor.&nbsp;
+This works well because the script runner within TFS calls subscripts by
+simply furthering its depth into its own stack.&nbsp; If a script runs
+a binary executable (COFF, ELF or AOUT), things can get a bit more complicated,
+and just what happens depends on the way the executable was built.&nbsp;
+If the executable simply returns through the same point from which it was
+called (the entrypoint of that load image), then it will return to the
+script runner when complete and the calling script will regain control.&nbsp;
+If the executable starts up some multi-tasking operating system, then its
+only means of termination is through <a href="api/appexit.html">mon_appexit()</a>.&nbsp;
+This means that the monitor is being reentered; hence, no stack frame to
+return through, so the calling context is lost and no further "unnesting"
+will be done.&nbsp; Refer to the <a href="monlib.html#simple_example">example
+application startup code</a> for a simple example that can be configured
+to use mon_appexit() or simply return to the monitor.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Note that the limitation described above is beyond the scope of this monitor.&nbsp;
+A typical system will boot up and run some diagnostic executable, followed
+by a script that configures the system and finally the actual application
+executable.&nbsp; All three of these files would be in TFS with the auto-boot
+flag set.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+One final note regarding script nesting... All shell variables are global.&nbsp;
+If script A sets VARA, then calls script B which modifies VARA, script
+A will see that modification.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="cleanup"></a></font>Example
+#1: cleanup</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This script can be used to apply some conditions to the "tfs clean" command
+which is used to defragment the FLASH used by TFS.&nbsp; The script can
+be run at the command line with or without an argument passed to it, or
+(if the <a href="tfs.html#attributes">TFS attribute</a> 'b' or 'B' is set)
+it will automatically run at system startup.</font></blockquote>
+
+<blockquote>
+<blockquote><tt># Cleanup script:</tt>
+<br><tt># Used to call tfs clean if TFS is running out of flash space.</tt>
+<br><tt># If argument is present, then use it as the threshold; else</tt>
+<br><tt># use default of 1000000.</tt>
+<br><tt>#</tt>
+<br><tt>argv -v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Load cmd line args into shell vars.</tt>
+<br><tt>set SIZE 1000000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Establish default size.</tt>
+<br><tt>if $ARGC eq 1 goto CLEANUP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # If no
+args, jump to cleanup; else</tt>
+<br><tt>set SIZE $ARG1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# set SIZE to cmd line arg value.</tt>
+<p><tt># CLEANUP:</tt>
+<br><tt>tfs -v freemem freemem&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Determine amount of free memory left</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# in TFS and place that value in $freemem.</tt>
+<br><tt>set -i freemem 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Change to decimal value.</tt>
+<br><tt>if $freemem gt $SIZE goto DONE&nbsp; # If $freemem is less than
+size, run</tt>
+<br><tt>tfs clean&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# tfs clean to defragment.</tt>
+<p><tt># DONE:</tt></blockquote>
+
+<p><br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Notice the use of '#' as an indication that the remaining text on the line
+is a comment.&nbsp; Also, note the use of "goto tags" such as 'CLEANUP'
+and 'DONE'.&nbsp;&nbsp;&nbsp; When script execution is in progress,&nbsp;
+if a 'goto' statement is reached (either standalone or part of an 'if'
+statement) the argument to the 'goto' is assumed to be a tag that exists
+somewhere else in the script.&nbsp; A target of a goto tag is seen by the
+monitor as the first whitespace delimited block of text after a pound sign.&nbsp;
+The content of the argument to goto is compared to the same number of characters
+at the start of the tag.&nbsp; As a result, the line</font>
+<p><tt>&nbsp;&nbsp;&nbsp; # CLEANUP:</tt>
+<p><font face="Arial,Helvetica">is the target of the line</font>
+<p><tt>&nbsp;&nbsp;&nbsp; if $ARGC eq 1 goto CLEANUP</tt>
+<p><font face="Arial,Helvetica">even though the target has the colon at
+the end, the first 7 characters match.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Finally, note that multiple targets with the same text can cause undefined
+results.&nbsp; The following two lines are considered to be the same target...</font>
+<br>&nbsp;
+<blockquote><tt># CLEANUP: this is the start of tfs defragmentation</tt></blockquote>
+
+<blockquote><tt># CLEANUP is the first line of tfs defragmentation</tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="ping"></a><font face="Arial,Helvetica">Example
+# 2: ping</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The following example is similar in syntax to the above script, but carries
+out a totally different task...</font>
+<p><tt>&nbsp;&nbsp;&nbsp; #</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; # ping script using icmp echo and argv:</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; # script syntax: ping IP_ADDRESS [optional ping
+count]</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; #</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; argv -v</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; if $ARGC eq 2 goto PING_1</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; if $ARGC eq 3 goto PING_N</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; echo $ARG0: requires IP address</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; exit</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; # PING_1:</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; icmp echo $ARG1</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; exit</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; # PING_N:</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; icmp -c $ARG2 echo $ARG1</tt>
+<p><font face="Arial,Helvetica">Not much to say.&nbsp; Same kind of deal
+as <i>cleanup</i> above.&nbsp; Uses comments, goto tags and the argv command
+to build a fairly self-explanatory wrapper around the 'icmp' command in
+the monitor.</font>
+<br>&nbsp;</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="namelist"></a><font face="Arial,Helvetica">Example
+# 3: namelist</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The following example demonstrates a usage of the nested shell variable
+capability in the monitor's command interpreter...</font>
+<blockquote><tt># Build a name list:</tt>
+<br><tt>set NAME_1 Jane</tt>
+<br><tt>set NAME_2 John</tt>
+<br><tt>set NAME_3 Peter</tt>
+<br><tt>set NAME_4 Paul</tt>
+<br><tt>set NAME_5 Tommy</tt>
+<br><tt>set NAME_6 Adam</tt>
+<br><tt>set NAME_7 Eric</tt>
+<br><tt>set idx 1</tt>
+<br><tt>set max 7</tt>
+<p><tt># Now print the name list using the idx shell variable as an index:</tt>
+<br><tt># TOP:</tt>
+<br><tt>if $idx gt $max goto DONE</tt>
+<br><tt>echo ${NAME_${idx}}</tt>
+<br><tt>set -i idx</tt>
+<br><tt>goto TOP</tt>
+<br><tt># DONE</tt></blockquote>
+<font face="Arial,Helvetica">The output of this script would be...</font>
+<blockquote><tt>Jane</tt>
+<br><tt>John</tt>
+<br><tt>Peter</tt>
+<br><tt>Paul</tt>
+<br><tt>Tommy</tt>
+<br><tt>Adam</tt>
+<br><tt>Eric</tt></blockquote>
+<font face="Arial,Helvetica">Note that the 'idx' shell variable is used
+like an index into an array of names; where the array is called 'NAME_".</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="item"></a><font face="Arial,Helvetica">Example
+# 4: namelist using "item" command</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The following example demonstrates a usage of the "item" command in the
+monitor's command interpreter.&nbsp; The end result is similar to the above
+example, but implemented in a simpler way...</font>
+<blockquote><tt># Print each name in a list:</tt>
+<br><tt>set idx 1</tt>
+<br><tt># Top_of_Loop:</tt>
+<br><tt>item $idx NAME Jane John Peter Paul Tommy Adam Eric</tt>
+<br><tt>if $NAME seq \$NAME exit</tt>
+<br><tt>echo $NAME</tt>
+<br><tt>set -i idx</tt>
+<br><tt>goto Top_of_Loop</tt></blockquote>
+<font face="Arial,Helvetica">The output of this script would be...</font>
+<blockquote><tt>Jane</tt>
+<br><tt>John</tt>
+<br><tt>Peter</tt>
+<br><tt>Paul</tt>
+<br><tt>Tommy</tt>
+<br><tt>Adam</tt>
+<br><tt>Eric</tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="example5"></a><font face="Arial,Helvetica">Example
+# 5: processing a variable number of command line arguments</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This example uses the <a href="commands/argv.html">argv</a> command and
+the command interpreter's <a href="shellvars.html">shell variable processing</a>
+to handle a command line that has a variable number of arguments...</font>
+<blockquote><tt># This script processes a variable number of command line</tt>
+<br><tt># arguments using the argv command and nested shell variables...</tt>
+<br><tt>argv -v</tt>
+<br><tt>set idx 0</tt>
+<br><tt># TOP:</tt>
+<br><tt>echo Arg $idx: ${ARG${idx}}</tt>
+<br><tt>set -i idx</tt>
+<br><tt>if $idx lt $ARGC goto TOP</tt></blockquote>
+<font face="Arial,Helvetica">If the script was invoked with "script aa
+bb cc dd", the output would be...</font>
+<blockquote><tt>Arg 0: script</tt>
+<br><tt>Arg 1: aa</tt>
+<br><tt>Arg 2: bb</tt>
+<br><tt>Arg 3: cc</tt>
+<br><tt>Arg 4: dd</tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="why_do_this"></a><font face="Arial,Helvetica">Example
+# 6: why would you ever want to do this??...</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This example takes the shell variable usage to a bit of an extreme, but
+demonstrates its capability within a script yet again...</font>
+<blockquote><tt>set abcX HELLO</tt>
+<br><tt>set defY MOM</tt>
+<br><tt>set var1 X</tt>
+<br><tt>set var2 Y</tt>
+<br><tt>set HELLO_MOM BINGO!</tt>
+<br><tt>echo ${abc${var1}}_${def${var2}}</tt>
+<br><tt>echo ${${abc${var1}}_${def${var2}}}</tt></blockquote>
+<font face="Arial,Helvetica">The output would be generated by the two final
+"echo" lines...</font>
+<blockquote><tt>HELLO_MOM</tt>
+<br><tt>BINGO!</tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="example7"></a><font face="Arial,Helvetica">Example
+# 7: startup script using subroutines, if/else and file decompression</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This is a practical script example that could be used for a system that
+may (or may not) have their application compressed and their monitor has
+been configured in such a way that file decompression requires temporary
+monitor heap expansion.&nbsp; Note that the use of the 0x44000002 is PowerPC
+specific, but could be re-worked for other CPUs.&nbsp; See the <a href="commands/heap.html">heap</a>
+man page for discussion on heap expansion.</font>
+<blockquote><tt>#########################################################</tt>
+<br><tt>#</tt>
+<br><tt># run:</tt>
+<br><tt># Autobootable script used for starting up MicroMonitor</tt>
+<br><tt># based systems.&nbsp; This script allows the user to be</tt>
+<br><tt># unaware of the fact that the application program may be</tt>
+<br><tt># compressed. The heap expansion step is needed for decompresion</tt>
+<br><tt># here because the monitor was intentionally built with less</tt>
+<br><tt># heap space allocated to it than is needed for decompression.</tt>
+<br><tt># If the monitor was allocated more memory at build time, this</tt>
+<br><tt># step could be eliminated.</tt>
+<br><tt># In addition, if the BREAKPOINT shell variable is set, then</tt>
+<br><tt># after the application has been loaded, but before execution</tt>
+<br><tt># starts, the value of 0x44000002 is placed in the address</tt>
+<br><tt># specified by $BREAKPOINT.&nbsp; This inserts a SC (system-call)</tt>
+<br><tt># instruction at that address and will cause an exception to</tt>
+<br><tt># occur.&nbsp; At that point, the monitor command "strace" can
+be</tt>
+<br><tt># used to dump the stack frame.</tt>
+<br><tt>#</tt>
+<br><tt># Main:</tt>
+<br><tt>argv -v</tt>
+<br><tt>if $ARGC eq 1 gosub APPNAME_DEFAULT else gosub APPNAME_ARG1</tt>
+<br><tt>gosub FILE_CHECK</tt>
+<br><tt>if -t iscmp $APP gosub EXPANDLOAD else gosub NORMALLOAD</tt>
+<br><tt>if $BREAKPOINT sne \$BREAKPOINT gosub SETBREAKPOINT</tt>
+<br><tt>call $ENTRYPOINT</tt>
+<br><tt>reset</tt>
+<p><tt># end Main</tt>
+<br><tt>#</tt>
+<br><tt>##########################################################</tt>
+<br><tt>#</tt>
+<br><tt># begin Subroutines:</tt>
+<p><tt># SETBREAKPOINT:</tt>
+<br><tt>pm -4 $BREAKPOINT 0x44000002</tt>
+<br><tt>return</tt>
+<p><tt># EXPANDLOAD:</tt>
+<br><tt>heap -X 0xf0200000,0x40000</tt>
+<br><tt>gosub NORMALLOAD:</tt>
+<br><tt>heap -x</tt>
+<br><tt>return</tt>
+<p><tt># NORMALLOAD:</tt>
+<br><tt>tfs ld $APP</tt>
+<br><tt>return</tt>
+<p><tt># APPNAME_ARG1</tt>
+<br><tt>set APP $ARG1</tt>
+<br><tt>return</tt>
+<p><tt># APPNAME_DEFAULT:</tt>
+<br><tt>if $PLATFORM seq MY_PLATFORM goto APP_MINE</tt>
+<br><tt>if $PLATFORM seq YOUR_PLATFORM goto APP_YOURS</tt>
+<br><tt>echo Invalid platform: $PLATFORM</tt>
+<br><tt>exit</tt>
+<p><tt># APP_YOURS:</tt>
+<br><tt>set APP you</tt>
+<br><tt>return</tt>
+<p><tt># APP_MINE:</tt>
+<br><tt>set APP me</tt>
+<br><tt>return</tt>
+<p><tt># FILE_CHECK:</tt>
+<br><tt>set SIZE</tt>
+<br><tt>tfs size $APP SIZE</tt>
+<br><tt>if $SIZE sne \$SIZE return</tt>
+<br><tt>echo File error: $APP</tt>
+<br><tt>exit</tt>
+<p><tt># USAGE:</tt>
+<br><tt>echo Usage: $ARG0 [appname]</tt>
+<br><tt>exit</tt>
+<br>&nbsp;</blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="docommand"></a><font face="Arial,Helvetica">Overriding
+the default command interpreter used by the script runner</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+By default, scripts are run in the monitor using the command interpreter
+that is part of the monitor.&nbsp; This allows all of the commands within
+the command table of the monitor to be accessible by a script.&nbsp; If
+an application takes over the system, it may have its own command interpreter,
+so if the application expects to be able to use the monitor's script runner,
+then two things must be done:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The application must inform the monitor that
+it has a command interpreter and that the script runner in the monitor
+should use that command interpreter instead of the one in the monitor.&nbsp;
+This allows the monitor's script runner to access the commands that are
+in the application's command table.&nbsp; This is done with the monitor's
+API function <a href="api/tfsctrl.html">tfsctrl()</a> and the TFS_DOCOMMAND
+request.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The application's command interpreter must
+provide a hook so that if the command is not seen in the application's
+command table, the command is passed to the monitor's command interpreter.&nbsp;
+This can be done within the application's command interpreter by calling
+the monitor's API function <a href="api/docommand.html">docommand()</a>.</font></li>
+</ul>
+<font face="Arial,Helvetica">If these two steps are taken, then an application
+will have the ability to use all of the commands in the monitor plus all
+of its additional commands in a script that is run when the application
+is active.&nbsp; Note that the monitor supports the case of duplicate commands
+existing in application and monitor space by ignoring an initial underscore
+if found on the command line.&nbsp; This means that if the application
+has a "help" command and the monitor also has a "help" command, then "_help"
+into the application's command interpreter will be processed as "help"
+by the monitor's command interpreter.</font></blockquote>
+
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: tfsclose</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsclose()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsclose()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Close a TFS file that had previously
+been opened.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsclose(int
+tfd, char *info);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">When all interaction with a previously
+opened file has been completed, mon_tfsclose() must be called to release
+the file descriptor used with the opened file and possibly initiate a transfer
+of the data to flash (if the file was opened for some type of modification).
+The tfd argument is the value that was returned from the initial mon_tfsopen(),
+and the info argument is a string (optionally NULL) that is used to store
+the "info" field of the file header.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; tfd</font></li>
+
+<br><font face="Arial,Helvetica">the same value that was returned when
+the initial mon_tfsopen() was called.</font>
+<li>
+<font face="Arial,Helvetica">char *info</font></li>
+
+<br><font face="Arial,Helvetica">a pointer to a string that is stored in
+the "info" field of the file header.</font></ul>
+
+<p><br><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFS_OKAY&nbsp; if successful,
+else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADARG</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADFD</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FLASHFAILURE</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfsapi.c.html#tfsclose">tfsapi.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

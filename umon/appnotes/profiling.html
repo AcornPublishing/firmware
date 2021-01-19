@@ -1,0 +1,252 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Profiling</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Profiling Your Application</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica"><a href="#tid_stats">RunTime Profiling
+for Task ID Statistics</a></font>
+<br><font face="Arial,Helvetica"><a href="#func_stats">RunTime Profiling
+for Function Statistics</a></font>
+<br><font face="Arial,Helvetica"><a href="#pc_stats">RunTime Profiling
+for Line-of-Code Statistics</a></font>
+<br><font face="Arial,Helvetica"><a href="#pc_stats">Example Profiling
+Session</a></font></center>
+
+<p><br>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Ideally, the
+functions that are most heavily used by the application should be the ones
+that are most heavily optimized.&nbsp; The purpose behind "profiling" an
+application is to determine what functions (or tasks) are active the most.&nbsp;
+This provides the developer with pointers to the code that should be worked
+on hardest.&nbsp;&nbsp;&nbsp;&nbsp; This page discusses how MicroMonitor
+can help a developer profile an application.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The "<a href="../commands/prof.html">prof</a>"
+command is used to configure the runtime portion of the profiler and to
+dump the statistics gathered by the profiler.&nbsp; The runtime portion
+of this is handled through a call to <a href="../api/profiler.html">mon_profiler()</a>.&nbsp;
+This monitor API function is called with a pointer to a monprof structure...</font>
+<br>&nbsp;
+<blockquote><tt>&nbsp;&nbsp;&nbsp; struct monprof {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int type;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int pc;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int tid;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; }</tt></blockquote>
+
+<p><br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Refer to <a href="../src/common/monitor/monprof.h.html">monprof.h</a>
+for the latest information.&nbsp; Currently there are three different modes
+of operation (bitfields in the 'type' member) supported by this profiler:
+MONPROF_FUNCLOG, MONPROF_TIDLOG and MONPROF_PCLOG.&nbsp; Each of them have
+their value and depend on the CPU and facilities available in the target
+hardware.&nbsp; The application simply includes monprof.h as a header in
+the file that contains some high-priority interrupt (preferably the system
+tick) that can call mon_profiler().&nbsp; It must load the 'pc' entry of
+the monprof structure with the address that was interrupted by this interrupt
+handler, and the 'tid' entry with the task id of the running task.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Note that MONPROF_FUNCLOG
+and MONPROF_PCLOG need the 'pc' entry and MONPROF_TIDLOG needs the 'tid'
+entry; hence, both the pc and tid entries may not be required information.</font>
+<br>&nbsp;
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="tid_stats"></a><font face="Arial,Helvetica">Task
+ID Statistics</font></h2>
+<font face="Arial,Helvetica"><b>Definition:</b> the ability to determine
+what tasks are statistically the most active.</font>
+<p><font face="Arial,Helvetica">The prof command is used to initialize
+the profiler so that it knows how many different TID values to keep track
+of.&nbsp; Each time mon_profiler is called the TID value is compared to
+all tid values already logged (binary search), if a match is found, then
+that TID count is incremented; if no match is found then the new TID value
+is inserted into the list.&nbsp; The list is kept sorted so that the TID
+search is kept efficient.</font>
+<p><font face="Arial,Helvetica">Following is an example code snippet that
+would be part of the application's system tick handler or some other high-level
+interrupt...</font>
+<blockquote><tt>struct monprof mp;</tt>
+<p><tt>mp.type = MONPROF_TIDLOG;</tt>
+<br><tt>mp.tid = getCurrentTaskId();&nbsp;&nbsp;&nbsp;&nbsp; /* this is
+application/RTOS specific */</tt>
+<br><tt>mon_profiler(&amp;mp);</tt></blockquote>
+
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="func_stats"></a><font face="Arial,Helvetica">Function
+Statistics</font></h2>
+<font face="Arial,Helvetica"><b>Definition: </b>the ability to determine
+what functions are statistically the most active.</font>
+<p><font face="Arial,Helvetica">The prof command is used to initialize
+the profiler based on the content of the "symtbl" file.&nbsp; This file
+is assumed to have its entries in ascending address order, so the profiler
+uses the addresses as symbolic ranges into which each interrupted PC will
+fall into.&nbsp; For example, if the content of symtbl was:</font>
+<br>&nbsp;
+<blockquote><tt>main&nbsp; 0x123000</tt>
+<br><tt>func&nbsp; 0x123804</tt>
+<br><tt>func1 0x124008</tt></blockquote>
+<font face="Arial,Helvetica">then any interrupted PC value between 0x123000
+and 0x123803 would be considered a hit to the function main().&nbsp; This
+profiling method uses the content of symtbl, so it is wise to remove all
+but the function addresses from symtbl for this profiling method.&nbsp;
+Optimizing symtbl provides two benefits: less ram is needed to store this
+data and less time is taken in the interrupt handler to determine which
+symbolic range the PC has fallen within.&nbsp; At runtime, each call to
+mon_profiler() results in a binary search through the list of function
+symbol addresses looking for a match between the incoming PC and one of
+the symbol address ranges.</font>
+<p><font face="Arial,Helvetica">Following is an example code snippet that
+would be part of the application's system tick handler or some other high-level
+interrupt...</font>
+<blockquote><tt>struct monprof mp;</tt>
+<p><tt>mp.type = MONPROF_FUNCLOG;</tt>
+<br><tt>mp.pc = getInterruptedPC();&nbsp;&nbsp;&nbsp;&nbsp; /* this is
+application/RTOS specific */</tt>
+<br><tt>mon_profiler(&amp;mp);</tt></blockquote>
+
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="pc_stats"></a><font face="Arial,Helvetica">PC
+Statistics</font></h2>
+<font face="Arial,Helvetica"><b>Definition:
+</b>the ability to determine
+what lines of code are statistically the most active.</font>
+<p><font face="Arial,Helvetica">The prof command is used to initialize
+the profiler based on the size of the application's instruction space (size
+of .text section).&nbsp; The runtime profiler assumes that all instructions
+are of fixed size and that an array of space equal to the size of the instruction
+space is dedicated to this profiling.&nbsp; At the call to mon_profiler()
+this mechanism simply takes the interrupted PC and computes an offset into
+the secondary text array based on the PC value and the start of the real
+.text space.&nbsp; The location of the offset is incremented; hence, this
+provides the ability to log each instruction that is interrupted in runtime.&nbsp;
+If the memory space is available and the CPU does have a fixed size for
+each instruction, then this is a very efficient profiling alternative,
+the run-time profiler is simply incrementing a location in a table based
+on the incoming PC and some already computed offset between the actual
+text space and the "shadow" text space used to log the data.&nbsp; Refer
+to the diagram...</font>
+<center>
+<p><img SRC="../images/pc_profiling.gif" NOSAVE height=576 width=768></center>
+
+<p><font face="Arial,Helvetica">Following is an example code snippet that
+would be part of the application's system tick handler or some other high-level
+interrupt...</font>
+<blockquote><tt>struct monprof mp;</tt>
+<p><tt>mp.type = MONPROF_PCLOG;</tt>
+<br><tt>mp.pc = getInterruptedPC();&nbsp;&nbsp;&nbsp;&nbsp; /* this is
+application/RTOS specific */</tt>
+<br><tt>mon_profiler(&amp;mp);</tt>
+<br>&nbsp;</blockquote>
+
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="pc_stats"></a><font face="Arial,Helvetica">Example
+Profiling Session</font></h2>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Let's assume we have an
+application called 'app'.&nbsp; It is an RTOS-based program with three
+tasks, and a memory map as is shown by the output of "tfs -v ld app" below.&nbsp;
+The function "sysTick()" is the system tick handler (high level periodic
+interrupt), the function getInterruptedPC() will return the address of
+the instruction that was running just as the interrupt occurred and the
+function getCurrentTid() will return the ID of the task that was running
+prior to the interrupt occurring.</font>
+<br>&nbsp;
+<blockquote><tt>uMON>tfs -v ld app</tt>
+<br><tt>.text&nbsp;&nbsp;&nbsp;&nbsp; : copy&nbsp;&nbsp; 14200 bytes from
+0xf01b308c to 0x00030000</tt>
+<br><tt>.data&nbsp;&nbsp;&nbsp;&nbsp; : copy&nbsp;&nbsp;&nbsp;&nbsp; 264
+bytes from 0xf01b6804 to 0x00033778</tt>
+<br><tt>.rodata&nbsp;&nbsp; : copy&nbsp;&nbsp;&nbsp;&nbsp; 208 bytes from
+0xf01b690c to 0x00033880</tt>
+<br><tt>.got&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : copy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+16 bytes from 0xf01b69dc to 0x00033950</tt>
+<br><tt>.bss&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : set&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+204 bytes&nbsp; at&nbsp; 0x00033960 to 0x00</tt>
+<br><tt>.sbss&nbsp;&nbsp;&nbsp;&nbsp; : set&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+12 bytes&nbsp; at&nbsp; 0x00033a2c to 0x00</tt></blockquote>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; We are running on a CPU
+that has fixed size instructions (4 bytes per) and enough spare memory
+to allocate a block of RAM equal in size to the .text section of our application
+(14200 bytes).&nbsp; In the application we insert the following code into
+the sysTick() function:</font>
+<br>&nbsp;
+<blockquote><tt>struct monprof mp;</tt>
+<p><tt>mp.type = MONPROF_PCLOG | MONPROF_TIDLOG;</tt>
+<br><tt>mp.pc = getInterruptedPC();</tt>
+<br><tt>mp.tid = getCurrentTid();</tt>
+<br><tt>mon_profiler(&amp;mp);</tt></blockquote>
+<font face="Arial,Helvetica">Prior to running the application, we must
+configure the profiler code in the monitor.&nbsp; This is done with the
+"<a href="../commands/prof.html">prof</a>" command...</font>
+<br><font face="Arial,Helvetica">There are several steps:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Initialize (clear) the profiling statistics
+and control structures</font></li>
+</ul>
+
+<ul>
+<ol><tt>prof init</tt></ol>
+
+<li>
+<font face="Arial,Helvetica">Configure the profiling mechanisms to be used.&nbsp;
+In this case we are using the PC and TID logging.&nbsp; For this example
+we are running an application with 3 task ids and a text section of size
+14200 bytes starting at 0x30000...</font></li>
+
+<br>&nbsp;
+<ul><tt>prof tidcfg 3</tt>
+<br><tt>prof pccfg 4 0x30000 14200</tt></ul>
+
+<li>
+<font face="Arial,Helvetica">Enabling profiling.&nbsp; Without this, the
+mon_profiler() function would simply return with no logging performed.</font></li>
+
+<ul>&nbsp;
+<br><tt>prof on</tt></ul>
+</ul>
+<font face="Arial,Helvetica">At this point, the application can be started
+and statistics will be gathered.&nbsp; At completion of the application
+profiling run, the prof command is used to dump the results of the statistics...</font>
+<blockquote>
+<blockquote><tt>prof show</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">The output of prof show is something like
+this...</font>
+<blockquote>
+<blockquote><tt>FuncCount Cfg: tbl: 0x00000000, size: 0x0</tt>
+<br><tt>TidCount&nbsp; Cfg: tbl: 0x00022000, size: 0x3</tt>
+<br><tt>PcCount&nbsp;&nbsp; Cfg: tbl: 0x00022018, size: 0x3778</tt>
+<p><tt>TID_PROF stats:</tt>
+<br><tt>&nbsp;00000002&nbsp;&nbsp;&nbsp; :&nbsp; 1</tt>
+<br><tt>&nbsp;01114000&nbsp;&nbsp;&nbsp; :&nbsp; 3</tt>
+<br><tt>&nbsp;01114800&nbsp;&nbsp;&nbsp; :&nbsp; 2</tt>
+<p><tt>PC_PROF stats:</tt>
+<br><tt>&nbsp;00030804&nbsp;&nbsp;&nbsp; :&nbsp; 1</tt>
+<br><tt>&nbsp;00031214&nbsp;&nbsp;&nbsp; :&nbsp; 1</tt>
+<p><tt>4 pc out-of-range hits</tt>
+<br><tt>6 total profiler calls</tt></blockquote>
+</blockquote>
+</blockquote>
+
+</body>
+</html>

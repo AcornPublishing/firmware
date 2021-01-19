@@ -1,0 +1,237 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/wiggler/mystart.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* mystart.c:
+ *
+ * This code is used to help bring up a FADS860 evaluation board.
+ * 
+ * General notice:
+ * This code is part of a boot-monitor package developed as a generic base
+ * platform for embedded system designs.  As such, it is likely to be
+ * distributed to various projects beyond the control of the original
+ * author.  Please notify the author of any enhancements made or bugs found
+ * so that all may benefit from the changes.  In addition, notification back
+ * to the author will allow the new user to pick up changes that may have
+ * been made by other users after this version of the code was distributed.
+ *
+ * Author:  Ed Sutter
+ * email:   esutter@lucent.com  (home: lesutter@worldnet.att.net)
+ * phone:   908-582-2351        (home: 908-889-5161)
+ */
+#include "cpuio.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "arch_ppc.h"
+#include "mpc860.h"
+#include "bcsr.h"
+
+/* The monitor's stack is declared in target-specific reset.s.
+ * It is externed here so that the bottom of the stack can be loaded with
+ * some fixed value to be checked periodically be stkchk() to determine if
+ * a stack overflow has occurred.
+ */
+extern ulong    MonStack[];
+
+EPPC    *IMMRBase;
+int timeout;
+extern EPPC *IMMRBase;
+ulong   bcsr;
+struct smc_uart_bd  *rbd, *tbd;
+char    c;
+
+#define PLPRCR_MULTIPLIER   5
+#define BAUD                19200
+#define CLOCK               (4000000 * PLPRCR_MULTIPLIER)
+
+void
+<A NAME="delay">delay</A>()
+{
+    int timeout;
+
+    for(timeout=0;timeout&lt;100000;timeout++);
+}
+
+void
+<A NAME="auxled_on">auxled_on</A>(void)
+{
+    *(ulong *)BCSR4_BASE = bcsr & ~0x10000000;
+}
+
+void
+<A NAME="auxled_off">auxled_off</A>(void)
+{
+    *(ulong *)BCSR4_BASE = bcsr | 0x10000000;
+}
+
+int
+<A NAME="rputchar">rputchar</A>(char c)
+{
+    /* Wait for ready bit to clear... */
+    while(1) {
+        if (!(tbd-&gt;status & 0x8000))
+            break;
+    }
+    *tbd-&gt;baddr = c;
+    tbd-&gt;status |= 0x8000;
+    return((int)c);
+}
+
+int
+<A NAME="gotachar">gotachar</A>(void)
+{
+    if (IMMRBase-&gt;qcp_or_ud.umd.u_rbd.status & 0x8000)
+        return(0);
+    return(1);
+}
+
+int
+<A NAME="getchar">getchar</A>(void)
+{
+    char c;
+
+    while(rbd-&gt;status & 0x8000);
+    /* Retrieve character and clear status bit: */
+    c = *rbd-&gt;baddr;
+    rbd-&gt;status |= 0x8000;
+    return((int)c);
+}
+
+/* start():
+ * Called at the end of reset.s as the first C function after processor
+ * bootup.  It is passed a state that is used to determine whether or not
+ * the CPU is restarting as a result of a warmstart or a coldstart.
+ */
+void
+<A NAME="start">start</A>(void)
+{
+    /* Set IMMRBase pointing to the MPC860's internal register memory map. */
+    IMMRBase = (EPPC *)0xff000000;
+    
+    /* At startup, the board is configured with ethernet and rs232
+     * disabled. Set the appropriate bits in BCSR1 to enable these...
+     */
+    bcsr = *(ulong *)BCSR1_BASE;
+    bcsr &= ~RS232DISABLE_1;
+    bcsr &= ~RS232DISABLE_2;
+    bcsr &= ~ETHERDISABLE;
+    *(ulong *)BCSR1_BASE = bcsr;
+
+    /* Set up the pin (muxed with PIP) to be SMTXD1/SMRXD1: */
+    /* (see page 16-460 of MPC860 Users Manual) */
+    IMMRBase-&gt;pip_pbpar |= 0x000000c0;     
+    IMMRBase-&gt;pip_pbdir &= 0xffffff3f;
+    IMMRBase-&gt;pip_pbodr &= 0xff3f;
+
+    /* Set up SI Mode Register to assign BRG1 to SMC1. */
+    /* (see page 16-114 of MPC860 Users Manual) */
+    IMMRBase-&gt;si_simode &= ~0x0000f000; /* NMSI mode, using BRG1. */
+
+    /* SDMA Control Register: */
+    IMMRBase-&gt;dma_sdcr = 0x0001;
+
+    /* SMC Mode register  (pg 16-352 MPC860 Users Manual): */
+    /* 8 data bits, 1 stop bit, no parity */
+    /* TE & RE not yet enabled. */
+    IMMRBase-&gt;smc_regs[SMC1_REG].smc_smcmr = 0x4820;
+
+    /* Set up a very basic buffer descriptor configuration. */
+    /* Both transmit and receive will use only a 1-byte buffer, both of */
+    /* these buffers will be in DPRAM. */
+    rbd = &IMMRBase-&gt;qcp_or_ud.umd.u_rbd;
+    tbd = &IMMRBase-&gt;qcp_or_ud.umd.u_tbd;
+
+    /* Set parameter ram to point to buffer descriptors in DPRAM: */
+    /* Note that this will generate a compiler warning because we are */
+    /* casting a pointer to a short. This can be ignored because these */
+    /* two entries are offsets relative to the base of the IMMR, not the */
+    /* actual address. */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.rbase = (ushort)rbd;
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.tbase = (ushort)tbd;
+
+    /* Set RFCR,TFCR -- Rx,Tx Function Code */
+    /* Normal Operation and Motorola byte ordering */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.rfcr = 0x10;  
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.tfcr = 0x10;  
+
+    /* MRBLR = MAX buffer length */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.mrblr = 1;    
+
+    /* MAX_IDL = Disable MAX Idle Feature */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.max_idl = 0;  
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.brkln = 0;    
+
+    /* BRKEC = No break condition occurred */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.brkec = 0;    
+
+    /* BRKCR = 1 break char sent on top XMIT */
+    IMMRBase-&gt;PRAM[PAGE3].pg.other.smc_dsp1.psmc1.u1.brkcr = 1;    
+
+    /* Mask all interrupts: */
+    IMMRBase-&gt;smc_regs[SMC1_REG].smc_smcm = 0;     
+    IMMRBase-&gt;cpmi_cicr = 0;           /* Disable all CPM interrups */
+    IMMRBase-&gt;cpmi_cipr = 0xFFFFFFFF;  /* Clear all pending interrupt events */
+    IMMRBase-&gt;cpmi_cimr = 0;           /* Mask all event interrupts */
+    
+    /* Initialize buffer descriptors: */
+    rbd-&gt;status = 0xa000;       /* 16-354 */
+    rbd-&gt;length = 1;
+    rbd-&gt;baddr = IMMRBase-&gt;qcp_or_ud.umd.u_rxbuf;
+
+    tbd-&gt;status = 0x2000;       /* 16-359 */
+    tbd-&gt;length = 1;
+    tbd-&gt;baddr = IMMRBase-&gt;qcp_or_ud.umd.u_txbuf;
+
+    /* Clear any events: */
+    IMMRBase-&gt;smc_regs[SMC1_REG].smc_smce = 0xFF;
+
+    /* Issue CPM Command to init RX/TX params (wait for completion): */
+    IMMRBase-&gt;cp_cr = 0x0091;
+    timeout = 500000;
+    while(IMMRBase-&gt;cp_cr & 0x0001) {
+        timeout--;
+        if (timeout &lt;= 0)
+            break;
+    }
+
+    /* Setup baudrate based on incoming value: */
+    /* Clock is 4Mhz multplied up to 20Mhz. */
+    /* (0x10000 | (((CLOCK/(BAUD*16)) - 1)  1)) */&lt;&lt;
+    IMMRBase-&gt;brgc1 = (0x10000 | (((CLOCK/(BAUD*16)) - 1) &lt;&lt; 1));
+
+    /* SMC Mode register  (pg 16-352 MPC860 Users Manual): */
+    /* TE & RE now enabled. */
+    IMMRBase-&gt;smc_regs[SMC1_REG].smc_smcmr = 0x4823;
+
+    bcsr = *(ulong *)BCSR4_BASE;
+
+    c = ' ';
+
+    while(1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/wiggler/mystart.c.html#delay>delay</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/wiggler/mystart.c.html#auxled_on>auxled_on</A>();
+
+        *(ulong *)0x1000 = 0x33445566;
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/wiggler/mystart.c.html#delay>delay</A>();
+        if (*(ulong *)0x1000 == 0x33445566) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>('=');
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>('!');
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>('=');
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(c);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/wiggler/mystart.c.html#delay>delay</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/wiggler/mystart.c.html#auxled_off>auxled_off</A>();
+
+        if (<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>())
+            c = <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+    }
+}
+</HTML>
+</PRE>
+</BODY>

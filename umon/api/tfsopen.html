@@ -1,0 +1,157 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en] (Win95; I) [Netscape]">
+   <title>Micro Monitor API: tfsopen</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsopen()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsopen()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Open up a TFS file for read and/or
+write access.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsopen(char
+*filename,long flagmode, char *buffer);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Similar to a standard open() of
+a file, this function allows the user to open a TFS file for access.&nbsp;
+The final buffer argument is needed only for files that are to be created
+or modified.&nbsp; This is the space that is used by TFS for building the
+file as multilple mon_tfswrite() calls are made, the data written is placed
+in this buffer; then when mon_tfsclose() is called to complete the file
+transaction, the buffer is transferred to flash to become a permanent part
+of the file system.</font>
+<br><font face="Arial,Helvetica">Note that the final buffer argument should
+be NULL if the file is opened for read-only.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *filename</font></li>
+
+<br><font face="Arial,Helvetica">name of the file to be read, written or
+created.</font>
+<li>
+<font face="Arial,Helvetica">long flagmode</font></li>
+
+<br><font face="Arial,Helvetica">the flags to be applied to the file when
+closed and the mode that the file is to be opened in</font>
+<li>
+<font face="Arial,Helvetica">char *buffer</font></li>
+
+<br><font face="Arial,Helvetica">a pointer to memory space that will be
+used by TFS while the file is being generated.</font></ul>
+<font face="Arial,Helvetica">Valid modes:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">TFS_RDONLY: file is assumed to already exist,
+and it is being opened for reading only.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_APPEND: file is assumed to already exist,
+and it is being opened to append to the end of the current file.&nbsp;
+If the file does not exist, then an error (TFSERR_NOFILE) is returned.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_CREATE: file is assumed to not exist,
+and it is being created.&nbsp; If the file does exist, an error (TFSERR_FILEEXISTS)
+is returned.</font></li>
+</ul>
+<font face="Arial,Helvetica">In general, only one mode should be specified.&nbsp;
+An exception to this is TFS_APPEND|TFS_CREATE.&nbsp; If both of these modes
+are specified, then TFS will modify the mode based on the presence of the
+file... If the file exists, then it is opened with TFS_APPEND; if the file
+doesn't exist, it is opened with TFS_CREATE.</font>
+<p><font face="Arial,Helvetica">Valid flags:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">TFS_EXEC: executable</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_BRUN: to be automatically executed at
+boot time</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_QRYBRUN: to be automatically executed
+at boot time, after querying at the console.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_COFF: loadable executable is COFF format.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_ELF: loadable executable is ELF format.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_AOUT: loadable executable is AOUT format.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_CPRS: file is compressed.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_UNREAD: file cannot even be read at a
+user level lower than its own.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFS_ULVLN: file is accessible by user level
+N and above, where N can be 0-3.</font></li>
+</ul>
+<font face="Arial,Helvetica">In general, multiple flags are specified for
+a file.&nbsp; For example...</font>
+<blockquote><font face="Arial,Helvetica">TFS_EXEC|TFS_QRYBRUN|TFS_ELF|TFS_ULVL2</font></blockquote>
+<font face="Arial,Helvetica">is a valid flag specification indicating that
+the file is executable ELF that will autoboot with query and will only
+be executable by userlevels greater than or equal to 2.</font>
+<p><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Any number greater
+than or equal to zero (similar, but not to be confused with, a file descriptor)&nbsp;
+if successful, else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_NOFILE</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_USERDENIED</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FILEEXISTS</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADARG</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_MEMFAIL</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_NOSLOT</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfsapi.c.html#tfsopen">tfsapi.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Debugging</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Debugging Your Application</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica"><a href="#symbolic_debugging">Symbolic
+Debugging</a></font>
+<br><font face="Arial,Helvetica"><a href="#Runtime_trace">Run-Time Trace</a></font>
+<br><font face="Arial,Helvetica"><a href="#Stack_trace">Context-Sensetive
+Stack Trace</a></font>
+<br><font face="Arial,Helvetica"><a href="#build_symtbl">Building a "symtbl"
+File</a></font></center>
+
+<p><br>
+<blockquote>
+<center><font face="Arial,Helvetica">This page will discuss how MicroMonitor
+can help a developer debug an application.&nbsp; Portions of these capabilities
+are CPU and compiler independent, but some portions do require code in
+the monitor that is specific to the target hardware and the compiler used.&nbsp;
+That being the case, sections of the following discussion that are not
+CPU and compiler independent may not be available on all target systems.</font>
+<br><font face="Arial,Helvetica">For additional debugging tips, refer to
+<a href="../commands/strace.html">stack trace</a> and <a href="../commands/prof.html">profiling</a>
+pages.</font></center>
+
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="symbolic_debugging"></a><font face="Arial,Helvetica">Symbolic
+Debugging:</font></h2>
+<font face="Arial,Helvetica"><b>Definition:</b> the ability to look at
+variables of various types (integer, short, struct, etc...)&nbsp; in the
+target system without the need to be aware of their actual physical address.</font>
+<p><font face="Arial,Helvetica">The monitor's ability to do symbolic debugging
+comes from the command line interface's (CLI) ability to replace "symbols"
+on the command line with "replacement strings" from the symbol table.&nbsp;
+The symbol table for the monitor is a simple file (called <i>symtbl</i>)
+in TFS.&nbsp; Each line in the file is assumed to contain a symbol name
+followed by a string to replace the symbol name.&nbsp; In all cases of
+its usage so far, the string that replaces the symbol name is a hex address,
+but this is not a requirement.</font>
+<br><font face="Arial,Helvetica">Following is an example that uses <i>symtbl</i>
+to replace a string with a hex address.&nbsp; Assume we have the following
+lines in our <i>symtbl</i> file in TFS...</font>
+<br>&nbsp;
+<blockquote>
+<blockquote><tt>IpAddr_binary&nbsp;&nbsp;&nbsp;&nbsp; 0xf0041008</tt>
+<br><tt>MacAddr_binary&nbsp;&nbsp;&nbsp; 0xf0042000</tt>
+<br><tt>myVariable&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0xf0042040</tt>
+<br><tt>ipHdr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0xf0048010</tt>
+<br><tt>testFunction&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0xf0100480</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">With that, we can now type in the following
+command on the monitor console...</font>
+<blockquote>
+<blockquote><tt>dm -4d %myVariable 1</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">and it will be converted by the monitor's
+CLI to...</font>
+<blockquote>
+<blockquote><tt>dm -4d 0xf0042040 1</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">The command interpreter then processes the
+converted line.&nbsp; The result is that whatever was stored in&nbsp; <i>myVariable</i>
+as a 4-byte integer will be displayed in decimal format to the user (see
+<a href="../commands/dm.html">dm</a>
+command for details on output formats); with the user&nbsp; unaware of
+the physical location of the&nbsp; variable.&nbsp;&nbsp; All commands within
+the monitor can&nbsp; take advantage of this symbolic replacement by the
+CLI, but certain commands are more applicable to symbolic debugging.</font>
+<p><font face="Arial,Helvetica">To modify a location in memory, use the
+"<a href="../commands/pm.html">pm</a>" command (similar in syntax to dm).&nbsp;
+The following line...</font>
+<blockquote>
+<blockquote><tt>pm -4 %myVariable 87</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">will place decimal 87 into the location 0xf0042040,
+assuming it is a 4-byte integer.</font>
+<p><font face="Arial,Helvetica">To execute a function within the system,
+the "<a href="../commands/call.html">call</a>" command can be used.&nbsp;
+The following line...</font>
+<blockquote>
+<blockquote><tt>call %testFunction</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">will execute the function "testFunction()"
+assumed to reside in memory at 0xf0100480.&nbsp; The return value will
+be displayed and arguments could be passed to it.</font>
+<p><font face="Arial,Helvetica">Finally, and probably most useful is the
+"cast" command.&nbsp; The following line...</font>
+<blockquote>
+<blockquote><font face="Arial,Helvetica">cast ip %ipHdr</font></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">will display memory starting at location 0xf0048010
+as a structure of type "ip" (see <a href="../commands/cast.html">cast</a>
+for more details).</font>
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="Runtime_trace"></a><font face="Arial,Helvetica">Run-time
+Trace:</font></h2>
+<font face="Arial,Helvetica"><b>Definition: </b>the ability to analyze
+the behaviour of a system as it is carrying out the tasks it was designed
+to carry out, without severely affecting the performance and without modifying
+the code.</font>
+<p><font face="Arial,Helvetica">Note, first that this is "run-time" not
+"real-time" trace; although, it is about as close to real time as you are
+going to get without the help of external equipment.&nbsp; One of the commands
+in the monitor is called "<a href="../commands/at.html">at</a>".&nbsp;
+This is an attempt to provide the ability to do some fairly sophisticated
+run-time state analysis by setting a variety of breakpoints, or hooks,
+in the code that allow the user to keep track of events.&nbsp; For example,
+as a simple case, you could set up a counter that would keep track of the
+number of times a particular function is called.&nbsp; Or you could cause
+a breakpoint to occur ONLY after some other function has occurred 3 times.&nbsp;
+There is a difference between a breakpoint and a hook.&nbsp;&nbsp; A breakpoint
+causes the application to stop and turn over control to the monitor; while
+a hook simply causes the application to branch into some record-keeping
+code in the monitor and then continue from the point of the branch.</font>
+<p><font face="Arial,Helvetica"><font color="#FF0000"><b>Note1: </b>An
+important limitation of the monitor regarding breakpoints is that once
+a breakpoint (not a hook) has been taken, there is no turning back.&nbsp;
+The monitor does not support the ability to resume execution of the application.&nbsp;
+This limitation keeps the monitor simple, because a <i>true</i> breakpoint
+would have to shutdown all periphery until control was returned to the
+application.&nbsp; This can be quite tricky and is heavily target-system
+dependent, so keeping simplicity in mind, it is not a feature of this monitor's
+debug capability.</font></font>
+<p><font face="Arial,Helvetica"><font color="#FF0000"><b>Note2: </b>This
+capability, although implemented for some earlier monitor ports, has not
+been used much lately; hence, it needs work to be compatible with some
+of the current CPUs.</font></font>
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="Stack_trace"></a><font face="Arial,Helvetica">Context-Sensitive
+Stack Trace:</font></h2>
+<font face="Arial,Helvetica"><b>Definition:
+</b>the ability to determine
+how the system reached a certain point in the code (function nesting) for
+both single and multi-threaded applications.</font>
+<p><font face="Arial,Helvetica">What do you do if you hit a piece of code
+(or take an exception) and want to know how you got there?&nbsp; A stack
+trace capability is invaluable in cases like this.&nbsp; MicroMonitor has
+a stack trace capability that allows the user to step back through the
+function nesting to see each of the functions that have been called to
+reach the current context.&nbsp; Having this capability allows the user
+to insert a "man-made" exception into an error leg of the code and upon
+taking that exception the user can quickly determine how the code got there.&nbsp;
+Refer to the <a href="../commands/strace.html">strace</a> command for more
+details.&nbsp; Following is an example of a system exception followed by
+the monitor's strace output...</font>
+<p><tt>EXCEPTION (offset 0xc00) occurred near 0xf003204c</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; R0=0xf002e474&nbsp;&nbsp;&nbsp;&nbsp; R1=0xf00f6e90&nbsp;&nbsp;&nbsp;&nbsp;
+R2=0xf00d1780&nbsp;&nbsp;&nbsp;&nbsp; R3=0x00000021</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; R4=0xf00e7964&nbsp;&nbsp;&nbsp;&nbsp; R5=0x00000000&nbsp;&nbsp;&nbsp;&nbsp;
+R6=0x00000006&nbsp;&nbsp;&nbsp;&nbsp; R7=0x00009000</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; R8=0x00000001&nbsp;&nbsp;&nbsp;&nbsp; R9=0x00000000&nbsp;&nbsp;&nbsp;
+R10=0x00000005&nbsp;&nbsp;&nbsp; R11=0x00000021</tt>
+<br><tt>&nbsp;&nbsp; R12=0x00000001&nbsp;&nbsp;&nbsp; R13=0xf00dd8fc&nbsp;&nbsp;&nbsp;
+R14=0x00000000&nbsp;&nbsp;&nbsp; R15=0x00000000</tt>
+<br><tt>&nbsp;&nbsp; R16=0x00000000&nbsp;&nbsp;&nbsp; R17=0x00000000&nbsp;&nbsp;&nbsp;
+R18=0x00000000&nbsp;&nbsp;&nbsp; R19=0x00000000</tt>
+<br><tt>&nbsp;&nbsp; R20=0x00000000&nbsp;&nbsp;&nbsp; R21=0x00000000&nbsp;&nbsp;&nbsp;
+R22=0x00000000&nbsp;&nbsp;&nbsp; R23=0x00000000</tt>
+<br><tt>&nbsp;&nbsp; R24=0x00000000&nbsp;&nbsp;&nbsp; R25=0x00000000&nbsp;&nbsp;&nbsp;
+R26=0x00000000&nbsp;&nbsp;&nbsp; R27=0x00000000</tt>
+<br><tt>&nbsp;&nbsp; R28=0x00000c00&nbsp;&nbsp;&nbsp; R29=0xf000add4&nbsp;&nbsp;&nbsp;
+R30=0x00000000&nbsp;&nbsp;&nbsp; R31=0x00000000</tt>
+<br><tt>&nbsp;&nbsp; MSR=0x00001000&nbsp;&nbsp; SRR0=0xf003204c&nbsp;&nbsp;
+SRR1=0x00009000&nbsp;&nbsp;&nbsp;&nbsp; CR=0x20000000</tt>
+<br><tt>&nbsp; SRR2=0x00000000&nbsp;&nbsp; SRR3=0x00000000&nbsp;&nbsp;
+BEAR=0x00000000&nbsp;&nbsp; DEAR=0x00000000</tt>
+<br><tt>&nbsp; BESR=0x00000000&nbsp;&nbsp;&nbsp; ESR=0x00000000&nbsp; EXISR=0x00000008&nbsp;&nbsp;&nbsp;
+TSR=0xc4000000</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; LR=0xf002e4a0</tt>
+<p><tt>uMON> strace</tt>
+<br><tt>&nbsp;&nbsp; 0xf003204c: systemError() + 0x4</tt>
+<br><tt>&nbsp;&nbsp; 0xf00265d0: funcA() + 0xe4</tt>
+<br><tt>&nbsp;&nbsp; 0xf00a17fc: TaskMain() + 0x34</tt>
+<br><tt>uMON></tt>
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="build_symtbl"></a><font face="Arial,Helvetica">Building
+a "symtbl" File:</font></h2>
+<font face="Arial,Helvetica">The steps taken to build the symtbl file vary
+because it is dependent on the way the compiler/linker toolset builds the
+symbol file (some derivative of 'nm' usually).&nbsp; It is usually some
+type of tabulated output that can be easily parsed with a few shell commands
+like awk &amp; grep.&nbsp; If this is not available, there is a tool called
+monsym that will take an input file and rearrange the collumns to be in
+the format needed for symtbl.&nbsp; Refer to <a href="../tools/doc/monsym.html">monsym</a>
+for details.&nbsp; The syntax of each line in the monitor's symtbl file
+is simply</font>
+<blockquote>
+<blockquote>
+<blockquote><font face="Arial,Helvetica">"&lt;input_string> SP &lt;replacement_string>"</font></blockquote>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">two whitespace delimited strings per line.</font></blockquote>
+
+</body>
+</html>

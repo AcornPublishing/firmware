@@ -1,0 +1,101 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: BootBlock Safety</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Using the BootBlock Safety</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The monitor
+makes no assumption about the underlying FLASH memory other than the fact
+that it is broken up into some fixed number of sectors and that there is
+an algorithm that allows the monitor to write and/or erase data within
+those sectors.&nbsp; This means that the monitor can be put in a system
+and there is no immediate need to be concerned with what capabilities the
+system has to protect its own memory space.&nbsp; It is up to the user
+to make sure that the monitor is able to work with the capabilities of
+the system to best protect the flash from undesired corruption.&nbsp; At
+the one extreme, all flash can be left unprotected and chances are very
+good that there will never be a problem simply because it's not easy to
+accidentally reproduce the flash algorithms necessary to cause a write
+or erasure.&nbsp; At the other extreme, all flash can be write protected
+and there is no need to ever worry about a corruption problem even if the
+"evil" code is executed.&nbsp; Obviously there are quite a few different
+other options between these two and the approach taken is really based
+on the application.&nbsp; <b>The purpose of this section is to discuss
+one option that provides the system with the ability to update almost any
+portion of the flash (monitor or TFS space) without fear of ever losing
+a system because of some error in the process of the update.&nbsp;</b>
+For the sake of this discussion the term "losing a system" refers to the
+situation where the flash update somehow went astray causing the system
+to no longer boot; this means that the device must come back to the factory
+for reprogramming.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The normal monitor does
+a good job of detecting a corrupt file in TFS, but does not have the ability
+to detect corruption within itself; so, if the flash space that is occupied
+by the monitor is not hardware protected (which it wouldn't be if there
+were ever a need to update the monitor), then there is the potential of
+it becoming corrupted and leaving the system in an unrecoverable state.&nbsp;
+The obvious solution to this would be to hardware protect all of the sectors
+that are used by the monitor binary; then it would be impossible for the
+system to trash the flash used by the monitor; unfortunately, this means
+that the monitor itself could not be updated (this may be an acceptable
+case, and if so, you're done here!).</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If there is a need to
+occasionally update the monitor in the field, then use of a boot-sector
+safety is recommended.&nbsp; The system startup is modified slightly such
+that the monitor does not have initial control of the CPU.&nbsp; The bootsector
+code runs a crc on the block of space that contains the monitor binary
+and if it passes, it jumps into the monitor; otherwise, it waits for a
+new download via XMODEM.&nbsp; In this case, ONLY the sectors used by the
+boot-sector safety code (typically less than 4K of space) would be hardware
+protected; hence, all portions of the flash, both monitor and TFS, can
+be updated and even in the worst case, the system can be rebuilt.&nbsp;
+Refer to the diagram below...</font></blockquote>
+
+<center>
+<p><br><img SRC="../images/bootblock.gif" NOSAVE height=512 width=640></center>
+
+<p><br>
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<blockquote><font face="Arial,Helvetica">If the CRC test fails, XMODEM
+is run by the boot sector code.&nbsp; The boot sector code does not have
+the ability to write to flash by itself.&nbsp; It will download a binary
+image to RAM and turn over control to it.&nbsp; That image is expected
+to contain enough smarts to then allow a complete reburn of the monitor
+into flash.&nbsp; Typically it would be a version of the monitor built
+to run in RAM.&nbsp; It can then be used to download a new monitor image
+and transfer it to flash.</font>
+<p><font face="Arial,Helvetica">The creation of this .bsi data is done
+with a tool after the final monitor image has been built.&nbsp; It is a
+post processing stage that is simply put in the makefile after the final
+linkage.&nbsp; The reset code in the monitor must have this space allocated
+and the tool, ibsi, is used to insert the data.&nbsp; Refer to
+<a href="../tools/doc/ibsi.html">ibsi</a>
+for more details.</font></blockquote>
+
+</body>
+</html>

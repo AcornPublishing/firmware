@@ -1,0 +1,847 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/flash.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* flashcom.c:
+ *  This file contains the portions of the flash code that are device
+ *  independent.  Refer to the appropriate device sub-directory for the
+ *  code that is specific to the flash device on the target.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_FLASH
+#include "cpu.h"
+#include "flashdev.h"
+#include "flash.h"
+#include "genlib.h"
+#include "ctype.h"
+#include "stddefs.h"
+#include "tfs.h"
+#include "cli.h"
+
+extern struct flashdesc FlashNamId[];
+
+int     FlashCurrentBank;
+int     sectortoaddr(int,int *,uchar **);
+
+#define SRANGE_ERROR    -1
+#define SRANGE_SINGLE   1
+#define SRANGE_RANGE    2
+#define SRANGE_ALL      3
+    
+/* FlashProtectWindow:
+ *  Must be set to allow any flash operation to be done on space assumed
+ *  to be software protected.
+ */
+int FlashProtectWindow;
+
+/* FlashBank[]:
+ *  This table contains all of the information that is needed to keep the
+ *  flash code somewhat generic across multiple flash devices.
+ */
+struct  flashinfo FlashBank[FLASHBANKS];
+
+#ifdef DISABLE_INTERRUPTS_DURING_FLASHOPS
+#define <A NAME="FLASH_INTSOFF">FLASH_INTSOFF</A>()             <A NAME="intsoff">intsoff</A>()
+#define <A NAME="FLASH_INTSRESTORE">FLASH_INTSRESTORE</A>(ival)     <A NAME="intsrestore">intsrestore</A>(ival)
+#else
+#define <A NAME="FLASH_INTSOFF">FLASH_INTSOFF</A>()             0
+#define <A NAME="FLASH_INTSRESTORE">FLASH_INTSRESTORE</A>(ival)
+#endif
+
+/* showflashtype():
+ *  Find a match between the incoming id and an entry in the FlashNamId[]
+ *  table.  The FlashNamId[] table is part of the device-specific code.
+ */
+int
+<A NAME="showflashtype">showflashtype</A>(ulong id)
+{
+    struct flashdesc *fdp;
+
+    fdp = FlashNamId;
+    while(fdp-&gt;desc) {
+        if (id == fdp-&gt;id) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Device = %s\n",fdp-&gt;desc);
+            return(0);
+        }
+        fdp++;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Flash id 0x%lx not recognized\n",id);
+    return(-1);
+}
+
+/* flasherased():
+ * Return 1 if range of memory is all 0xff; else 0.
+ * Scan through the range of memor specified by begin-end (inclusive)
+ * looking for anything that is not 0xff.  Do this in three sections so
+ * that the pointers can be 4-byte aligned for the bulk of the comparison
+ * range...
+ * The beginning steps through as a char pointer until aligned on a 4-byte
+ * boundary.  Then do ulong * comparisons until the just before the end
+ * where we once again use char pointers to align on the last few
+ * non-aligned bytes (if any).
+ */
+int
+<A NAME="flasherased">flasherased</A>(uchar *begin, uchar *end)
+{
+    ulong *lp, *lp1;
+
+    /* Get pointers aligned so that we can do the bulk of the comparison
+     * with long pointers...
+     */
+    while(((long)begin & 3) && (begin != end)) {
+        if (*begin != 0xff) {
+            return(0);
+        }
+        begin++;
+    }
+    if (begin &gt;= end)
+        return(1);
+
+    lp = (ulong *)begin;
+    lp1 = (ulong *)end;
+    (long)lp1 &= ~3;
+
+    while(lp &lt; lp1) {
+        if (*lp != 0xffffffff) {
+            return(0);
+        }
+        lp++;
+    }
+    if (lp &gt;= (ulong *)end)
+        return(1);
+    
+    begin = (uchar *)lp;
+    do {
+        if (*begin++ != 0xff)
+            return(0);
+    } while(begin != end);
+    return(1);
+}
+
+/* showflashinfo():
+ * Dump information about specified flash device.
+ */
+int
+<A NAME="showflashinfo">showflashinfo</A>(struct flashinfo *fdev, char *range)
+{
+    int i;
+    struct  sectorinfo *sp;
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#showflashtype>showflashtype</A>(fdev-&gt;id) &lt; 0)
+        return(-1);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Base addr   : 0x%08lx\n",(ulong)(fdev-&gt;base));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Sectors     : %d\n",fdev-&gt;sectorcnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Bank width  : %d\n",fdev-&gt;width);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Sector     Begin       End        Size     SWProt?  Erased?\n");
+    for(i=0;i&lt;fdev-&gt;sectorcnt;i++) {
+        sp = &fdev-&gt;sectors[i];
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#inRange>inRange</A>(range,sp-&gt;snum)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    %2d    0x%08lx  0x%08lx  0x%06lx    %s       %s\n",
+                sp-&gt;snum, (ulong)(sp-&gt;begin), (ulong)(sp-&gt;end), sp-&gt;size,
+                sp-&gt;protected ? "yes" : " no",
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flasherased>flasherased</A>(sp-&gt;begin,sp-&gt;end) ? "yes" : "no");
+        }
+    }
+    return(0);
+}
+
+/* flashopload():
+ *  Copy flash operation to ram space.  
+ *  Note that this function assumes that cache is disabled at this point.
+ *  This is important because we are copying text into bss space and if
+ *  cache was on, there could be a coherency problem.
+ */
+int
+<A NAME="flashopload">flashopload</A>(ulong *begin,ulong *end,ulong *copy,int size)
+{
+    volatile ulong  *bp;
+    int ret;
+
+    /* Verify space availability: */
+    if (((int)end - (int)begin) &gt;= size) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashopload overflow ((0x%lx-0x%lx) &gt; 0x%x)\n",
+            (ulong)end,(ulong)begin,size);
+        return(-1);
+    }
+
+    ret = 0;
+    /* Copy function() to RAM, then verify: */
+    bp = begin;
+    while(bp &lt;= end) {
+        *copy = *bp;
+        if (*copy++ != *bp++) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashopload failed\n");
+            ret = -1;
+            break;
+        }
+    }
+
+    return(ret);
+}
+
+/* flashtype():
+ *  Use the device-specific function pointer to call the routine
+ *  relocated to RAM space.
+ */
+int
+<A NAME="flashtype">flashtype</A>(fdev)
+struct flashinfo *fdev;
+{
+    return(fdev-&gt;fltype(fdev));
+}
+
+/* flasherase():
+ *  Use the device-specific function pointer to call the routine
+ *  relocated to RAM space.
+ *  Note that flasherase() is called with a sector number.  The sector
+ *  number is relative to the entire system, not just the particular device.
+ *  This means that if there is more than one flash device in the system that
+ *  the actual sector number (relative to the device) may not be the same
+ *  value.  This adjustment is made here so that the underlying code that is
+ *  pumped into ram for execution does not have to be aware of this.
+ */
+int
+<A NAME="flasherase">flasherase</A>(fdev,snum)
+struct  flashinfo *fdev;
+int snum;
+{
+    int size;
+    unsigned char *base, *end;
+
+    if (fdev-&gt;id == FLASHRAM) {
+        if (snum == ALL_SECTORS) {
+            size = fdev-&gt;end - fdev-&gt;base;
+            base = fdev-&gt;base;
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#sectortoaddr>sectortoaddr</A>(snum,&size,&base);
+        }
+        end = base+size;
+        while(base &lt; end) {
+            *base = 0xff;
+            if (*base++ != 0xff)
+                return(-1);
+        }
+        return(0);
+    }
+
+    if ((snum != ALL_SECTORS) && (fdev-&gt;sectors[0].snum != 0)) {
+/*      printf("Adjusting snum from %d to",snum); */
+        snum -= fdev-&gt;sectors[0].snum;
+/*      printf(" %d.\n",snum); */
+    }
+    return(fdev-&gt;flerase(fdev,snum));
+}
+
+/* flashwrite():
+ *  Use the device-specific function pointer to call the routine
+ *  relocated to RAM space.
+ *  First make a few checks on the request, then write to flash if all
+ *  checks succeed.
+ */
+int
+<A NAME="flashwrite">flashwrite</A>(struct flashinfo *fdev,uchar *dest,uchar *src,long bytecnt)
+{
+    int j, lowsector, highsector;
+    register uchar  *dp, *sp, *edp;
+
+    if (fdev-&gt;id == FLASHRAM) {
+        uchar *sp, *dp, *end;
+        sp = src;
+        dp = dest;
+        end = dp+bytecnt;
+        while(dp &lt; end) {
+            *dp = *sp;
+            if (*dp != *sp)
+                return(-1);
+            dp++; sp++;
+        }
+        return(0);
+    }
+
+    dp = dest;
+    sp = src;
+    edp = (dest + bytecnt) - 1;
+
+    /* If outside the devices space, return failed.. */
+    if ((edp &lt; fdev-&gt;sectors[0].begin) ||
+        (dp &gt; fdev-&gt;sectors[fdev-&gt;sectorcnt-1].end)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashwrite() failed: dest out of flash range\n");
+        return(-1);
+    }
+
+    /* Make sure the destination is not within a protected sector */
+    if (FlashProtectWindow == FLASH_PROTECT_WINDOW_CLOSED) {
+
+        /* First determine the sectors that overlap with the
+         * flash space to be written...
+         */
+
+        lowsector = highsector = -1;
+        for(j=0;j&lt;fdev-&gt;sectorcnt;j++) {
+            if ((dp &gt;= fdev-&gt;sectors[j].begin) &&
+                (dp &lt;= fdev-&gt;sectors[j].end))
+                lowsector = j;
+        }
+        for(j=0;j&lt;fdev-&gt;sectorcnt;j++) {
+            if ((edp &gt;= fdev-&gt;sectors[j].begin) &&
+                (edp &lt;= fdev-&gt;sectors[j].end))
+                highsector = j;
+        }
+        if ((lowsector == -1) || (highsector == -1)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashwrite() failed: can't find sector\n");
+            return(-1);
+        }
+
+        /* Now that the range of affected sectors is known,
+         * verify that those sectors are not protected...
+         */
+        for(j=lowsector;j&lt;=highsector;j++) {
+            if (fdev-&gt;sectors[j].protected) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashwrite() failed: sector protected\n");
+                return(-1);
+            }
+        }
+    }
+
+    /* Now make sure that there is no attempt to transition a bit
+     * in the affected range from 0 to 1...  A flash write can only
+     * bring bits low (erase brings them  high).
+     */
+    while(dp &lt; edp) {
+        if ((*dp & *sp) != *sp) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flashwrite() failed: bit 0-&gt;1 rqst denied.\n");
+            return(-1);
+        }
+        dp++; 
+        sp++;
+    }
+    return(fdev-&gt;flwrite(fdev,dest,src,bytecnt));
+}
+
+/* flashewrite():
+ *  Use the device-specific function pointer to call the routine
+ *  relocated to RAM space.
+ */
+int
+<A NAME="flashewrite">flashewrite</A>(struct flashinfo *fdev,uchar *dest,uchar *src,long bytecnt)
+{
+    int i;
+
+    /* Source and destination addresses must be long-aligned. */
+    if (((int)src & 3) || ((int)dest & 3))
+        return(-1);
+
+    /* If the protection window is closed, then verify that no protected
+     * sectors will be written over...
+     */
+    if (FlashProtectWindow == FLASH_PROTECT_WINDOW_CLOSED) {
+        for (i=0;i&lt;fdev-&gt;sectorcnt;i++) {
+            if((((uchar *)dest) &gt; (fdev-&gt;sectors[i].end)) ||
+                (((uchar *)dest+bytecnt) &lt; (fdev-&gt;sectors[i].begin)))
+                continue;
+            else
+                if (fdev-&gt;sectors[i].protected)
+                    return(-1);
+        }
+    }
+    return(fdev-&gt;flewrite(fdev,dest,src,bytecnt));
+}
+
+/* addrtosector():
+ *  Incoming address is translated to sector number, size of sector
+ *  and base of sector.
+ *  Return 0 if successful; else -1.
+ */
+int
+<A NAME="addrtosector">addrtosector</A>(uchar *addr,int *sector,int *size,uchar **base)
+{
+    struct flashinfo *fbnk;
+    struct  sectorinfo *sinfo;
+    int     dev, sec, i;
+
+    sec = 0;
+    for(dev=0;dev&lt;FLASHBANKS;dev++) {
+        fbnk = &FlashBank[dev];
+        for(i=0;i&lt;fbnk-&gt;sectorcnt;i++,sec++) {
+            sinfo = &fbnk-&gt;sectors[i];
+            if ((addr &gt;= sinfo-&gt;begin) && (addr &lt;= sinfo-&gt;end)) {
+                if (sector) {
+                    *sector = sec;
+                }
+                if (base) {
+                    *base = sinfo-&gt;begin;
+                }
+                if (size) {
+                    *size = sinfo-&gt;size;
+                }
+                return(0);
+            }
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("addrtosector(0x%lx) failed\n",(ulong)addr);
+    return(-1);
+}
+
+/* addrtobank():
+ *  From the incoming address, return a pointer to the flash bank that
+ *  this address is within.
+ */
+struct flashinfo *
+<A NAME="addrtobank">addrtobank</A>(uchar *addr)
+{
+    struct flashinfo *fbnk;
+    int     dev;
+
+    for(dev=0;dev&lt;FLASHBANKS;dev++) {
+        fbnk = &FlashBank[dev];
+        if ((addr &gt;= fbnk-&gt;base) && (addr &lt;= fbnk-&gt;end))
+            return(fbnk);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("addrtobank(0x%lx) failed\n",(ulong)addr);
+    return(0);
+}
+
+int
+<A NAME="sectortoaddr">sectortoaddr</A>(int sector,int *size,uchar **base)
+{
+    struct flashinfo *fbnk;
+    struct  sectorinfo *sinfo;
+    int     dev, sec, i;
+
+    sec = 0;
+    for(dev=0;dev&lt;FLASHBANKS;dev++) {
+        fbnk = &FlashBank[dev];
+        for(i=0;i&lt;fbnk-&gt;sectorcnt;i++,sec++) {
+            if (sec == sector) {
+                sinfo = &fbnk-&gt;sectors[i];
+                if (base) *base = sinfo-&gt;begin;
+                if (size) *size = sinfo-&gt;size;
+                return(0);
+            }
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("sectortoaddr(%d) failed\n",sector);
+    return(-1);
+}
+
+/* flashbankinfo():
+ *  Based on the incoming bank number, return the beginning, end and
+ *  number of sectors within that bank.
+ */
+int
+<A NAME="flashbankinfo">flashbankinfo</A>(int bank,uchar **begin,uchar **end,int *sectorcnt)
+{
+    struct flashinfo *fbnk;
+
+    if (bank &gt;= FLASHBANKS)
+        return(-1);
+
+    fbnk = &FlashBank[bank];
+    if (begin)
+        *begin = fbnk-&gt;base;
+    if (end)
+        *end = fbnk-&gt;end;
+    if (sectorcnt)
+        *sectorcnt = fbnk-&gt;sectorcnt;
+    return(0);
+}
+
+/* lastlargesector():
+ *  Incoming bank number is used to populate the sector information
+ *  (sector number, sector size and address) of the last large sector
+ *  in the specified bank.
+ *  Return 0 if successful; else -1.
+ */
+int
+<A NAME="lastlargesector">lastlargesector</A>(int bank,int *sector,int *size,uchar **base)
+{
+    struct flashinfo    *fbnk;
+    struct sectorinfo   *sinfo;
+    uchar               *largest_sbase;
+    int                 i, largest_ssize, largest_snum;
+
+    if (bank &gt;= FLASHBANKS) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("lastlargesector(%d) failed\n",bank);
+        return(-1);
+    }
+
+    fbnk = &FlashBank[bank];
+    sinfo = fbnk-&gt;sectors;
+    largest_ssize = 0;
+    largest_snum = 0;
+    largest_sbase = (uchar *)0;
+
+    for(i=0;i&lt;fbnk-&gt;sectorcnt;i++,sinfo++) {
+        if (sinfo-&gt;size &gt;= largest_ssize) {
+            largest_ssize = sinfo-&gt;size;
+            largest_snum = sinfo-&gt;snum;
+            largest_sbase = sinfo-&gt;begin;
+        }
+    }
+    if (sector)
+        *sector = largest_snum;
+    if (size)
+        *size = largest_ssize;
+    if (base)
+        *base = largest_sbase;
+    return(0);
+}
+
+void
+<A NAME="LowerFlashProtectWindow">LowerFlashProtectWindow</A>()
+{
+    if (FlashProtectWindow)
+        FlashProtectWindow--;
+}
+
+/* AppFlashWrite():
+ *  Takes in a source, destination and byte count and converts that to
+ *  the appropriate flashwrite() call.  This function supports the possibility
+ *  of having one write request span across multiple devices in contiguous
+ *  memory space.
+ */
+int
+<A NAME="AppFlashWrite">AppFlashWrite</A>(dest,src,bytecnt)
+ulong   *src, *dest;
+long bytecnt;
+{
+    struct flashinfo *fbnk;
+    ulong   oints;
+    int     ret, tmpint;
+    long    tmpcnt;
+
+    ret = 0;
+    while(bytecnt &gt; 0) {
+        fbnk = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#addrtobank>addrtobank</A>((uchar *)dest);
+        if (!fbnk)
+            return(-1);
+    
+        if (((int)dest + bytecnt) &lt;= (int)(fbnk-&gt;end))
+            tmpcnt = bytecnt;
+        else
+            tmpcnt = ((int)(fbnk-&gt;end) - (int)dest) + 1;
+    
+        oints = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSOFF>FLASH_INTSOFF</A>();
+        ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flashwrite>flashwrite</A>(fbnk,(uchar *)dest,(uchar *)src,tmpcnt);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSRESTORE>FLASH_INTSRESTORE</A>(oints);
+        if (ret &lt; 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("AppFlashWrite(0x%lx,0x%lx,%ld) failed\n",
+                (ulong)dest,(ulong)src,bytecnt);
+            break;
+        }
+        tmpint = (int)dest;
+        tmpint += tmpcnt;
+        dest = (ulong *)tmpint;
+        tmpint = (int)src;
+        tmpint += tmpcnt;
+        src = (ulong *)tmpint;
+        bytecnt -= tmpcnt;
+    }
+    return(ret);
+}
+
+int
+<A NAME="AppFlashEraseAll">AppFlashEraseAll</A>()
+{
+    int     ret, i;
+    ulong   oints;
+    struct  flashinfo *fbnk;
+
+    ret = 0;
+    oints = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSOFF>FLASH_INTSOFF</A>();
+    fbnk = FlashBank;
+    for(i=0;i&lt;FLASHBANKS;i++,fbnk++) {
+        ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flasherase>flasherase</A>(fbnk,ALL_SECTORS);
+        if (ret == -1)
+            break;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSRESTORE>FLASH_INTSRESTORE</A>(oints);
+    return(ret);
+}
+
+/* Erase the flash sector specified. */
+int
+<A NAME="AppFlashErase">AppFlashErase</A>(snum) /* erase specified sector */
+int snum;
+{
+    ulong   oints;
+    uchar   *base;
+    int     ret, size;
+    struct  flashinfo *fbnk;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#sectortoaddr>sectortoaddr</A>(snum,&size,&base);
+    fbnk = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#addrtobank>addrtobank</A>(base);
+    if (!fbnk)
+        return(-1);
+    oints = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSOFF>FLASH_INTSOFF</A>();
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flasherase>flasherase</A>(fbnk,snum);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSRESTORE>FLASH_INTSRESTORE</A>(oints);
+    return(ret);
+}
+
+/* sectorProtect():
+ *  Set or clear (based on value of protect) the protected flag for the
+ *  specified range of sectors...
+ *  This supports incoming ranges that can be dash and/or comma delimited.
+ *  For example a range can be "0", "0-3", or "0,2-4", etc...
+ */
+int
+<A NAME="sectorProtect">sectorProtect</A>(char *range, int protect)
+{
+    struct  flashinfo *fbnk;
+    int i, dev, snum;
+
+    snum = 0;
+    for(dev = 0;dev &lt; FLASHBANKS;dev++) {
+        fbnk = &FlashBank[dev];
+        for(i = 0;i &lt; fbnk-&gt;sectorcnt;i++,snum++) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#inRange>inRange</A>(range,snum))
+                fbnk-&gt;sectors[i].protected = protect;
+        }
+    }
+    return(0);
+}
+
+#ifdef FLASHRAM_BASE
+/* FlashRamInit():
+ * This monitor supports TFS space allocated across multiple flash devices
+ * that may not be in contiguous memory space.  To allow BBRAM to be seen
+ * as a "flash-like" device to TFS, we set it up in sectors similar to
+ * those in a real flash device.
+ * Input...
+ *  snum:   All the "flash" space is broken up into individual sectors.
+ *          This is the starting sector number that is to be used for
+ *          the block of sectors within this BBRAM space.
+ *  fbnk:   Pointer to the structure that must be populated with the
+ *          flash bank information.  Usually this contains pointers to the
+ *          functions that operate on the flash; but for RAM they aren't
+ *          necessary.
+ *  sinfo:  Table populated with the characteristics (size, start, etc...)
+ *          of each sector.
+ *  ssizes: A table containing the size of each of the sectors.  This is
+ *          copied to the sinfo space.
+ */
+int
+<A NAME="FlashRamInit">FlashRamInit</A>(int snum, int scnt, struct flashinfo *fbnk,
+            struct sectorinfo *sinfo, int *ssizes)
+{
+    int i;
+    uchar   *begin;
+
+    /* FLASHRAM_SECTORCOUNT (in config.h) must match the number of sectors
+     * allocated to the flash ram device in flashdev.c...
+     */
+    if (scnt != FLASHRAM_SECTORCOUNT)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Warning: flashram sector count inconsistency\n");
+
+    fbnk-&gt;id = FLASHRAM;                        /* Device id. */
+    fbnk-&gt;base = (uchar *)FLASHRAM_BASE;        /* Base address of bank. */
+    fbnk-&gt;end = (uchar *)FLASHRAM_END;          /* End address of bank. */
+    fbnk-&gt;sectorcnt = scnt;                     /* Number of sectors. */
+    fbnk-&gt;width = 1;                            /* Width (in bytes). */
+    fbnk-&gt;fltype = NotUsed;                     /* Flashtype() function. */
+    fbnk-&gt;flerase = NotUsed;                    /* Flasherase() function. */
+    fbnk-&gt;flwrite = NotUsed;                    /* Flashwrite() function. */
+    fbnk-&gt;flewrite = NotUsed;                   /* Flashewrite() function. */
+    fbnk-&gt;sectors = sinfo;                  /* Ptr to sector size table. */
+    begin = fbnk-&gt;base;
+    for(i=0;i&lt;fbnk-&gt;sectorcnt;i++,snum++) {
+        sinfo[i].snum = snum;
+        sinfo[i].size = ssizes[i];
+        sinfo[i].begin = begin;
+        sinfo[i].end = sinfo[i].begin + sinfo[i].size - 1;
+        sinfo[i].protected = 0;
+        begin += sinfo[i].size;
+    }
+    return(snum);
+}
+#endif
+
+char *FlashHelp[] = {
+    "Flash memory operations",
+    "{op} [args]",
+    "Ops...",
+    "  opw",
+    "  info [rnge]",
+    "  init",
+    "  bank [#]",
+    "  prot {rnge}",
+    "  unprot {rnge}",
+#if FLASH_LOCK_SUPPORTED
+    "  lock {rnge}",
+    "  unlock {rnge}",
+    "  lockdwn {rnge}",
+#endif
+    "  erase {rnge}",
+    "  write {dest} {src} {byte_cnt}",
+    "  ewrite {dest} {src} {byte_cnt}",
+    "",
+    "  rnge = range of affected sectors",
+    0,
+};
+
+/* FlashCmd():
+ *  Code that handles the user interface.  See FlashHelp[] below for usage.
+ */
+int
+<A NAME="FlashCmd">FlashCmd</A>(int argc,char *argv[])
+{
+    int     snum, ret;
+    ulong   dest, src, oints;
+    long    bytecnt, rslt;
+    struct  flashinfo *fbnk;
+
+    oints = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSOFF>FLASH_INTSOFF</A>();
+
+    fbnk = &FlashBank[FlashCurrentBank];
+    ret = CMD_SUCCESS;
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"init") == 0)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/flash/flash_dirname/flashdev.c.html#FlashInit>FlashInit</A>();
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"info") == 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#showflashinfo>showflashinfo</A>(fbnk,argv[2]);
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"bank") == 0)  {
+        int tmpbank;
+        if (argc == 3) {
+            tmpbank = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(argv[2]);
+            if (tmpbank &lt; FLASHBANKS)
+                FlashCurrentBank = tmpbank;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Subsequent flash ops apply to bank %d\n",FlashCurrentBank);
+        }
+        else 
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Current flash bank: %d\n",FlashCurrentBank);
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"ewrite") == 0) {
+        if (argc == 5) {
+            dest = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[2],(char **)0,0);
+            src = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[3],(char **)0,0);
+            bytecnt = (long)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[4],(char **)0,0);
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flashewrite>flashewrite</A>(fbnk,(uchar *)dest,(uchar *)src,bytecnt) == -1) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ewrite failed\n");
+                ret = CMD_FAILURE;
+            }
+        }
+        else
+            ret = CMD_PARAM_ERROR;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"write")) {
+        if (argc == 5) {
+            dest = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[2],(char **)0,0);
+            src = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[3],(char **)0,0);
+            bytecnt = (long)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[4],(char **)0,0);
+#if 0
+            rslt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flashwrite>flashwrite</A>(fbnk,(uchar *)dest,(uchar *)src,bytecnt);
+#else
+            rslt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#AppFlashWrite>AppFlashWrite</A>((ulong *)dest,(ulong *)src,bytecnt);
+#endif
+            if (rslt == -1) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Write failed\n");
+                ret = CMD_FAILURE;
+            }
+        }
+        else
+            ret = CMD_PARAM_ERROR;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"opw")) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>() != MAXUSRLEVEL)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Must be user level %d\n",MAXUSRLEVEL);
+        else    
+            FlashProtectWindow = 2;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"unprot")) {
+        if (argc != 3)
+            ret = CMD_PARAM_ERROR;
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#sectorProtect>sectorProtect</A>(argv[2],0);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"prot")) {
+        if (argc != 3) 
+            ret = CMD_PARAM_ERROR;
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#sectorProtect>sectorProtect</A>(argv[2],1);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"erase")) {
+        if (argc != 3) {
+            ret = CMD_PARAM_ERROR;
+        }
+        else {
+            for(snum=fbnk-&gt;sectors[0].snum;snum&lt;fbnk-&gt;sectorcnt;snum++) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#inRange>inRange</A>(argv[2],snum)) {
+                    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flasherase>flasherase</A>(fbnk,snum) == -1) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Erase failed\n");
+                        ret = CMD_FAILURE;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+#if FLASH_LOCK_SUPPORTED
+    else if ((!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"lock")) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"unlock")) ||
+        (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"lockdwn"))) {
+        extern int flashlock(struct flashinfo *fbnk,int snum,int operation);
+        int operation, snum;
+
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"lock")) 
+            operation = FLASH_LOCK;
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[1],"unlock")) 
+            operation = FLASH_UNLOCK;
+        else
+            operation = FLASH_LOCKDWN;
+        if (argc != 3)
+            ret = CMD_PARAM_ERROR;
+        else {
+            for(snum=fbnk-&gt;sectors[0].snum;snum&lt;fbnk-&gt;sectorcnt;snum++) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#inRange>inRange</A>(argv[2],snum)) {
+                    if (flashlock(fbnk,snum,operation) == -1) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Erase failed\n");
+                        ret = CMD_FAILURE;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+#endif
+    else {
+        ret = CMD_PARAM_ERROR;
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#FLASH_INTSRESTORE>FLASH_INTSRESTORE</A>(oints);
+    return(ret);
+}
+
+int
+<A NAME="NotUsed">NotUsed</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ERROR: flash operation not supported\n");
+    return(0);
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,88 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>strace</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>STRACE</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">strace</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Stack trace (used after exception
+or breakpoint).</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">strace</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">In most cases, the user of the
+monitor is running some higher level package that has a complete debugging
+environment included.&nbsp; For those cases, this command is likely to
+be of little value.&nbsp; On the other hand, if you are using a system
+that does not trap exceptions, or allows the user to redefine some of the
+exception handlers, then this is useful for determining just how an exception
+occurred.</font>
+<br><font face="Arial,Helvetica">For best results, this command looks for
+a symbol table file to symbolically dump a function name instead of an
+address within a function.&nbsp; In some cases, the stack trace actually
+requires that the symbol table file be there to work.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">strace</font></li>
+
+<br><font face="Arial,Helvetica">Dumps the current function nesting, showing
+the function name and the hex offset into the function.</font></ul>
+<b><font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></b>
+<ul>
+<li>
+<font face="Arial,Helvetica">Because of the cpu-specific nature of this
+command, it may not be ported to all versions of the monitor.&nbsp; As
+of this writing, strace is available for power-pc and SH2/4 platforms.&nbsp;
+Additional ports will be done as the need arises.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The monitor allows small applications to be
+run directly out of the monitor's own stack space.&nbsp; Be aware that
+strace will not work for those cases simply because the monitor will be
+reusing the same stack that the application had been using.&nbsp; Bottom
+line... if you want to use strace, then establish a stack frame for the
+application.</font></li>
+</ul>
+
+</body>
+</html>

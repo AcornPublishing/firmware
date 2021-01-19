@@ -1,0 +1,708 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor HomePage</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a></h1></center>
+
+<center><img SRC="images/monitor_wide.gif" ALT="Micro Monitor" NOSAVE BORDER=0 USEMAP="#monitor_wide" height=275 width=635>
+<br><map NAME = "monitor_wide"><area SHAPE = "POLY" COORDS = " 176,  11,  121,  50,  116,  90,  204,  91,  205,  72,  377,  71,  376,  51,  225,  50,  280,  10" HREF = "tfs.html"><area SHAPE = "POLY" COORDS = " 402,  220,  414,  228,  439,  208,  430,  194,  401,  219" HREF = "commands/icmp.html" ALT = "Command: ICMP"><area SHAPE = "POLY" COORDS = " 177,  132,  243,  225,  389,  225,  458,  134,  176,  131" HREF = "monitor.html#boot_platform" ALT = "What is an embedded system?"><area SHAPE = "POLY" COORDS = " 245,  44,  314,  47,  354,  16,  289,  9" HREF = "scripts.html" ALT = "Using Scripts"><area SHAPE = "POLY" COORDS = " 324,  45,  342,  49,  361,  33,  352,  22" HREF = "commands/edit.html" ALT = "Command: EDIT"><area SHAPE = "POLY" COORDS = " 487,  93,  513,  133,  513,  133,  570,  165,  582,  151,  600,  151,  602,  144,  499,  78,  487,  93" HREF = "supporttools.html" ALT = "PC Based Support Tools"><area SHAPE = "POLY" COORDS = " 115,  209,  213,  266,  218,  258,  121,  198,  115,  208"><area SHAPE = "POLY" COORDS = " 62,  84,  7,  128,  6,  182,  43,  201,  140,  141,  138,  97,  101,  94,  63,  84" HREF = "appnotes/servers.html" ALT = "Servers built to use TFS"><area SHAPE = "RECT" COORDS = " 403,  7,  493,  29" HREF = "commands/xmodem.html"><area SHAPE = "RECT" COORDS = " 465,  51,  505,  73" HREF = "cmdlist.html"><area SHAPE = "RECT" COORDS = " 436,  32,  510,  48" HREF = "commands/history.html"><area SHAPE = "RECT" COORDS = " 128,  182,  192,  199" HREF = "commands/sm.html" ALT = "Command: SM"><area SHAPE = "RECT" COORDS = " 481,  192,  529,  213" HREF = "tools/doc/moncmd.html" ALT = "UDP based host-monitor interface"><area SHAPE = "RECT" COORDS = " 433,  235,  490,  252" HREF = "commands/tftp.html" ALT = "TFTP client/server"><area SHAPE = "RECT" COORDS = " 397,  253,  464,  272" HREF = "commands/dhcp.html" ALT = "BOOTP client"><area SHAPE = "RECT" COORDS = " 465,  217,  519,  230" HREF = "commands/dhcp.html" ALT = "DHCP client"><area SHAPE = "RECT" COORDS = " 268,  73,  376,  88" HREF = "tfs.html#user_levels" ALT = "User levels in TFS"><area SHAPE = "RECT" COORDS = " 216,  75,  256,  93" HREF = "tfs.html#decompression" ALT = "decompression in TFS"><area SHAPE = "RECT" COORDS = " 522,  69,  597,  90" HREF = "tools/doc/moncmd.html" ALT = "PC Tool: MONCMD"><area SHAPE = "RECT" COORDS = " 556,  93,  620,  110" HREF = "tools/doc/f2mem.html" ALT = "PC Tool: F2MEM"><area SHAPE = "RECT" COORDS = " 591,  117,  630,  136" HREF = "tools/doc/coff.html" ALT = "PC Tool: COFF"><area SHAPE = "RECT" COORDS = " 493,  147,  532,  166" HREF = "tools/doc/ibsi.html" ALT = "PC Tool: IBSI"><area SHAPE = "RECT" COORDS = " 582,  160,  608,  180" HREF = "tools/doc/elf.html" ALT = "PC Tool: ELF"><area SHAPE = "RECT" COORDS = " 523,  169,  563,  185" HREF = "tools/doc/aout.html" ALT = "PC Tool: AOUT"><area SHAPE = "RECT" COORDS = " 564,  187,  605,  204" HREF = "tools/doc/ttftp.html" ALT = "PC Tool: TTFTP"><area SHAPE = "RECT" COORDS = " 175,  215,  226,  229" HREF = "commands/dm.html" ALT = "Command: DM"><area SHAPE = "RECT" COORDS = " 217,  238,  265,  253" HREF = "commands/pm.html" ALT = "Command: PM"><area SHAPE = "RECT" COORDS = " 123,  227,  142,  246" HREF = "commands/fm.html" ALT = "Command: FM"><area SHAPE = "RECT" COORDS = " 142,  250,  179,  269" HREF = "commands/mt.html" ALT = "Command: MT"><area SHAPE = "DEFAULT" HREF = "monitor.html"></map></center>
+
+<blockquote>
+<center><font face="Arial,Helvetica">The information that follows describes
+<i>MicroMonitor</i>,&nbsp;
+a boot platform developed for embedded systems. It provides a firmware
+development team&nbsp; with a <a href="#feature_list">startup feature set</a>
+that is independent of the target CPU and the embedded operating system
+chosen.</font></center>
+</blockquote>
+
+<center>
+<p><br><font face="Arial,Helvetica"><font size=+2><a href="#brief_description">Quick
+Description of Monitor and File System</a></font></font>
+<p><font face="Arial,Helvetica">Click <a href="http://www.embedded.com/internet/0012/0012ia2.htm">here</a>
+for recent "Tiny File System" article published in December 2000 Issue
+of</font>
+<br><font face="Arial,Helvetica"><a href="http://www.embedded.com/mag.htm">Embedded
+Systems Programming</a> magazine.</font>
+<br>&nbsp;
+<p>
+<hr WIDTH="60%">
+<p><b><font face="Arial,Helvetica"><font size=+2>Introductory Questions
+Answered:</font></font></b>
+<p><font face="Arial,Helvetica"><a href="#boot_platform">What is an "embedded
+system boot platform"?</a></font>
+<br><font face="Arial,Helvetica"><a href="#feature_list">What comes with
+Micro Monitor?</a></font>
+<br><font face="Arial,Helvetica"><a href="#why_not_use_OS">Why not use
+what already comes with the RTOS?</a></font>
+<br><font face="Arial,Helvetica"><a href="#what_rtoss">What RTOS's have
+been used with this monitor?</a></font>
+<br><font face="Arial,Helvetica"><a href="#what_cpus">What CPUs has this
+environment been ported to?</a></font>
+<br><font face="Arial,Helvetica"><a href="#min_require">What hardware is
+needed for the monitor to run?</a></font>
+<br><font face="Arial,Helvetica"><a href="#users">Are there other users?</a></font>
+<br><font face="Arial,Helvetica"><a href="#source_code">Source code available?</a></font>
+<br><font face="Arial,Helvetica"><a href="#print_sections">Can I Print
+Sections of this Documentation?</a></font>
+<br><font face="Arial,Helvetica"><a href="#get_started">How do I get started?</a></font>
+<br>&nbsp;
+<p><b><font face="Arial,Helvetica"><font size=+2>Features or Sub-Sections
+in Detail:</font></font></b></center>
+
+<center><table BORDER=0 COLS=3 WIDTH="80%" >
+<tr ALIGN=CENTER>
+<td><font face="Arial,Helvetica"><a href="startup.html">Startup</a></font></td>
+
+<td><font face="Arial,Helvetica"><a href="tfs.html">Tiny File System</a></font></td>
+
+<td><font face="Arial,Helvetica"><a href="scripts.html">Scripts</a></font></td>
+</tr>
+
+<tr ALIGN=CENTER>
+<td><font face="Arial,Helvetica"><a href="cmdlist.html">Command Set</a></font></td>
+
+<td><font face="Arial,Helvetica"><a href="monlib.html">Monitor API</a></font></td>
+
+<td><font face="Arial,Helvetica"><a href="shellvars.html">Shell Variables</a></font></td>
+</tr>
+
+<tr ALIGN=CENTER>
+<td><font face="Arial,Helvetica"><a href="userlevels.html">User Levels</a></font></td>
+
+<td>
+<center><font face="Arial,Helvetica"><a href="supporttools.html">PC-Based
+Support Tools</a></font></center>
+</td>
+
+<td><font face="Arial,Helvetica"><a href="modifications.html">Modification
+List</a></font></td>
+</tr>
+
+<tr>
+<td>
+<center><font face="Arial,Helvetica"><a href="appnotes/debugging.html">Using
+Monitor for Debug</a></font></center>
+</td>
+
+<td ALIGN=CENTER VALIGN=CENTER></td>
+
+<td>
+<center><font face="Arial,Helvetica"><a href="appnotes/memorylayout.html">Memory
+Layout Options</a></font></center>
+</td>
+</tr>
+</table></center>
+
+<center>
+<p><b><font face="Arial,Helvetica"><font size=+2>Application Notes:</font></font></b>
+<p><font face="Arial,Helvetica"><a href="appnotes/heapspace.html">Extending
+the monitor's heap</a></font>
+<br><font face="Arial,Helvetica"><a href="appnotes/application_update.html">Field
+Upgrades</a></font>
+<br><font face="Arial,Helvetica"><a href="appnotes/porting.html">Porting
+the Monitor to a New Target</a></font>
+<br><font face="Arial,Helvetica"><a href="appnotes/bootblock.html">Boot
+Block Saftey</a></font>
+<br>&nbsp;
+<p>
+<hr WIDTH="60%">
+<p><font face="Arial,Helvetica"><a href="faq.html">Frequently Asked Questions</a></font>
+<br><font face="Arial,Helvetica"><a href="rfclist.html">Referenced RFCs</a></font>
+<br><font face="Arial,Helvetica"><a href="umonsearch.html">Search Through
+MicroMonitor Documentation</a></font>
+<br><font face="Arial,Helvetica"><a href="contact_author.html">Contact
+the Author</a></font>
+<p>
+<hr WIDTH="60%">
+<p><b><blink><font face="Arial,Helvetica"><font color="#FF0000">NOTE:</font></font></blink></b>
+<br><font face="Arial,Helvetica">This monitor package is now available
+to users outside of Lucent through</font>
+<br><font face="Arial,Helvetica"><b>Lucent's Research Software Distribution
+Web Site</b>.</font>
+<br><font face="Arial,Helvetica">If interested, go to <a href="http://www.bell-labs.com/topic/swdist/">http://www.bell-labs.com/topic/swdist/</a>
+and follow instructions on that page.</font></center>
+
+<blockquote>
+<blockquote>
+<center><font face="Arial,Helvetica">This platform is provided "AS-IS".&nbsp;
+There is no support or guarantee of any kind (see public license associated
+with this package at the web site mentioned above).&nbsp; The intent of
+this Lucent Public release is to generate technical conversation and improve
+the package for all.&nbsp; Please forward all comments/questions/suggestions
+to the <a href="mailto:esutter@lucent.com">author</a> .</font></center>
+</blockquote>
+</blockquote>
+
+<center>
+<p><br>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<h2>
+<a NAME="brief_description"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Brief
+description of MicroMonitor and TFS...</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor is the firmware that the CPU executes immediately after a reset
+or power-up.&nbsp; It resides in the non-volatile flash memory of the target
+system.&nbsp; It is responsible for "starting up" or booting the CPU and
+getting it to a point where a user can access the target through some interface
+(typically either RS-232 or ethernet).&nbsp; The capabilities provided
+at this interface depend on what capabilities have been configured into
+the monitor when it was built (refer to <a href="#feature_list">What comes
+with Micro Monitor?&nbsp;</a> for a brief list of capabilities).</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Once the monitor does some initialization of the target, it presents itself
+as a command line interface to the user typically through an RS-232 port
+(also through UDP if an ethernet interface is included in the hardware).&nbsp;
+The command set includes basic capabilities like memory display and modification,&nbsp;
+parallel IO control and command line editing/history.&nbsp; In addition
+to this, the monitor configures part of the flash to be used as a file
+system (<a href="tfs.html">TFS: tiny file system</a>).&nbsp; This basically
+means that code can access flash as name space instead of address space.&nbsp;
+Adding this basic capability opens up a whole new set of ideas applicable
+to the embedded target.&nbsp; Files can be set up with different <a href="tfs.html#attributes">attributes</a>.&nbsp;
+Among other things, these attributes let the monitor know what to do with
+the files at startup.&nbsp; If a file is marked as "auto-bootable", then
+the monitor will automatically execute that file at startup.&nbsp; The
+executable file can be either a binary (COFF, ELF or AOUT) that will be
+loaded into DRAM and executed, or it can be an ascii script of commands
+that may, for example, configure the target to run <a href="startup.html#DHCP">DHCP</a>
+or <a href="startup.html#BOOTP">BOOTP</a>, or may assign a fixed IP and
+MAC address to the target (refer to description of <a href="scripts.html">scripts</a>
+within MicroMonitor).&nbsp; Multiple files can be configured for autoboot
+and the monitor will automatically run them in alphabetical order regardless
+of the order in which they actually exist in the flash.&nbsp; Additionally,
+TFS and the monitor share the concept of <a href="userlevels.html">user
+levels</a>.&nbsp; When&nbsp; the target first starts up, it is running
+at the highest user level (similar to UNIX super-user or Windows administrator).&nbsp;
+Once control is turned over to the individual TFS files, the user level
+can be adjusted so that certain portions of the system (both files and
+commands) are only accessible by certain user levels.&nbsp; The user level
+access is controlled through encrypted passwords that are stored in a TFS
+file.&nbsp; If somehow the passwords are lost or inaccessible, there is
+a "backdoor" password that is derived from the MAC address of the target.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Everything
+is a file, even the main application.&nbsp; It's just another file in TFS.&nbsp;
+When the application is running (as a result of the monitor loading it
+from TFS flash to DRAM), other files can be accessed by the active application.&nbsp;
+This makes it convenient to build one application binary that configures
+itself based on a few locally <a href="commands/edit.html">editable</a>
+ascii files in TFS.&nbsp; Also, since the application executes out of DRAM
+(rather than directly out of the flash in TFS), a new application can be
+loaded into flash while the current application in DRAM is left running.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+As you can see, the monitor is very heavily linked to TFS.&nbsp; As a result,
+many of the other commands within the monitor assume the existence of a
+file system.&nbsp;&nbsp; <a href="commands/xmodem.html">Xmodem</a> and
+<a href="commands/tftp.html">TFTP</a>
+both interface to the file system so uploads and downloads can all be name
+based instead of address based. This makes life a lot easier, and it makes
+applications that reside on top of the monitor a lot easier to manage.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="boot_platform"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">What
+is an "embedded system boot platform"?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In this context, an embedded system boot platform is a target-resident
+environment that provides the developer with a suite of capabilities that
+enhance the development process and potentially, the environment provided
+to the application being developed.&nbsp; In its simplest form, it is used
+to speed up some of the early stages of embedded system development by
+providing a simple file system, tftp/xmodem interfaces for application
+transfer and an array of additional commands/capabilities that provide
+a variety of enhancements to the development environment.&nbsp; As a part
+of a development strategy for an organization, it provides a common base
+platform; an integral part of the application itself, providing the system
+with a core set of features that are generic in nature, and should be useable
+by application code regardless of the operating system chosen.</font></blockquote>
+
+<blockquote>&nbsp;
+<br>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="feature_list"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">What
+comes with Micro Monitor?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor is a <a href="src/">few directories</a> of source code, all
+of which is made available to anyone within Lucent (as of Dec 2000, most
+of this platform is available to folks outside of Lucent).&nbsp; The directories
+are broken up into the code that is <a href="src/common">common</a> to
+all platforms and the code that is <a href="src/targets/target_dirname/monitor">unique</a>
+per platform.&nbsp;&nbsp;&nbsp; All platforms build from a <a href="src/targets/target_dirname/monitor/config.h.html">configuration
+file</a> that is used to specify what chunks of functionality are to be
+included in the build.&nbsp; Almost all (obviously not 100%) of the code
+is C; with a very small block of CPU specific assembler.&nbsp; The monitor
+provides the following capabilities to an embedded system:</font></blockquote>
+
+<ul>
+<ul>
+<li>
+<font face="Arial,Helvetica">Command interpreter via RS-232 or UDP.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Command line editor and history.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Flash file system (<a href="tfs.html">TFS</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">File decompression (using zlib).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Program loader currently supporting COFF,
+ELF &amp; AOUT file formats.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="commands/xmodem.html">Xmodem</a>
+for up/download of data.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Disassembler (depends on CPU).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Memory interface commands (<a href="commands/dm.html">display</a>,
+<a href="commands/pm.html">modify</a>,
+<a href="commands/mt.html">test</a>,
+<a href="commands/cm.html">copy</a>,
+<a href="commands/fm.html">fill</a>,
+<a href="commands/sm.html">search</a>,
+etc...).</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="src/common/monitor/malloc.c.html">Memory
+allocator</a>.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="src/common/monitor/mprintf.c.html">Small
+printf</a>.</font></li>
+
+<li>
+<font face="Arial,Helvetica">A simple <a href="commands/edit.html">file
+editor</a> for use with ascii files resident to the flash file system.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="shellvars.html">Shell variables</a>
+accessible by <a href="scripts.html">scripts</a> and application code.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="commands/icmp.html">ICMP</a>: ping
+client/server, ICMP time retrieval.</font></li>
+
+<li>
+<font face="Arial,Helvetica">TFTP: <a href="commands/tftp.html">client</a>/<a href="commands/tftp.html#tftp_server">server</a>.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="startup.html#BOOTP">BOOTP</a>/<a href="startup.html#DHCP">DHCP</a>:
+client (server code is part of a <a href="supporttools.html">PC-based support
+package</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="appnotes/debugging.html">Symbolic
+debugging capabilities</a> based on the use of a resident symbol table
+file.</font></li>
+</ul>
+<font face="Arial,Helvetica"></font>
+<p><br>
+<hr WIDTH="100%"></ul>
+
+<h2>
+<a NAME="why_not_use_OS"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Why
+not use what already comes with the RTOS?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+For many applications, the boot platform is something that comes with the
+vendor-supplied RTOS (real time operating system), usually referred to
+as the BSP or board support package.&nbsp; This model obviously works;
+but, inserting MicroMonitor into the boot up path prior to the vendor-supplied
+environment enhances the whole thing.&nbsp; Following are some of the enhancements...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">it provides the application with a very flexible
+field-upgrade capability that is 100% independent of the RTOS (this means
+applications using VxWorks can have the same field upgrade mechanism as
+applications using ATI_Nucleus or uC/OS or whatever);</font></li>
+
+<li>
+<font face="Arial,Helvetica">in most cases it eliminates the need to consider
+the additional purchase of a FlashFileSystem (FFS);</font></li>
+
+<li>
+<font face="Arial,Helvetica">seeing the flash as namespace instead of address
+space makes an application much more maintainable;</font></li>
+
+<li>
+<font face="Arial,Helvetica">the monitor can be used to help develop the
+BSP... Typically, the BSP requires a lot of the system to already be working
+just to be able to use printf().&nbsp; This makes the initial BSP developement
+difficult because, without an emulator, it's tough to see where you are
+in the startup code.&nbsp; If the monitor is used to boot the system, then
+its facilities are available at the first line of BSP code, so calls to
+printf() can be inserted all over the BSP startup. Since all of the facilities
+of the monitor can run in polled mode, it's usually an easy task to get
+the monitor up and running; then the experience gained from that process
+is directly applied to the more complicated task of starting up the BSP;</font></li>
+
+<li>
+<font face="Arial,Helvetica">HTTP, FTP and TFTP servers based on TFS are
+already available for use in applications that use the monitor;</font></li>
+
+<li>
+<font face="Arial,Helvetica">hardware developers can use the monitor to
+debug other parts of the hardware without a need to be connected to some
+bulky development environment;</font></li>
+
+<li>
+<font face="Arial,Helvetica">the monitor provides fast downloads without
+a bulky TCP/IP stack;</font></li>
+
+<li>
+<font face="Arial,Helvetica">it does not eliminate the option of using
+a 3rd party FFS... one section of the flash can be allocated to TFS and
+another section allocated to the 3rd party FFS;</font></li>
+
+<li>
+<font face="Arial,Helvetica">etc., etc...</font></li>
+</ul>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp; This boot-platform
+is not offering much that is not already available from most RTOS vendors;
+but it<i> is</i> offering the <b><i>same</i> boot platform regardless of
+what vendor you choose for your RTOS</b>.&nbsp; This gives a development
+organization flexibility to pick and choose different vendor-supplied packages
+without concern for the work involved with booting the hardware and establishing
+some core capabilities like Xmodem&nbsp; and/or TFTP downloader, BOOTP/DHCP,&nbsp;
+Flash File System, etc...&nbsp; Plus <b>it allows various product lines
+to standardize on a field upgrade path, but does not force them to use
+the same development environment.</b></font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; This
+discussion leads to another question... <i>If we don't use the BSP that
+comes with the RTOS, then how can we debug our application, since the debugger
+that comes with the RTOS interfaces to code in the BSP?&nbsp;</i><b>&nbsp;</b>
+Actually, you can still use the RTOS's BSP (or equivalent), but it runs
+after MicroMonitor turns over control to it.&nbsp; The BSP becomes a file
+in the file system that at some point, is invoked by the monitor (see <a href="#brief_description">Brief
+description of monitor and its use of the file system).</a></font>
+<p>
+<hr WIDTH="100%">
+<br>&nbsp;</blockquote>
+
+<h2>
+<a NAME="what_cpus"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">What
+CPUs has this environment been ported to?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+For the most part, the monitor is CPU independent.&nbsp; Obviously, there
+is still some bootup code&nbsp; that must be written based on the CPU that
+the target is running.&nbsp; Currently, the monitor has been ported to
+several different 68K platforms, SH2, SH4, ARM, PPC860, PPC603, PPC403GCX,
+PPC405 and Coldfire 5206.&nbsp; Also, a very early version of the monitor
+ran on a few different MIPS platforms, so updating them could be done quite
+easily if needed.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Keep in mind that there is a bit more to porting this monitor to a new
+target than just the CPU issues.&nbsp;&nbsp;&nbsp; Also, note that this
+would be necessary for building any boot environment unless it is supplied
+by a 3rd party.&nbsp; Following is a high-level list of the "target-specific"
+(CPU and periphery) issues that must be understood prior to doing a port
+(refer to <a href="appnotes/porting.html">Porting the Monitor to a New
+Target</a> for more details)...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The code needed to get the CPU out of reset.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Initialization of the CPU's exception handlers.</font></li>
+
+<li>
+<font face="Arial,Helvetica">A serial driver (typically RS-232 or RS-485)
+written in polled mode.</font></li>
+
+<li>
+<font face="Arial,Helvetica">An ethernet driver written in polled mode.&nbsp;
+Note that the monitor will function without the need for an ethernet driver,
+but the advantages of faster download speeds and remote access, make this
+interface quite convenient.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Flash memory drivers.&nbsp; There are examples
+that come with the monitor for a few different devices used in a few different
+configurations.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Parallel IO interface drivers&nbsp; This is
+a feature in the monitor that allows the user to configure the parallel
+IO pins of the CPU.&nbsp; Some CPUs don't even have any PIO pins others
+have a fairly complex block of PIO pins that are muxed with other CPU periphery.&nbsp;
+This is not needed for basic monitor functionality, but the feature comes
+in handy in the field.</font></li>
+</ul>
+<font face="Arial,Helvetica">Note that after development of the serial
+driver mentioned above, you have a working monitor.&nbsp; This means that
+after this stage of development, the monitor can be used to help develop
+the new pieces by downloading into the target's RAM via XMODEM.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="what_rtoss"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">What
+RTOS's have been used on top of this environment?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Currently this monitor has been used with <a href="http://www.ucos-ii.com" "target="_top&quot;" target="_top">uC/OS</a>,
+<a href="http://www.wrs.com" target="_top">VxWorks</a>,
+<a href="http://www.atinucleus.com/intro.htm" target="_top">Nucleus</a>,
+Linux and standalone (no RTOS, just single-threaded application).&nbsp;
+Keep in mind that there is absolutely no OS-specific requirements in the
+monitor; as a matter of fact, the monitor doesn't even use any interrupts.&nbsp;
+This makes porting it to a new CPU even easier.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Also, I have used this with a VxWorks application that needed FTP, TFTP
+and HTTP, so these servers have already been written to interface to TFS.&nbsp;
+Once again, they are OS independent, but they do assume an underlying sockets
+API.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="min_require"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">What
+hardware is needed for this monitor to run?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+At a minimum, the target hardware requires a CPU that can support linear
+address space, RAM (or DRAM), some type of large-sector flash and some
+type of communication port (RS-232/485, ethernet, etc...).&nbsp; The actual
+amount of flash required depends on what features you need for your system
+and what you plan to store in the file system.&nbsp; The file system allows
+multiple devices to be configured as file system storage devices.&nbsp;
+Each device is seen as a directory, so they need not be contiguous within
+the CPU's memory space.&nbsp; The footprint of the monitor (amount of memory
+space needed) alone is very dependent on both the CPU type and the configuration
+of the monitor.&nbsp; It can range from about 20K to 256K depending on
+feature set and CPU.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="source_code"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Source
+Code Available?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; A <a href="src">directory</a>
+containing a version of the code ported to the Motorola FADS860 Evaluation
+Platform is available for browsing (the starting point is found in <a href="src/common/monitor/start.c.html#start">start.c</a>).&nbsp;&nbsp;
+Following is a description of the directory heirarchy:</font>
+<br>&nbsp;
+<br>&nbsp;
+<table WIDTH="80%" >
+<tr>
+<td>common/cpu</td>
+
+<td>code that is cpu-specific</td>
+</tr>
+
+<tr>
+<td>common/flash</td>
+
+<td>code that is flash-specific</td>
+</tr>
+
+<tr>
+<td>common/monitor</td>
+
+<td>code that is generic to all platforms</td>
+</tr>
+
+<tr>
+<td>common/zlib</td>
+
+<td>code from <b><font face="Arial,Helvetica"><a href="http://www.info-zip.org/pub/infozip/zlib/">public
+domain zlib</a> </font></b><font face="Arial,Helvetica">modified to fit
+this environment</font></td>
+</tr>
+
+<tr>
+<td>targets/target-name/monitor</td>
+
+<td>code that is specific to "target-name", part of monitor binary</td>
+</tr>
+
+<tr>
+<td>targets/target-name/app</td>
+
+<td>code that is specific to "target-name", as an application that would
+run ontop of the monitor</td>
+</tr>
+</table>
+
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If you click on <a href="src/common/monitor/start.c.html#start">start.c</a>,
+you will be looking at a version of the source code that has been "html"ized
+for the sake of coordinating this text with the actual source code. <b>Note
+that for the most accurate source browsing, use the real source code.&nbsp;
+This "html"ized version is for a quick overview.</b>&nbsp;&nbsp; There
+is also a
+<a href="src/micromon.tar">tar file</a> containing all of the
+source not "html"-ized.&nbsp; If you start to edit the code, note that
+most of it is written with 4-character tab-stops, so set up your editor
+appropriately; otherwise, it may look a bit jumbled.&nbsp; Also, to avoid
+confusion, move the tar file to some fresh directory prior to un-tarring
+it.&nbsp; This will avoid confusion with the html-ized version of the source
+code that exists in that same directory for examining the code with a browser.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If you plan to use the
+code, then I suggest that you try not to modify anything in the common
+directory; otherwise, you will not be compatible with future releases of
+the monitor.&nbsp; On the other hand, if you find a bug in the common stuff,
+PLEASE report it back to me and I will make the changes so that they are
+available to others.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="users"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Are
+there other users/contributors?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+There have been several contributors outside of Lucent, some of whom are
+willing to share their experiences.&nbsp; If you have done any work with
+the monitor, and you're willing to make that known.&nbsp; It would be a
+big help to the author if you are willing to share some experience with
+others...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:esutter@lucent.com">Ed Sutter</a></font></li>
+
+<br><font face="Arial,Helvetica">Wrote MicroMonitor.&nbsp; Ported to many
+68K, SH2/4, Coldfire and PowerPC platforms.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:rod_boyce@DMCWave.com">Rod
+Boyce</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported MicroMonitor to a PPC860 platform.&nbsp;
+Particularly, the MBX platform from Motorola.&nbsp; Also did a lot of work
+on breakpoints for PPC860.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:tom.dannemiller@rolls-royceesi.com">Tom
+Dannemiller</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported portions of the monitor to an x86
+platform and found/fixed a few bugs in Xmodem related to a little-endian
+CPU.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:aeven@internetphotonics.com">Amos
+Even</a></font></li>
+
+<br><font face="Arial,Helvetica">Using the monitor in a Linux host and
+target environment. Found/fixed a few bugs in TFS.&nbsp; Has hooked TFS
+into Linux.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:karelsandy@qwest.net">Andy
+Karels</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported the platform to a NetSilicon NetARM
+processor.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:ymohaber@mail.com">Yousef
+Mohaber</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported MicroMonitor to a PPC860 platform
+running VxWorks on top.</font>
+<li>
+<font face="Arial,Helvetica"><a href="mailto:joerg.rapka@duagon.com">Joerg
+Rapka</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported MicroMonitor to a 68331 platform
+and found a few bugs in the in-place-modify functionality of TFS.</font>
+<li>
+<font face="Arial,Helvetica"><a href="tharvan@inaccessnetworks.com">Tom
+Arvanitis</a>, <a href="npat@inaccessnetworks.com">Nikos Patavalis</a>,
+<a href="decon@inaccessnetworks.com">Dimitris
+Economou</a> and <a href="manousos@inaccessnetworks.com">Michael Manousos</a></font></li>
+
+<br><font face="Arial,Helvetica">Ported MicroMonitor to a StrongARM target.&nbsp;
+The port includes an ethernet driver for an NE-2000 compatible ethernet
+device, 28F128x2 flash device drivers, a much-improved xmodem (and ymodem)
+implementation and the SA1100 disassembler and PIO interface.</font></ul>
+
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="print_sections"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Can
+I Print Sections of this Documentation?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Yes!&nbsp; But you have to do it with Internet Explorer...&nbsp; Go to
+the section you want to print, then, use the "Print All Links" option of
+Internet Explorer's Print facility.&nbsp; To save a tree, make sure you
+set properties to 2-sided.&nbsp; By the way... this is still not a "perfect"
+solution because if one of the links on the page is an executable (as is
+the case for the documentation on the <a href="supporttools.html">PC-based
+support tools</a>), then the binary of that executable is also printed.&nbsp;
+YUK!&nbsp; If anyone has a better solution for this (whether it be Netscape
+or Explorer), please share it with <a href="mailto:esutter@lucent.com">the
+author</a>.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+For example, if you want to print all of MicroMonitor's command manual
+pages, go to the <a href="cmdlist.html">command list</a> page and use the
+above facility to print all of the linked pages.</font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a NAME="get_started"></a><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">How
+do I get started?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+If you think this monitor (or snippets of this monitor code) may be useful
+to you or your project, please don't hesitate to contact <a href="mailto:esutter@lucent.com">the
+author.</a></font>
+<p>
+<hr WIDTH="100%"></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">Acknowledgements</font></h2>
+
+<blockquote>
+<ul>
+<li>
+<font face="Arial,Helvetica">This package started around 1993 when<a href="mailto:esutter@lucent.com">
+I </a>realized that I had written almost identical boot code for 5 or 6
+different projects with differences only in the CPU, serial port and ethernet
+driver.&nbsp; As the source code became more organized I started suggesting
+that other projects within Lucent use it too.&nbsp; This is what motivated
+this web-site within Lucent.&nbsp; In December 2000, I was given permission
+to make the package public through <a href="http://www.bell-labs.com/topic/swdist/">Lucent's
+Software Distribution Site</a>.&nbsp; Now, thanks to feedback (bug reports,
+bug fixes, suggested improvements, contributed source code, and insults!)
+from users in and out of Lucent, the term "author" is a mis-representation
+of credit.&nbsp; Thanks to all that have contributed!</font></li>
+
+<li>
+<font face="Arial,Helvetica">This package includes software developed by
+the <b>University of California, Berkley</b> and its contributors.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Various portions of CPU-specific code is taken
+from evaluation platforms provided by <b>CPU vendors</b>.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The file decompression libraries are built
+from the <b><a href="http://www.info-zip.org/pub/infozip/zlib/">public
+domain zlib</a></b> source code.</font></li>
+</ul>
+</blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

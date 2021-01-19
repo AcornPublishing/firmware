@@ -1,0 +1,198 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: tfsctrl</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsctrl()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsctrl()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Perform some type of "control"
+operation on TFS or a file in TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsctrl(int rqst,
+long arg1, long arg2);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Similar in purpose to a standard
+ioctl(), this function allows the user to perform some type of control
+function on TFS or a file in TFS.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; rqst</font></li>
+
+<br><font face="Arial,Helvetica">type of control function to be performed.</font>
+<li>
+<font face="Arial,Helvetica">long arg1</font></li>
+
+<br><font face="Arial,Helvetica">depending on the value of rqst, this argument
+may or may not be used.</font>
+<li>
+<font face="Arial,Helvetica">long arg2</font></li>
+
+<br><font face="Arial,Helvetica">depending on the value of rqst this argument
+may or may not be used.</font></ul>
+<font face="Arial,Helvetica">Valid rqst values:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">TFS_ERRMSG</font></li>
+
+<br><font face="Arial,Helvetica">Returns a pointer to a character string
+that corresponds to the verbose description of the error.</font>
+<br><font face="Arial,Helvetica">The value in arg1 is some error value
+that was returned by some other tfs system call.</font>
+<li>
+<font face="Arial,Helvetica">TFS_MEMUSE</font></li>
+
+<br><font face="Arial,Helvetica">Returns the amount of flash memory that
+is currently being used by files in TFS.&nbsp; This includes space used
+by active and deleted files.</font>
+<li>
+<font face="Arial,Helvetica">TFS_MEMAVAIL</font></li>
+
+<br><font face="Arial,Helvetica">Returns the amount of flash memory that
+is still available for use by TFS.</font>
+<li>
+<font face="Arial,Helvetica">TFS_MEMDEAD</font></li>
+
+<br><font face="Arial,Helvetica">Returns the amount of flash memory that
+is currently being used by deleted files.</font>
+<li>
+<font face="Arial,Helvetica">TFS_DEFRAG</font></li>
+
+<br><font face="Arial,Helvetica">Run a TFS defragmentation, to remove any
+"dead" flash space taken up by deleted files.</font>
+<br><font face="Arial,Helvetica">If arg1 is non-zero, then after defragmentation,
+the target is reset; the value of arg2 is considered the verbosity level
+to use during defragmentation.</font>
+<li>
+<font face="Arial,Helvetica">TFS_UNOPEN</font></li>
+
+<br><font face="Arial,Helvetica">If a TFS file was previously opened for
+creation or append, and for some reason, the need to create/modify the
+file no longer exists, this function&nbsp; essentially calls mon_tfsclose()
+but does not make any modifications to the flash.&nbsp; The value of arg1
+is the file descriptor returned by the initial call to mon_tfsopen().</font>
+<li>
+<font face="Arial,Helvetica">TFS_FATOB</font></li>
+
+<br><font face="Arial,Helvetica">This request converts a string of flag
+characters (see <a href="../tfs.html#attributes">tfs attributes</a>) to
+a binary value that is stored in the file header.&nbsp; Arg1 contains a
+pointer to the string of characters.&nbsp; The return value is a long that
+represents the binary value used by TFS internally.&nbsp; The return value
+is -1 if any character of the incoming string is invalid.</font>
+<li>
+<font face="Arial,Helvetica">TFS_FBTOA</font></li>
+
+<br><font face="Arial,Helvetica">Just the opposite of TFS_FATOB... It takes
+a binary value and converts it to an ascii string.&nbsp; Arg1 is the binary
+value, arg2 is a pointer to the buffer (should be at least 16 bytes) into
+which TFS stores the string.</font>
+<li>
+<font face="Arial,Helvetica">TFS_TELL</font></li>
+
+<br><font face="Arial,Helvetica">Return the offset into the file specified
+by arg1 which is the file descriptor returned by mon_tfsopen() sometime
+prior.</font>
+<li>
+<font face="Arial,Helvetica">TFS_TIMEFUNCS</font></li>
+
+<br><font face="Arial,Helvetica">Arg1 is a pointer to the getLtime() function
+and arg2 is a pointer to the getAtime() function.&nbsp; Refer to tfs <a href="../tfs.html#TOD">time-of-day
+</a>discussion.&nbsp;
+Returns TFS_OKAY if successful.</font>
+<li>
+<font face="Arial,Helvetica">TFS_DOCOMMAND</font></li>
+
+<br><font face="Arial,Helvetica">Arg1 is a pointer to the application's
+command interpreter function whose prototype is <i>void docommand(char
+* cmdline, int verbosity).</i>&nbsp; If NULL, then the standard command
+interpreter is used.</font>
+<br><font face="Arial,Helvetica">Arg2 is a pointer to a location into which
+the monitor will place the current command interpreter function being used
+by the script runner.&nbsp; If NULL, then this value is not loaded.&nbsp;
+Returns TFS_OKAY if successful.</font>
+<li>
+<font face="Arial,Helvetica">TFS_DEFRAGDEV</font></li>
+
+<br><font face="Arial,Helvetica">Arg1 is a char pointer to the name of
+the TFS device to be defragmented (cleaned).&nbsp;&nbsp; Returns TFS_OKAY
+if successful.</font>
+<li>
+<font face="Arial,Helvetica">TFS_CHECKDEV</font></li>
+
+<br><font face="Arial,Helvetica">Arg1 is a char pointer to the name of
+the TFS device to be checked.&nbsp;&nbsp; Returns TFS_OKAY if file system
+on the specified device is not found to be corrupt.</font>
+<li>
+<font face="Arial,Helvetica">TFS_INITDEV</font></li>
+
+<br><font face="Arial,Helvetica">Arg1 is a char pointer to the name of
+the TFS device to be initialized.&nbsp; Returns TFS_OKAY if successful.</font>
+<li>
+<font face="Arial,Helvetica">TFS_HEADROOM</font></li>
+
+<br><font face="Arial,Helvetica">Return the gap between the current position
+and the end of the file.&nbsp; In RDONLY mode, the end of the file is the
+sum of the base + filesize; otherwise, the end of the file is taken as
+the high water point of all previous accesses to the file.&nbsp; With arg1
+being the descriptor of a file in question.</font>
+<li>
+<font face="Arial,Helvetica">TFS_FCOUNT</font></li>
+
+<br><font face="Arial,Helvetica">Return the number of active (not deleted)
+files in TFS.&nbsp; If arg1 is non-zero, then it is assumed to be the prefix
+(string pointer) of the specific device for which the count is to be tallied;
+otherwise, it assumes the count is for all devices in TFS space.&nbsp;
+Typically arg1 is zero because most systems have only one TFS device configured.</font></ul>
+<font face="Arial,Helvetica">If in the above descriptions, one or both
+of the 'arg' values is not mentioned, then assume it is not used.</font>
+<p><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The value returned
+depends on the 'rqst' value passed into the function.</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfs.c.html#tfsctrl">tfs.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: comnet</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>COMNET</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">comnet</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">A "Telnet-to-PC-COM-Port" connection
+sever.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">comnet [-b:cehp:V] {comport #}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool runs as a&nbsp; server
+on a PC.&nbsp; It looks like a telnet server (default TCP port 8200) on
+the PC's network side, but instead of the telnet client being connected
+to some shell on the PC, this server provides a bi-directional connection
+between the telnet client and the PC's COM port.&nbsp; Although other uses
+can be imagined, the purpose of this tool is to allow a user to connect
+to a target's COM port from a remote location.</font>
+<br><font face="Arial,Helvetica">This is a "console" application (not a
+windows GUI), so it is run from a console window of a PC.&nbsp; Options
+are available to the ability to connect both the local console AND the
+remote telnet client to the same target at the same time, and each interface
+will see the actions of the other.&nbsp; Obviously this requires some coordination
+between the multiple users.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-b {##}</font></li>
+
+<br><font face="Arial,Helvetica">override default baudrate of 19200</font>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">connect local PC to COM port also</font>
+<li>
+<font face="Arial,Helvetica">-e</font></li>
+
+<br><font face="Arial,Helvetica">run with console in local-echo mode (read-only
+console attachment)</font>
+<li>
+<font face="Arial,Helvetica">-h</font></li>
+
+<br><font face="Arial,Helvetica">dump verbose 'help' output</font>
+<li>
+<font face="Arial,Helvetica">-p {##}</font></li>
+
+<br><font face="Arial,Helvetica">override default TCP port of 8200</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">display the version (build date) of the
+tool</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">comnet -b 57600&nbsp; 1</font></li>
+
+<br><font face="Arial,Helvetica">Connect to COM1 at 57600 baud.&nbsp; There
+is no console interaction with this session.</font>
+<li>
+<font face="Arial,Helvetica">comnet -e&nbsp; 2</font></li>
+
+<br><font face="Arial,Helvetica">Connect to COM2 at 19200 baud.&nbsp; All
+character transfer is echoed to the PC console, but the user at the console
+cannot intervene.</font>
+<li>
+<font face="Arial,Helvetica">comnet -c&nbsp; 1</font></li>
+
+<br><font face="Arial,Helvetica">Connect to COM1 at19200 baud.&nbsp; The
+user at the console also has full read/write access to the COM port.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/comnet.exe">PC Win95</a></font></li>
+</ul>
+
+</body>
+</html>

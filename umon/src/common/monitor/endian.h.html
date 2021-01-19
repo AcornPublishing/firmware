@@ -1,0 +1,29 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/endian.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* endian.h:
+ *  macros used for endian conversion.
+ *  The intent is that the macros have nil effect on Big_Endian
+ *  systems...
+ *  ecs:    endian-convert short
+ *  ecl:    endian-convert long
+ */
+#ifdef CPU_LE
+#define <A NAME="ecs">ecs</A>(a) (((a & 0x00ff) &lt;&lt; 8) | ((a & 0xff00) &gt;&gt; 8))
+#define <A NAME="ecl">ecl</A>(a) (((a & 0x000000ff) &lt;&lt; 24) | ((a & 0x0000ff00) &lt;&lt; 8) | \
+          ((a & 0x00ff0000) &gt;&gt; 8) | ((a & 0xff000000) &gt;&gt; 24))
+#define <A NAME="self_ecs">self_ecs</A>(a) (a = <A NAME="ecs">ecs</A>(a))
+#define <A NAME="self_ecl">self_ecl</A>(a) (a = <A NAME="ecl">ecl</A>(a))
+#else
+#define <A NAME="ecs">ecs</A>(a)  a
+#define <A NAME="ecl">ecl</A>(a)  a
+#define <A NAME="self_ecs">self_ecs</A>(a)
+#define <A NAME="self_ecl">self_ecl</A>(a)
+#endif
+</HTML>
+</PRE>
+</BODY>

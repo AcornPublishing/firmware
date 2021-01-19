@@ -1,0 +1,224 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/moncom.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* moncom.c:
+ *  This function is used by the application to interface to code that
+ *  is part of the monitor.  A pointer to this function exists at some
+ *  "well-known" address in the monitors space.  This location must be
+ *  known by the application (hence... "well-known").
+ */
+#include "monlib.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "bbc.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "monflags.h"
+
+extern int addcommand(struct monCommand *);
+extern int profiler(void *);
+static int moncom_pcnt;
+
+int
+<A NAME="moncom">moncom</A>(int cmd, void *arg1, void *arg2, void *arg3)
+{
+    int retval;
+    
+
+    retval = 0;
+
+    /* If the monflag is set, then print out a message here.
+     */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_MONCOMVERBOSE>MFLAGS_MONCOMVERBOSE</A>()) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d: moncom(%d,0x%lx,0x%lx,0x%lx)\n",
+            moncom_pcnt,cmd,(ulong)arg1,(ulong)arg2,(ulong)arg3);
+    }
+    switch(cmd) {
+        case GETMONFUNC_PUTCHAR:
+            *(unsigned long *)arg1 = (unsigned long)rputchar;
+            break;
+        case GETMONFUNC_GETCHAR:
+            *(unsigned long *)arg1 = (unsigned long)getchar;
+            break;
+        case GETMONFUNC_GOTACHAR:
+            *(unsigned long *)arg1 = (unsigned long)gotachar;
+            break;
+        case GETMONFUNC_GETBYTES:
+            *(unsigned long *)arg1 = (unsigned long)getbytes;
+            break;
+        case GETMONFUNC_PRINTF:
+            *(unsigned long *)arg1 = (unsigned long)printf;
+            break;
+        case GETMONFUNC_CPRINTF:
+            *(unsigned long *)arg1 = (unsigned long)cprintf;
+            break;
+        case GETMONFUNC_SPRINTF:
+            *(unsigned long *)arg1 = (unsigned long)sprintf;
+            break;
+        case GETMONFUNC_RESTART:
+            *(unsigned long *)arg1 = (unsigned long)monrestart;
+            break;
+        case GETMONFUNC_GETENV:
+            *(unsigned long *)arg1 = (unsigned long)getenv;
+            break;
+        case GETMONFUNC_SETENV:
+            *(unsigned long *)arg1 = (unsigned long)setenv;
+            break;
+        case GETMONFUNC_TFSINIT:
+            *(unsigned long *)arg1 = (unsigned long)tfsinit;
+            break;
+        case GETMONFUNC_TFSADD:
+            *(unsigned long *)arg1 = (unsigned long)tfsadd;
+            break;
+        case GETMONFUNC_TFSUNLINK:
+            *(unsigned long *)arg1 = (unsigned long)tfsunlink;
+            break;
+        case GETMONFUNC_TFSRUN:
+            *(unsigned long *)arg1 = (unsigned long)tfsrun;
+            break;
+        case GETMONFUNC_TFSNEXT:
+            *(unsigned long *)arg1 = (unsigned long)tfsnext;
+            break;
+        case GETMONFUNC_TFSFSTAT:
+            *(unsigned long *)arg1 = (unsigned long)tfsfstat;
+            break;
+        case GETMONFUNC_TFSTRUNCATE:
+            *(unsigned long *)arg1 = (unsigned long)tfstruncate;
+            break;
+        case GETMONFUNC_TFSEOF:
+            *(unsigned long *)arg1 = (unsigned long)tfseof;
+            break;
+        case GETMONFUNC_TFSSTAT:
+            *(unsigned long *)arg1 = (unsigned long)tfsstat;
+            break;
+        case GETMONFUNC_TFSREAD:
+            *(unsigned long *)arg1 = (unsigned long)tfsread;
+            break;
+        case GETMONFUNC_TFSWRITE:
+            *(unsigned long *)arg1 = (unsigned long)tfswrite;
+            break;
+        case GETMONFUNC_TFSOPEN:
+            *(unsigned long *)arg1 = (unsigned long)tfsopen;
+            break;
+        case GETMONFUNC_TFSCLOSE:
+            *(unsigned long *)arg1 = (unsigned long)tfsclose;
+            break;
+        case GETMONFUNC_TFSSEEK:
+            *(unsigned long *)arg1 = (unsigned long)tfsseek;
+            break;
+        case GETMONFUNC_TFSGETLINE:
+            *(unsigned long *)arg1 = (unsigned long)tfsgetline;
+            break;
+        case GETMONFUNC_TFSIPMOD:
+            *(unsigned long *)arg1 = (unsigned long)tfsipmod;
+            break;
+        case GETMONFUNC_TFSCTRL:
+            *(unsigned long *)arg1 = (unsigned long)tfsctrl;
+            break;
+        case GETMONFUNC_ADDCOMMAND:
+            *(unsigned long *)arg1 = (unsigned long)addcommand;
+            break;
+        case GETMONFUNC_DOCOMMAND:
+            *(unsigned long *)arg1 = (unsigned long)docommand;
+            break;
+        case GETMONFUNC_GETARGV:
+            *(unsigned long *)arg1 = (unsigned long)getargv;
+            break;
+        case GETMONFUNC_CRC16:
+            *(unsigned long *)arg1 = (unsigned long)xcrc16;
+            break;
+        case GETMONFUNC_CRC32:
+            *(unsigned long *)arg1 = (unsigned long)crc32;
+            break;
+        case GETMONFUNC_PIOGET:
+            *(unsigned long *)arg1 = (unsigned long)pioget;
+            break;
+        case GETMONFUNC_PIOSET:
+            *(unsigned long *)arg1 = (unsigned long)pioset;
+            break;
+        case GETMONFUNC_PIOCLR:
+            *(unsigned long *)arg1 = (unsigned long)pioclr;
+            break;
+        case GETMONFUNC_INTSOFF:
+            *(unsigned long *)arg1 = (unsigned long)intsoff;
+            break;
+        case GETMONFUNC_INTSRESTORE:
+            *(unsigned long *)arg1 = (unsigned long)intsrestore;
+            break;
+        case GETMONFUNC_APPEXIT:
+            *(unsigned long *)arg1 = (unsigned long)appexit;
+            break;
+        case GETMONFUNC_MALLOC:
+            *(unsigned long *)arg1 = (unsigned long)malloc;
+            break;
+        case GETMONFUNC_FREE:
+            *(unsigned long *)arg1 = (unsigned long)free;
+            break;
+        case GETMONFUNC_GETLINE:
+            *(unsigned long *)arg1 = (unsigned long)getline;
+            break;
+        case GETMONFUNC_DECOMPRESS:
+            *(unsigned long *)arg1 = (unsigned long)decompress;
+            break;
+        case GETMONFUNC_HEAPXTEND:
+            *(unsigned long *)arg1 = (unsigned long)extendHeap;
+            break;
+        case GETMONFUNC_PROFILER:
+            *(unsigned long *)arg1 = (unsigned long)profiler;
+            break;
+        case GETMONFUNC_TFSLINK:
+            *(unsigned long *)arg1 = (unsigned long)tfslink;
+            break;
+        case GETMONFUNC_BBC:
+            *(unsigned long *)arg1 = (unsigned long)bbc;
+            break;
+        case GETMONFUNC_MEMTRACE:
+            *(unsigned long *)arg1 = (unsigned long)Mtrace;
+            break;
+        case GETMONFUNC_TFSTELL:
+            *(unsigned long *)arg1 = (unsigned long)tfstell;
+            break;
+        case GETMONFUNC_VERSION:
+            *(unsigned long *)arg1 = (unsigned long)monVersion;
+            break;
+        case CACHEFTYPE_DFLUSH:
+            dcacheFlush = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CACHEFTYPE_IINVALIDATE:
+            icacheInvalidate = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CHARFUNC_PUTCHAR:
+            remoteputchar = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CHARFUNC_GETCHAR:
+            remotegetchar = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CHARFUNC_GOTACHAR:
+            remotegotachar = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CHARFUNC_RAWMODEON:
+            remoterawon = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case CHARFUNC_RAWMODEOFF:
+            remoterawoff = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        case ASSIGNFUNC_GETUSERLEVEL:
+            extgetUsrLvl = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())arg1;
+            break;
+        default:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("moncom unknown command: 0x%x\n",cmd);
+            retval = -1;
+            break;
+    }
+    moncom_pcnt++;
+    return(retval);
+}
+
+
+</HTML>
+</PRE>
+</BODY>

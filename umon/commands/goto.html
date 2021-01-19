@@ -1,0 +1,71 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: GOTO</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>GOTO</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">goto</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Branch to a tagged line in a TFS
+script.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">goto {tag}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Since TFS supports executable
+files that can be a set of monitor commands, this command enhances that
+capability by allowing the script to branch to specific tags within the
+script.&nbsp; The tag is simply a line starting with a <i># </i>(pound
+sign), one blank and a tag.&nbsp; For example, <i># TAG</i> on a line by
+itself is a target that could be branched to by the command <i>goto TAG</i>.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><font size=+1>Within a script
+file:</font></font>
+<blockquote><tt># TOPofScript</tt>
+<br><tt>set CNT 0</tt>
+<br><tt># ECHO_CNT</tt>
+<br><tt>echo $CNT</tt>
+<br><tt>set -i CNT</tt>
+<br><tt>sleep 1</tt>
+<br><tt>goto ECHO_CNT</tt></blockquote>
+</blockquote>
+
+</body>
+</html>

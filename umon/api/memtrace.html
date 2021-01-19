@@ -1,0 +1,97 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: memtrace</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_memtrace()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_memtrace()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Similar to mon_printf() but in
+coordination with the monitor's "<a href="../commands/mtrace.html">mtrace</a>"
+command, the formatted string is placed into a circular buffer in RAM.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">void&nbsp;&nbsp; mon_memtrace(char
+*format,arg1, arg2, ...);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This function allows the application
+to redirect "printf-like" formatted strings to a RAM area that can be dumped
+later (see mtrace command).&nbsp; The purpose is to allow the application
+to use formatted output, but not be concerned with the status of the console
+device (UART).&nbsp; The strings are formatted and placed in a memory buffer
+that was previously established by the "mtrace cfg" command.&nbsp; The
+formatting supported is the same as the mon_sprintf() function, so refer
+to that for limitations.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *format</font></li>
+
+<br><font face="Arial,Helvetica">pointer to a format buffer</font>
+<li>
+<font face="Arial,Helvetica">argN</font></li>
+
+<br><font face="Arial,Helvetica">arguments referred to (if any) by format
+buffer).</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Void</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<ul>
+<li>
+<font face="Arial,Helvetica">The user should omit newlines from the formatted
+string passed to mon_memtrace().&nbsp; To support a clean "dump" of the
+trace buffer, the mon_memtrace() function will automatically prepend each
+string with a new line and sequence number.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The user should not build a string that, when
+formatted, exceeds 128 characters on any one call to mon_memtrace().</font></li>
+</ul>
+</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/memtrace.c.html#Mtrace">memtrace.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

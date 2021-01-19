@@ -1,0 +1,92 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: GO</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>GO</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">go</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Turn over control to a resident
+(downloaded or TFS) application.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">go -[p:Rr:s:u:] [address]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the user to
+turn over control to an application (client) with its own stack space,
+and a copy of the register set maintained across exceptions.&nbsp; If no
+arguments are specified, then the context currently stored in the accessible
+register set is loaded prior to control transfer.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-p {PC}</font></li>
+
+<br><font face="Arial,Helvetica">specify PC to use upon entry into application;</font>
+<li>
+<font face="Arial,Helvetica">-R</font></li>
+
+<br><font face="Arial,Helvetica">dump registers prior to control transfer;</font>
+<li>
+<font face="Arial,Helvetica">-r {SR}</font></li>
+
+<br><font face="Arial,Helvetica">specify status register value to be used
+upon entry into application;</font>
+<li>
+<font face="Arial,Helvetica">-s {SSP}</font></li>
+
+<br><font face="Arial,Helvetica">specify supervisor stack pointer;</font>
+<li>
+<font face="Arial,Helvetica">-u {USP}</font></li>
+
+<br><font face="Arial,Helvetica">specify user stack pointer;</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">go 0x405000</font></li>
+
+<br><font face="Arial,Helvetica">Turn over control to an application whose
+starting point is 0x405000.</font></blockquote>
+
+</body>
+</html>

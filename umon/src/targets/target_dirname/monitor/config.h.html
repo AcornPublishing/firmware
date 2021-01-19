@@ -1,0 +1,168 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/config.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/*
+ * Monitor configuration file for FADS860 Evaluation Platform.
+ *
+ * General notice:
+ * This code is part of a boot-monitor package developed as a generic base
+ * platform for embedded system designs.  As such, it is likely to be
+ * distributed to various projects beyond the control of the original
+ * author.  Please notify the author of any enhancements made or bugs found
+ * so that all may benefit from the changes.  In addition, notification back
+ * to the author will allow the new user to pick up changes that may have
+ * been made by other users after this version of the code was distributed.
+ *
+ * Author:  Ed Sutter
+ * email:   esutter@lucent.com      (home: lesutter@worldnet.att.net)
+ * phone:   908-582-2351            (home: 908-889-5161)
+ */
+
+/* DEFAULT_ETHERADD & DEFAULT_IPADD:
+ * Refer to notes in ethernet.c function EthernetStartup() for details
+ * regarding the use of these definitions.
+ * DEFAULT_IPADD could be set to "DHCP" or "BOOTP" as well.
+ */
+#define     DEFAULT_ETHERADD "00:60:1D:02:0b:fa"
+#define     DEFAULT_IPADD    "135.3.94.138"
+
+/* ::::::NOTE::::::
+ * There appears to be a problem with some of the DRAM around the area of
+ * 0x80000-0x100000.  Two things could be... Either I don't have the 
+ * memory controller configured properly or there is a real problem with
+ * the DRAM that is on this FADS board.  Don't think UPMA is wrong though
+ * because all other memory tests pass ok.
+ */
+#define APPRAMBASE_OVERRIDE 0x180000
+/*
+ * For both RAM and FLASH based apps we want BOOTROMBASE to point to
+ * real flash.  For FLASH based stuff, this would be done automatically
+ * in start.c; however for a RAM-based app it must be forced.
+ * This is necessary so that the RAM-based build will automatically 
+ * burn a monitor into the proper base address.
+ */
+#define BOOTROMBASE_OVERRIDE 0x2800000
+
+/* XBUFCNT & RBUFCNT:
+ *  Number of transmit and receive buffers allocated to ethernet.
+ *  The total of XBUFCNT+RBUFCNT should not exceed MAXEBDS (defined in 
+ *  mpc860.h.
+ */
+#define XBUFCNT 8
+#define RBUFCNT 8
+
+/* LOOPS_PER_SECOND:
+ * Approximately the size of a loop that will cause a 1-second delay.
+ * This can be guestimated or modified with the sleep -c command at the
+ * monitor command line.
+ */
+#define LOOPS_PER_SECOND    30000
+
+/* DHCP_RETRYCOUNT is used as a timeout for DHCP or BOOTP startup.
+ * It is kept in the cpu.h file because it is target dependent loop time.
+ */
+#define DHCP_RETRYCOUNT     500000
+
+/* Flash bank configuration:
+ * This target is configured with one flash bank.
+ */
+#define FLASHBANKS              1
+#define FLASH_BANK0_WIDTH       4
+#define FLASH_BANK0_BASE_ADDR   0x02800000
+#define FLASH_LARGEST_SECTOR    0x40000
+#define FLASH_PROTECT_RANGE     "0-0"
+
+/* The flash is configured as a 32-bit wide device
+ * (4 29F040's in parallel).
+ */
+#define WIDTH8  0
+#define WIDTH16 0
+#define WIDTH32 1
+
+/* TFS definitions:
+ *  TFSSTART:       Base address in FLASH at which TFS starts.
+ *  TFSEND:         End address of TFS in FLASH.
+ *  TFSSPARE:       Location of sector that is used as the spare sector
+ *                  by TFS for defragmentation.
+ *  TFSSPARESIZE:   Size of the spare sector used by TFS for defragmentation.
+ *  TFSSECTORCOUNT: Number of eraseable sectors that TFS covers, not including
+ *                  the TFSSPARE sector.
+ */
+#define TFSSPARESIZE    FLASH_LARGEST_SECTOR
+#define TFSSECTORCOUNT  6
+#define TFS_DEVTOT      1
+#define TFSSTART        (FLASH_BANK0_BASE_ADDR+0x40000)
+#define TFSEND          (FLASH_BANK0_BASE_ADDR+0x1bffff)
+#define TFSSPARE        (FLASH_BANK0_BASE_ADDR+0x1c0000)
+#define TFS_EBIN_ELF    1
+
+#if 0
+/* SYMFILE is the name of a file that, if present, the monitor uses to 
+ * process symbols on the command line.  A symbol is a whitespace delimited
+ * string prefixed by a percent sign (%).
+ */
+#define SYMFILE "symtbl"
+#endif
+
+/* Specify CPU/PLATFORM type and name so that common code can be used
+ * for a similar cpu, on different platforms.
+ * The 'TYPE' definition is used for ifdefs in the code and the 'NAME'
+ * is used for printfs in the code.
+ */
+#define CPU_TYPE        PPC860
+#define CPU_NAME        "PowerPC-860"
+#define PLATFORM_TYPE   FADS860
+#define PLATFORM_NAME   "FADS860"
+
+/* Specify the size of the memory block (in monitor space) that is to be
+ * allocated to malloc in the monitor.  Note that this size can be dynamically
+ * increased using the heap extension option in the heap command.
+ */
+#define ALLOCSIZE 64*1024
+
+/* Specify inclusion of subsystems within the monitor here.
+ * Refer to comments in common/monitor/inc_check.h for details on
+ * each of these macros.
+ */
+#define INCLUDE_MEMCMDS         1
+#define INCLUDE_PIO             1
+#define INCLUDE_EDIT            1
+#define INCLUDE_DEBUG           0
+#define INCLUDE_DISASSEMBLER    1
+#define INCLUDE_UNPACK          0
+#define INCLUDE_UNZIP           1
+#define INCLUDE_ETHERNET        1
+#define INCLUDE_TFTP            1
+#define INCLUDE_DHCPBOOT        1
+#define INCLUDE_TFS             1
+#define INCLUDE_TFSCLI          1
+#define INCLUDE_TFSAPI          1
+#define INCLUDE_TFSAUTODEFRAG   1
+#define INCLUDE_TFSSCRIPT       1
+#define INCLUDE_TFSSYMTBL       1
+#define INCLUDE_XMODEM          1
+#define INCLUDE_LINEEDIT        1
+#define INCLUDE_EE              1
+#define INCLUDE_FLASH           1
+#define INCLUDE_CRYPT           0
+#define INCLUDE_EXCTEST         0
+#define INCLUDE_IDEV            0
+#define INCLUDE_STRACE          1
+#define INCLUDE_CAST            1
+#define INCLUDE_REDIRECT        1
+#define INCLUDE_QUICKMEMCPY     1
+#define INCLUDE_PROFILER        0
+#define INCLUDE_BBC             0
+#define INCLUDE_MEMTRACE        0
+
+/* Inclusion of this next file will make sure that all of the above
+ * inclusions are legal; and warn/adjust where necessary.
+ */
+#include "inc_check.h"
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,72 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: GOSUB</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>GOSUB</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">gosub</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Call a subroutine within the current
+script.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">gosub {tag}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">As an extension to the <a href="commands/goto.html">goto</a>
+capability within TFS scripts, this command branches to the named tag,
+and assumes that at some point the code branched to will execute a <a href="commands/return.html">return</a>.&nbsp;
+At that point, the script will continue execution on the line after the
+gosub line.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Within a script file:</font>
+<blockquote><tt># TOPofScript</tt>
+<br><tt>set CNT 0</tt>
+<br><tt># NEXT:</tt>
+<br><tt>gosub ECHO_CNT</tt>
+<br><tt>goto NEXT</tt><tt></tt>
+<p><tt># ECHO_CNT:</tt>
+<br><tt>echo $CNT</tt>
+<br><tt>set -i CNT</tt>
+<br><tt>sleep 1</tt>
+<br><tt>return</tt></blockquote>
+</blockquote>
+
+</body>
+</html>

@@ -1,0 +1,229 @@
+<HTML>
+<HEADER>
+<TITLE>common/zlib/zutil.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* zutil.h -- internal interface and configuration of the compression library
+ * Copyright (C) 1995-1998 Jean-loup Gailly.
+ * For conditions of distribution and use, see copyright notice in zlib.h
+ */
+
+/* WARNING: this file should *not* be used by applications. It is
+   part of the implementation of the compression library and is
+   subject to change. Applications should only use zlib.h.
+ */
+
+/* @(#) $Id$ */
+
+#ifndef _Z_UTIL_H
+#define _Z_UTIL_H
+
+#include "zlib.h"
+
+typedef unsigned long ulong;
+
+#ifndef NULL
+#define NULL 0
+#endif
+
+#ifndef EOF
+#define EOF -1 
+#endif
+
+#ifndef local
+#  define local static
+#endif
+/* compile with -Dlocal if your debugger can't find static symbols */
+
+typedef unsigned char  uch;
+typedef uch FAR uchf;
+typedef unsigned short ush;
+typedef ush FAR ushf;
+typedef unsigned long  ulg;
+
+extern const char *z_errmsg[10]; /* indexed by 2-zlib_error */
+/* (size given to avoid silly warnings with Visual C++) */
+
+#define <A NAME="ERR_MSG">ERR_MSG</A>(err) z_errmsg[Z_NEED_DICT-(err)]
+
+#define <A NAME="ERR_RETURN">ERR_RETURN</A>(strm,err) \
+  return (strm-&gt;msg = (char*)ERR_MSG(err), (err))
+/* To be used only when the state is known to be valid */
+
+        /* common constants */
+
+#ifndef DEF_WBITS
+#  define DEF_WBITS MAX_WBITS
+#endif
+/* default windowBits for decompression. MAX_WBITS is for compression only */
+
+#if MAX_MEM_LEVEL &gt;= 8
+#  define DEF_MEM_LEVEL 8
+#else
+#  define DEF_MEM_LEVEL  MAX_MEM_LEVEL
+#endif
+/* default memLevel */
+
+#define STORED_BLOCK 0
+#define STATIC_TREES 1
+#define DYN_TREES    2
+/* The three kinds of block type */
+
+#define MIN_MATCH  3
+#define MAX_MATCH  258
+/* The minimum and maximum match lengths */
+
+#define PRESET_DICT 0x20 /* preset dictionary flag in zlib header */
+
+        /* target dependencies */
+
+#ifdef MSDOS
+#  define OS_CODE  0x00
+#  if <A NAME="defined">defined</A>(__TURBOC__) || <A NAME="defined">defined</A>(__BORLANDC__)
+#    if(__STDC__ == 1) && (<A NAME="defined">defined</A>(__LARGE__) || <A NAME="defined">defined</A>(__COMPACT__))
+       /* Allow compilation with ANSI keywords only enabled */
+       void _Cdecl farfree( void *block );
+       void *_Cdecl farmalloc( unsigned long nbytes );
+#    else
+#     include &lt;alloc.h&gt;
+#    endif
+#  else /* MSC or DJGPP */
+#    include &lt;malloc.h&gt;
+#  endif
+#endif
+
+#ifdef OS2
+#  define OS_CODE  0x06
+#endif
+
+#ifdef WIN32 /* Window 95 & Windows NT */
+#  define OS_CODE  0x0b
+#endif
+
+#if <A NAME="defined">defined</A>(VAXC) || <A NAME="defined">defined</A>(VMS)
+#  define OS_CODE  0x02
+#  define <A NAME="F_OPEN">F_OPEN</A>(name, mode) \
+     <A NAME="fopen">fopen</A>((name), (mode), "mbc=60", "ctx=stm", "rfm=fix", "mrs=512")
+#endif
+
+#ifdef AMIGA
+#  define OS_CODE  0x01
+#endif
+
+#if <A NAME="defined">defined</A>(ATARI) || <A NAME="defined">defined</A>(atarist)
+#  define OS_CODE  0x05
+#endif
+
+#if <A NAME="defined">defined</A>(MACOS) || <A NAME="defined">defined</A>(TARGET_OS_MAC)
+#  define OS_CODE  0x07
+#  if <A NAME="defined">defined</A>(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os
+#    include &lt;unix.h&gt; /* for fdopen */
+#  else
+#    ifndef fdopen
+#      define <A NAME="fdopen">fdopen</A>(fd,mode) NULL /* No fdopen() */
+#    endif
+#  endif
+#endif
+
+#ifdef __50SERIES /* Prime/PRIMOS */
+#  define OS_CODE  0x0F
+#endif
+
+#ifdef TOPS20
+#  define OS_CODE  0x0a
+#endif
+
+#if <A NAME="defined">defined</A>(_BEOS_) || <A NAME="defined">defined</A>(RISCOS)
+#  define <A NAME="fdopen">fdopen</A>(fd,mode) NULL /* No fdopen() */
+#endif
+
+#if (<A NAME="defined">defined</A>(_MSC_VER) && (_MSC_VER &gt; 600))
+#  define fdopen(fd,type)  <A NAME="_fdopen">_fdopen</A>(fd,type)
+#endif
+
+
+        /* Common defaults */
+
+#ifndef OS_CODE
+#  define OS_CODE  0x03  /* assume Unix */
+#endif
+
+#ifndef F_OPEN
+#  define F_OPEN(name, mode) <A NAME="fopen">fopen</A>((name), (mode))
+#endif
+
+         /* functions */
+
+#ifdef HAVE_STRERROR
+   extern char *strerror OF((int));
+#  define <A NAME="zstrerror">zstrerror</A>(errnum) <A NAME="strerror">strerror</A>(errnum)
+#else
+#  define <A NAME="zstrerror">zstrerror</A>(errnum) ""
+#endif
+
+#if <A NAME="defined">defined</A>(pyr)
+#  define NO_MEMCPY
+#endif
+#if <A NAME="defined">defined</A>(SMALL_MEDIUM) && !<A NAME="defined">defined</A>(_MSC_VER) && !<A NAME="defined">defined</A>(__SC__)
+ /* Use our own functions for small and medium model with MSC = 5.0.
+  * You may have to use the same strategy for Borland C (untested).
+  * The __SC__ check is for Symantec.
+  */&lt;
+#  define NO_MEMCPY
+#endif
+#if <A NAME="defined">defined</A>(STDC) && !<A NAME="defined">defined</A>(HAVE_MEMCPY) && !<A NAME="defined">defined</A>(NO_MEMCPY)
+#  define HAVE_MEMCPY
+#endif
+#ifdef HAVE_MEMCPY
+#  ifdef SMALL_MEDIUM /* MSDOS small or medium model */
+#    define zmemcpy _fmemcpy
+#    define zmemcmp _fmemcmp
+#    define zmemzero(dest, len) <A NAME="_fmemset">_fmemset</A>(dest, 0, len)
+#  else
+#    define zmemcpy memcpy
+#    define zmemcmp memcmp
+#    define zmemzero(dest, len) <A NAME="memset">memset</A>(dest, 0, len)
+#  endif
+#else
+   extern void zmemcpy  OF((Bytef* dest, const Bytef* source, uInt len));
+   extern int  zmemcmp  OF((const Bytef* s1, const Bytef* s2, uInt len));
+   extern void zmemzero OF((Bytef* dest, uInt len));
+#endif
+
+/* Diagnostic functions */
+#ifdef DEBUG
+#  include &lt;stdio.h&gt;
+   extern int z_verbose;
+   extern void z_error    OF((char *m));
+#  define <A NAME="Assert">Assert</A>(cond,msg) {if(!(cond)) <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zutil.c.html#z_error>z_error</A>(msg);}
+#  define <A NAME="Trace">Trace</A>(x) {if (z_verbose&gt;=0) fprintf x ;}
+#  define <A NAME="Tracev">Tracev</A>(x) {if (z_verbose&gt;0) fprintf x ;}
+#  define <A NAME="Tracevv">Tracevv</A>(x) {if (z_verbose&gt;1) fprintf x ;}
+#  define <A NAME="Tracec">Tracec</A>(c,x) {if (z_verbose&gt;0 && (c)) fprintf x ;}
+#  define <A NAME="Tracecv">Tracecv</A>(c,x) {if (z_verbose&gt;1 && (c)) fprintf x ;}
+#else
+#  define <A NAME="Assert">Assert</A>(cond,msg)
+#  define <A NAME="Trace">Trace</A>(x)
+#  define <A NAME="Tracev">Tracev</A>(x)
+#  define <A NAME="Tracevv">Tracevv</A>(x)
+#  define <A NAME="Tracec">Tracec</A>(c,x)
+#  define <A NAME="Tracecv">Tracecv</A>(c,x)
+#endif
+
+
+typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
+                       uInt len));
+voidpf zcalloc OF((voidpf opaque, unsigned items, unsigned size));
+void   zcfree  OF((voidpf opaque, voidpf ptr));
+
+#define <A NAME="ZALLOC">ZALLOC</A>(strm, items, size) \
+           (*((strm)-&gt;zalloc))((strm)-&gt;opaque, (items), (size))
+#define ZFREE(strm, addr)  (*((strm)-&gt;zfree))((strm)-&gt;opaque, (voidpf)(addr))
+#define <A NAME="TRY_FREE">TRY_FREE</A>(s, p) {if (p) ZFREE(s, p);}
+
+#endif /* _Z_UTIL_H */
+</HTML>
+</PRE>
+</BODY>

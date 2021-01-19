@@ -1,0 +1,2010 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: Modifications</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font face="Arial,Helvetica">&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Modification List</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote>
+<center><font face="Arial,Helvetica">The purpose of this page is to allow
+users of the monitor to keep track of changes, fixes, and new features.&nbsp;
+The list is in chronological order with the most recent change at the top.&nbsp;
+Note that this list includes modifications made to the monitor source code
+as well as any of the other tools that support the monitor.&nbsp; This
+does not necessarily document changes that were made to the source code
+for small stuff (code cleanup, better way to do something, etc..).&nbsp;
+I rely on SourceSafe for that level of detail.</font></center>
+</blockquote>
+
+<p><br>
+<hr WIDTH="100%">
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug found in docommand()</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/16/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: docmd.c</font></i>
+<p><font face="Arial,Helvetica">Around May 2001, the CLI was modified a
+bit so that all commands would return more than just pass / fail.&nbsp;
+This allowed some of the monitor code to be a bit smarter when executing
+a command.&nbsp; One bit of "smartness" added was that the script runner
+could now terminate the execution of a script if a command line in a script
+was not successful.&nbsp; This brought a bug</font>
+<br><font face="Arial,Helvetica">to the surface in docommand() because
+if docommand() scanned the command table and did not find a match in the
+table with the first token of the command line, it then looked to TFS to
+see if the requested command name was a script or binary executable.&nbsp;
+If docommand() found the command to be a script, then it executed it as
+it should.&nbsp; Now the bug... docommand() would return CMD_NOT_FOUND
+regardless of whether or not an executable was found in TFS.&nbsp; This
+bug surfaced as a result of trying to execute one script from within another
+script.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New "arrow-key" based CLI editor</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/15/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: ledit_vt.c</font></i>
+<p><font face="Arial,Helvetica">Several folks have asked for an alternative
+to the monitor's KSH/VI-like command line editor.&nbsp; I have added an
+alternative that now uses the VT100 terminal emulator escape sequences
+for the UP, DOWN, LEFT and RIGHT arrow keys as well as the DEL key.&nbsp;
+The sophistication of line editing is reduced, but admittedly, it is a
+lot more user friendly and intuitive.&nbsp; Refer to the <a href="commands/history.html">history
+command</a> for more details on CLI editing.&nbsp; To use this new line
+editor, replace "lineedit.c" with "ledit_vt.c" in the target make file.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Enhancement to the CLI redirection facility.</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/07/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: redirect.c</font></i>
+<p><font face="Arial,Helvetica">The monitor's ability to redirect output
+to a file now allows the user to specify a complete "filename" string that
+can include file flags and file information field.&nbsp; Refer to the <a href="appnotes/cli_redirection.html">appnote
+on command line redirection</a> for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Enhancement to the 'call' command</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/07/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: go.c</font></i>
+<p><font face="Arial,Helvetica">The '<a href="commands/call.html">call</a>'
+command allows the user to call a fucntion in the target memory and pass
+it arguments.&nbsp; The arguments can be formatted a few different ways,
+but generally, the argument is converted to some unsigned long value using
+strtoul() and that result is passed to the called function.&nbsp; Now,
+if you precede an argument with an ampersand (&amp;), the function is passed
+a pointer to the string immediately following the ampersand.&nbsp; This
+makes it easy to call a function that is expecting a string of characters
+as its input.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS file header update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/06/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfs.h</font></i>
+<p><font face="Arial,Helvetica">The structure tfshdr in tfs.h has been
+changed.&nbsp; The header prior to this change was 76 bytes, now it is
+92 bytes.&nbsp; The change simply adds 4 reserved&nbsp; longs to the end
+of the structure.&nbsp; This is being done now so that a "real" change
+in the future is easier for a project to deal with.&nbsp; If the timing
+of this structure change is "bad" for your project, then simply #undef
+the value of TFS_RESERVED in tfs.h.&nbsp; Previously, this entry in the
+structure was an optional setting that could be specified in the target-specific
+config.h file.&nbsp; Seems more appropriate for this to be the default,
+not configurable; however, if you want to keep it that way, just undo the
+change in tfs.h.</font>
+<br><font face="Arial,Helvetica"><b>Because this involves a change to the
+header, if a new version of the monitor is installed expecting the new
+header structure, but the files in TFS storage are of the old structure
+type, then TFS will be confused.&nbsp;</b> This can be dealt with a few
+different ways:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">remove all files prior to updating the monitor,
+then reinstall them after putting the new monitor in place</font></li>
+
+<li>
+<font face="Arial,Helvetica">when installing the new monitor, use the <a href="tools/doc/f2mem.html">f2mem</a>
+tool to build not just the monitor binary, but the binary image of all
+files in TFS</font></li>
+</ul>
+<font face="Arial,Helvetica">No time is a good time for this kind of change,
+so you may want to back this out of your personal copy of tfs.h.&nbsp;
+Your choice!</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New mon_version() Monitor API call</font></h3>
+
+<ul><i><font face="Arial,Helvetica">Date:10/19/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: monlib.c, monlib.h,
+moncom.c, genlib.h</font></i>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">The <a href="api/version.html">mon_version()</a>
+function is now available to retrieve the monitor's build date/time string
+as is seen through the "version" command.</font></li>
+</ul>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Build-environment update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:10/19/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: all targets</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: makefile</font></i>
+<p><font face="Arial,Helvetica">I have converted all of my target builds
+over to the <a href="http://www.microcross.com">MicroCross</a> X-Tools
+tool suite.&nbsp; This toolset includes a full bash shell and all of the
+cross compilers available from GNU, but built for a PC using the Cygwin
+DLL.&nbsp; Makes things a lot cleaner and easier to manage.&nbsp; The exact
+same makefiles can now be used on both Linux and PC for building the monitor
+if the MicroCross toolset is used.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New stuff in TFS...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:10/12/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfsprivate.h, tfs.h,
+tfsapi.c, tfs.c</font></i>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">The mon_tfsseek() function now returns the
+new offset into the file as a result of the seek.&nbsp; Until this change,
+it was returning TFS_OKAY if successful.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The tfstell() function now has a corresponding
+mon_tfstell() hook in monlib.c.</font></li>
+
+<li>
+<font face="Arial,Helvetica">A new TFS_HEADROOM command to mon_tfsctrl():
+returns the gap between the current offset in an opened file and the end
+of the file.</font></li>
+
+<li>
+<font face="Arial,Helvetica">A new TFS_FCOUNT command in mon_tfsctrl():
+returns the number of files currently in TFS.</font></li>
+</blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Linux Boot Support</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:10/1/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: targets/walnut_eval</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: lboot.c (new), *.lnk,
+others</font></i>
+<p><font face="Arial,Helvetica">I've stepped through the process of booting
+a linux image using the monitor.&nbsp; So far, this has only been done
+on the WALNUT evaluation platform with HardHat Linux for the PPC405.&nbsp;
+Turns out to be a bit non-standard when compared to other boots of simple
+ELF, COFF or AOUT files.&nbsp; The image format for linux can be of a few
+different varieties.&nbsp; Refer to commenst in targets/walnut_eval/monitor/lboot.c
+for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New memory trace API and CLI capability</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/20/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: memtrace.c, cmdtbl.c,
+monlib.c, monlib.h</font></i>
+<p><font face="Arial,Helvetica">To support the ability to log printf-like
+formatted strings to a ram buffer, the monitor now has a command (<a href="commands/mtrace.html">mtrace</a>)
+and api (<a href="api/memtrace.html">mon_memtrace()</a>) that support memory-directed
+printf-like functionality.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS defragmentation source code split</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/14/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfsclean.c</font></i>
+<p><font face="Arial,Helvetica">There are currently two different mechanisms
+for implementing flash defragmentation, with a third mechanism coming.&nbsp;
+The different techniques provide different advantages and trade-offs, so
+depending on the application, one may be more appealing than another.&nbsp;
+Until now, all of the defragmentation code was in the file tfsclean.c.&nbsp;
+This has changed.&nbsp; The front-end function (tfsclean()) now resides
+in tfs.c and each of the defragmentation mechanisms are in a seperate file
+(tfslcean1.c, tfsclean2.c and tfsclean3.c)...</font>
+<p><font face="Arial,Helvetica"><b>tfsclean1.c:</b> This is the most used
+version which incorporates a complex strategy of per-sector defragmentation
+using a spare sector.</font>
+<br><font face="Arial,Helvetica"><b>tfsclean2.c:</b> This is the simplest
+implementation, but does not provide power-hit safety.&nbsp; It simply
+copies good files to ram, erases TFS flash, then copies the data concatenated
+in ram back to flash.&nbsp; Better not be interrupted!</font>
+<br><font face="Arial,Helvetica"><b>tfsclean3.c: </b>This is a new, not-yet-ready
+defragmentation that involves double-buffering of flash.&nbsp; TFS can
+reside in one of two "buffers".&nbsp; When a buffer reaches a point where
+defrag must be done, all good files are transferred to the alternate buffer
+and TFS switches to that.&nbsp; Then the "dirty" buffer is erased in the
+background.&nbsp; This mechanism can greatly reduce defragmentation time,
+but introduces a few device and hardware design dependent issues.</font>
+<p><font face="Arial,Helvetica">For those using the standard safe-defragmentation
+mechanism, the makefile will have to change to include "tfsclean1.o" instead
+of "tfsclean.o" from the common space (there is no longer a tfsclean.c
+source file in the build).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Public Package Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/12/2001</font></i></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New "SCRIPTVERBOSE" shell variable</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/7/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: if.c</font></i>
+<p><font face="Arial,Helvetica">Until now, the only way to enable verbosity
+in a script was through the "-v" option of "tfs run".&nbsp; Now, the shell
+variable "<a href="shellvars.html#SCRIPTVERBOSE">SCRIPTVERBOSE</a>" can
+be used to override this.&nbsp; It can be set to 0 1 or 2 to disable, enable
+some, enable more (respectively) verbosity.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New TFS "link" capability</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/7/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfs.c</font></i>
+<p><font face="Arial,Helvetica">A file in TFS can now be a "link" to another
+file.&nbsp; The new capability is supported through the API and CLI.&nbsp;
+Refer to the API function <a href="api/tfslink.html">tfslink()</a> for
+details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New Power-Safe TFS Defragmentation</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/6/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfsclean.c</font></i>
+<p><font face="Arial,Helvetica">The defragmenation algorithm used by TFS
+has been entirely re-written.&nbsp; The re-write was necessary for two
+reasons...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The original version made one bad assumption
+regarding an interrupted defragmenation (power hit during defrag)...&nbsp;
+The assumption was that any interrupted flash write would simply be an
+incomplete write.&nbsp; Turns out that this is not true, but appears to
+only show itself as a problem with some of the newer flash devices that
+support buffered writes.&nbsp; It is very possible that a power hit in
+the middle of a flash write can not only cause the write to be incomplete,
+but some bits that were going to be left untouched (remain high) can be
+cleared.&nbsp; This breaks the old algorithm, so in some cases, an interrupted
+defragmentation could result in a corrupt file.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The original version was messy.&nbsp; Not
+clean code and hard to follow.</font></li>
+</ul>
+<font face="Arial,Helvetica">The new defragger is much cleaner and very
+robust to interruptions (power hits and resets).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug in start.c</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:9/5/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: start.c</font></i>
+<p><font face="Arial,Helvetica">When started, the monitor calls a device
+initialization function (which ultimately calls the target-specific console
+uart initialization function) with the argument DEFAULT_BAUD_RATE.&nbsp;
+This is done so that the console initialization is fed some baud rate to
+configure to.&nbsp; If the baudrate is changed by monrc (via mstat -b XXX,
+where XXX is the new baud rate), and at some point later, mon_appexit()
+is called by an exiting application, the newly configued baudrate (XXX)
+is lost because device initialization is called with DEFAULT_BAUD_RATE
+again.</font>
+<br><font face="Arial,Helvetica">This is a bug and is fixed in start.c
+so that the function init1() is now called based on the state of the monitor.&nbsp;
+For example, if the monitor is in coldstart (state == INITIALIZE), then
+init1() is called with DEFAULT_BAUD_RATE.&nbsp; For all other restarts,
+init1() is called with NULL to let the lower level functions know that
+if they were already configued with a baud rate, they should continue to
+use that value instead of the default.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Another In-Place-Modify Bug fixed</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/29/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfsapi.c</font></i>
+<p><font face="Arial,Helvetica">If a file is created as in-place-modifiable,
+then it must be modified via the function tfsipmod().&nbsp; If the file
+is to be read, then the standard tfsopen/tfsread/tfsclose sequence should
+be used.&nbsp; In the case of an in-place-modifiable read, the call to
+tfsopen() was returning TFSERR_BADCRC incorrectly.&nbsp; This was happening
+because tfsopen() was erroneously doing a crc32 on the file to check for
+sanity before granting the user permission to read.&nbsp; In the case of
+in-place-modifiable read, the file should not be CRC-32 verified because
+it will (correctly) fail.&nbsp; The fix is in tfsopen() with logic added
+to support the possibility of an in-place-modifiable file being opened.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bugs fixed in CLI line-editor</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/15/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: lineedit.c</font></i>
+<p><font face="Arial,Helvetica">A few minor bugs were found/fixed in the
+CLI line-editing functionality.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Port to StrongARM Now Available</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:7/30/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/targets/strongARM</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: many</font></i>
+<p><font face="Arial,Helvetica">A complete port to a strongARM platform
+is now available.&nbsp; This is a contribution from developers at InAccess
+Networks.&nbsp; It includes the disassembler, a <u>much</u> more robust
+version of xmodem (and ymodem), and drivers for an NE2000 compatible ethernet
+interface.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug Fixed in tfsadd()</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:7/17/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfs.c</font></i>
+<p><font face="Arial,Helvetica">If a call to tfsadd() is done and the filename
+to be added is already in use in TFS, then the tfsadd() function would
+mark that file stale, then go through the process of adding the new file;
+and after adding the new file, mark the stale file as deleted.&nbsp; This
+is the double buffering scheme used by TFS so that the old file is not
+removed until the new file is successfully in place.</font>
+<br><font face="Arial,Helvetica">Now the bug...</font>
+<br><font face="Arial,Helvetica">The file is marked STALE prior to tfsadd()
+determining if there is actually enough space to copy the new file into
+flash.&nbsp; If it turns out that there is not enough space, then the new
+file is not copied and the old file is left in the STALE state.</font>
+<br><font face="Arial,Helvetica">This is fixed, now the file is not marked
+STALE until after all checks have been made to verify that there is enough
+room to add the new file to flash.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug Fixed in "edit" command</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/23/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: edit.c</font></i>
+<p><font face="Arial,Helvetica">If there is a line in a file that is followed
+by an empty line and that line is made smaller using the line-editor extension
+of the file edit facility, then the file will have minor corruption.&nbsp;
+For example, if you use 'edit' to modify the following file:</font>
+<br>&nbsp;
+<blockquote><tt># This is a file</tt>
+<br><tt>eecho hi!</tt>
+<p><tt># Notice that the above line is empty</tt>
+<br><tt># end of file</tt>
+<br>&nbsp;</blockquote>
+<font face="Arial,Helvetica">Now while in the editor, you modify line #2
+by removing the first 'e' in "eecho".&nbsp; The bug would cause the file
+to include one extra NULL character at the end of the line edited.&nbsp;
+This has been fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Enhancement Made to Ether Command</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/22/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: ethernet.c</font></i>
+<p><font face="Arial,Helvetica">The verbosity of the ethernet interface
+now includes an ascii conversion of the hex data.&nbsp; This is done with
+a 'X' argument appended to the -v option of the ether command.&nbsp; Also,
+the -p (enable promiscuity) has been changed to -p{0|1} so that promiscuity
+can be enabled (1) or disabled (0).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Host-based TTFTP Bug Fixed</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/15/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: tools/src/ttftp</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: ttftp.c, tftpsrvr.c</font></i>
+<p><font face="Arial,Helvetica">Both the client and server host-based tools
+for ttftp did not truncate properly... If a file was destined for the host,
+and the file already existed on the host, then the existing file was not
+truncated.&nbsp; The result was that if the new file that overwrote the
+old file was smaller, then the remnants of the old file would still be
+appended to the end of the new file.&nbsp; This is fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS Bug Fixed</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/5/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: tfs.c</font></i>
+<p><font face="Arial,Helvetica">The function tfsadd() did not handle the
+case where the TFS flash space was near the end of 32-bit space (0xFFFFFFFF).&nbsp;
+If the size of a new file added to TFS caused an address wrap, then tfsadd()
+was getting confused.&nbsp; This wrap case is now accounted for.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New "endian-swap" options for DM &amp; PM</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:5/18/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: memcmds.c</font></i>
+<p><font face="Arial,Helvetica">The DM command can now be told to endian-swap
+prior to displaying all 2 and 4-byte data units.&nbsp; Similarly, the PM
+command will take in a 2 or 4-byte data value and endian swap it prior
+to writing it to memory.&nbsp; Refer to the "-e" option of <a href="commands/dm.html">dm</a>
+and <a href="commands/pm.html">pm</a>.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Flash Sector Range Protection Improved</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:5/2/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: flash.c</font></i>
+<p><font face="Arial,Helvetica">The <a href="src/common/monitor/flash.c.html">sectorProtect()</a>
+function now accepts sector ranges that can include commas.&nbsp; The range
+can be a single digit, a dash-delimited range or a combination of both
+separated by a comma.&nbsp; This allows the FLASH_PROTECT_RANGE definition
+in config.h to be a bit more useful.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Documentation Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:5/2/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: appnotes</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: appnotes/porting.html</font></i>
+<p><font face="Arial,Helvetica">Updated the "New Target Port" <a href="appnotes/porting.html">page</a>
+to include more detail about FLASH, TFS and other configuration entries
+in <a href="src/targets/target_dirname/monitor/config.h">config.h</a>.</font></blockquote>
+
+<h3>
+<font face="Arial,Helvetica">&nbsp;<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a>&nbsp;
+CLI Processor now expects several different return values</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/1/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Files: several!</font></i>
+<p><font face="Arial,Helvetica">The command line interface (CLI) processor
+function <a href="src/common/monitor/docmd.c.html#docommand">docommand()</a>
+, had been executing command functions and only checking for a return of
+-1 (fail) or 0 (pass).&nbsp; That, plus the fact that docommand() returned
+void has been changed.&nbsp; This is a very minor change functionally,
+but a lot of files are affected because all command functions must now
+return a value based on the definitions in <a href="src/common/monitor/cli.h.html">cli.h</a>.&nbsp;
+There are two reasons for having made this change:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Now an application can issue mon_docommand()
+and process the return value (instead of void).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Since the script runner calls docommand(),
+it will now automatically terminate on a CLI parameter error within a script.</font></li>
+</ul>
+</blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS CLI&nbsp; "ls" command now displays file size total</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 4/20/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Files: tfscli.c</font></i>
+<p><font face="Arial,Helvetica">The "tfs ls" command now displays the file
+size total in addition to the number of files listed.&nbsp; This total
+does not include any TFS overhead; it is simply an accumulation of each
+of the file sizes displayed.&nbsp; A few other minor changes were made
+to the underlying code for cleanup.&nbsp; Refer to <a href="commands/tfs.html">updated
+manpage</a> and source code <a href="src/common/monitor/tfscli.c.html#tfsvlist">tfsvlist()</a>
+and <a href="src/common/monitor/tfscli.c.html#tfsqlist">tfsqlist(</a>).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Per-packet delay option added to host-based ttftp client tool</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 4/16/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor tools</font></i>
+<br><i><font face="Arial,Helvetica">Files: src/ttftp/ttftp.c src/ttftp/main.c</font></i>
+<p><font face="Arial,Helvetica">A new "-d" option in <a href="tools/doc/ttftp.html">ttftp</a>
+allows a user to insert a per-packet-delay (in milliseconds) into the outgoing
+stream of a client to target transfer.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Documentation Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/11/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: .</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: faq<a href="appnotes/application_update.html">.html</a></font></i>
+<p><font face="Arial,Helvetica">Started a "Frequently Asked Questions"
+<a href="faq.html">page</a>.&nbsp;
+This page is primarily geared toward users outside of Lucent.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="file:///H|/public_html/monitor/images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug found in X/YMODEM...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/10/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: xmodem.c</font></i>
+<p><font face="Arial,Helvetica">A few bugs were found in the xmodem.c code.&nbsp;
+Some occur only on little-endian CPUs (CRC value is byte swapped) and a
+few others related to file upload transfers greater than 255 packets.&nbsp;
+Refer to the <a href="src/common/monitor/xmodem.c.html">xmodem.c code</a>
+for the fixes.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Public Package Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/10/2001</font></i>
+<p><font face="Arial,Helvetica">Added complete port to FADS860 evaluation
+board.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+The "dr" and "pr" commands replaced with "reg" command</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/1/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common, target, cpu</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: common/reg_cache.c,
+cpu/regs_CPUNAME.c, target/regnames.c</font></i>
+<p><font face="Arial,Helvetica">Up till now, the <a href="commands/dr.html">dr</a>
+and <a href="commands/pr.html">pr</a> commands have been peices of code
+that were under the target specific space and wrapped with a #ifdef INCLUDE_DEBUG
+macro.&nbsp; This meant that they were never used because, in general,
+the current state of the monitor does not support much runtime debugging
+(see discussion in <a href="appnotes/debugging.html#Runtime_trace">debugging
+app note</a>).&nbsp; To eliminate the per-target baggage without eliminating
+the capability of the commands, dr and pr are replaced with a new <a href="commands/reg.html">reg</a>
+command that is not wrapped around any macro.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Slight change to "-s" and "-v" option of "dm" command</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:3/23/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: memcmd.c</font></i>
+<p><font face="Arial,Helvetica">The "-s' option of the "<a href="commands/dm.html">dm</a>"
+command allows a user to dump memory as if it was a null-terminated ascii
+string.&nbsp; Originally (until this change), the -s option would use the
+count specified on the command line as a max-out value.&nbsp; In other
+words, if the string was longer than the count, display would terminate
+at the count.&nbsp; This has been changed so that strings of any size will
+be printed without truncation.&nbsp; To use the count, refer to the -b
+option.</font>
+<br><font face="Arial,Helvetica">The "-v" option, when used in conjunction
+with "-s", will now populate the shell variable with the address after
+the NULL termination point detected in the string.&nbsp; This allows a
+block of null-terminated strings to be printed with the following command
+(as an example, assume a set of null-terminated strings start at address
+0x1000)..</font>
+<blockquote><font face="Arial,Helvetica">set STRING 0x1000</font>
+<br><font face="Arial,Helvetica">dm -v STRING -s $STRING</font>
+<br><font face="Arial,Helvetica">dm -v STRING -s $STRING</font>
+<br><font face="Arial,Helvetica">dm -v STRING -s $STRING</font></blockquote>
+<font face="Arial,Helvetica">Each dm command reloads the STRING shell variable
+with the address of the just-printed string's null termination plus one.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New "call" command option</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:3/9/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: go.c</font></i>
+<p><font face="Arial,Helvetica">The "<a href="commands/call.html">call</a>"
+command now supports the ability to pass (int argc,char **argv) to the
+embedded function instead of just passing long values.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Documentation Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:3/2/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected directory: appnotes</font></i>
+<br><i><font face="Arial,Helvetica">Affected file: <a href="appnotes/application_update.html">application_update.html</a></font></i>
+<p><font face="Arial,Helvetica">The text was out-dated.&nbsp; Did not accurately
+reflect the state of the monitor, so if you haven't read this page in a
+while, go read it again!</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Flash "opw" command now requires user-level 3</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:3/1/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Files: flash.c</font></i>
+<p><font face="Arial,Helvetica">Since the "opw" option of the flash command
+allows the user to modify the boot flash space, this is considered a "super-user-only"
+command.&nbsp; Should have always been that way!</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bugs found/fixed in "in-place-modify"&nbsp; functionality of TFS</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:2/21/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: common/monitor</font></i>
+<br><i><font face="Arial,Helvetica">Files: tfsapi.c, tfs.c</font></i>
+<p><font face="Arial,Helvetica">The "<a href="tfs.html#ipmod">in-place-modify</a>"
+option within TFS had a bug.&nbsp; This bug was inserted into the code
+as a result of some cleanup of some function prototype inconsistencies...
+It cleaned up a compiler warning, but broke the functionality of the tfsipmod()
+function.&nbsp; The result of the bug was that the offset handed to <a href="src/common/monitor/tfsapi.c.html#tfsipmod">tfsipmod()</a>
+was quadrupled because of a incorrect casting done on the first argument
+passed to the flashwrite function within tfsipmod().</font>
+<br><font face="Arial,Helvetica">Also, in <a href="src/common/monitor/tfs.c.html#tfsadd">tfsadd()</a>,
+there is a comparison made of the old file vs the new file.&nbsp; If the
+new file is identical to the old file, then there is no flash operation
+needed.&nbsp; This is done to avoid an unnecessary flash operation if the
+new file is identical to what is already there.&nbsp; A problem with this
+was found because the comparison should not be performed if the source
+file is in-place-modifiable.&nbsp; For in-place-modifiables, the source
+is undefined because the data is written with 0xff; hence, a memory comparison
+is illegal in this case.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+RFC2349 "tsize" extension supported by ttftp in client mode</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:2/12/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: tools/src/ttftp/</font></i>
+<br><i><font face="Arial,Helvetica">Files:main.c, ttftp.c, ttftp.h</font></i>
+<p><font face="Arial,Helvetica">The ttftp host-based tftp tool now supports
+the "tsize" extension as specified in <a href="rfcs/rfc2349.txt">RFC2349</a>.&nbsp;
+See <a href="tools/doc/ttftp.html">ttftp</a> for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug in TFS "cp" command...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:2/9/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c, tfscli.c</font></i>
+<p><font face="Arial,Helvetica">If "tfs cp" is used to copy one file to
+another, and the copy results in a defragmentation, then it is possible
+that the copy will be corrupted.&nbsp; This is because the code under "tfs
+cp" simply did a tfsadd() using the source address of the source file in
+flash.&nbsp; This is dangerous because of the potential of a defragmentation
+moving the source file to a new location within the flash.&nbsp; The fix
+for this is to have tfs cp first copy the source file to APPRAMBASE, then
+copy from APPRAMBASE to the new file in TFS.</font>
+<br><font face="Arial,Helvetica">Also, along those lines, more protection
+has been added to tfsadd() to detect this scenerio.&nbsp; Now, tfsadd()
+does an initial crc32 on the source data, then after the potential tfsclean()
+call, it does another crc32 on the space.&nbsp; If the crcs do not match
+then it assumes that something in the source space has changed and aborts
+the transfer with a TFSERR_FLAKEYSOURCE error code return.&nbsp; See warning
+in <a href="api/tfsadd.html">tfsadd()</a> for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New option in read command...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:2/9/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:chario.c, if.c, genlib.h</font></i>
+<p><font face="Arial,Helvetica">If a timeout is specified for the read
+command, and sometime during the timeout duration a character is typed
+at the console, then the timeout is ignored for the remaining character
+input and the user would have to type in a line terminated with carriage
+return to complete the read command.&nbsp; This is because the timeout
+is applied only to the initial period prior to receiving any characters
+from the user.&nbsp; Once the first character is typed, the read command
+no longer applied the timeout.&nbsp; A new option, -T, is added to support
+the restart of the timeout after each character.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Command Line Redirection...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:1/30/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:redirect.c (new file),docmd.c,chario.c,
+genlib.h</font></i>
+<p><font face="Arial,Helvetica">The monitor's command line interface now
+supports the ability to redirect the output of commands to a TFS file.&nbsp;
+This is done by setting the INCLUDE_REDIRECT macro in the config.h file.&nbsp;&nbsp;
+Refer to <a href="appnotes/cli_redirection.html">cli_redirection</a> for
+details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Optional Automatic Exception Post Processing...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:1/30/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:misc.c</font></i>
+<p><font face="Arial,Helvetica">At the time of an exception, the monitor
+will now look for the presence of the shell variable <a href="shellvars.html#EXCEPTION_SCRIPT">EXCEPTION_SCRIPT</a>.&nbsp;
+if it exists, then it assumes that the content of that shell variable is
+a script that is to be executed after an exception occurs.</font>
+<br><font face="Arial,Helvetica">Also, after checking for (and possibly
+executing) the EXCEPTION_SCRIPT, if the shell variable <a href="shellvars.html#NO_EXCEPTION_RESTART">NO_EXCEPTION_RESTART</a>
+is present, then the target system will remain at the monitor level; else,
+it will automatically reset so that the application can restart.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+General code cleanup...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:1/20/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:many</font></i>
+<p><font face="Arial,Helvetica">I am in the process of trying to cleanup
+some of the source code and reorganize a bit.&nbsp; There are a few rather
+major reorganizations:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The TFS code has been broken up into several
+smaller sections that can now be configured in/out of a monitor build depending
+on the needs.&nbsp; Prior to this, if a monitor was going to use TFS, then
+it had to incorporate all of it.</font></li>
+
+<li>
+<font face="Arial,Helvetica">I've added a configuaration check header file
+to the common code and this should be included in the target-specific config.h
+files so that some sanity checks (regarding what modules are included in
+a build) can be caught at compile time.&nbsp; For example, the header file
+will verify that the user has not conifured TFS in, but FLASH drivers out.</font></li>
+
+<li>
+<font face="Arial,Helvetica">General reorganization of some of the common
+cpu code is being done (and is still going on) so that from one target
+to the next (with similar CPU complexes), there is more sharing and less
+duplication of code in the target-specific directory.</font></li>
+</ul>
+</blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Improved command-line processing of symbols</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:1/17/2001</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:docmd.c symtbl.c</font></i>
+<p><font face="Arial,Helvetica">The support of symbols in the monitor was
+somewhat of an afterthought.&nbsp; I added it to the monitor originally
+and didn't really do it right.&nbsp; Symbols (tokens preceded by '%') are
+now handled in exactly the same way as shell variables.&nbsp; This was
+a good improvement because it gives the command line more processing power
+of symbols, and it uses less code than the older mechanism.&nbsp; I like
+it when that happens!</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Public Package Update</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:1/11/2001</font></i>
+<p><font face="Arial,Helvetica">Transition from Lucent SSG site to Lucent
+Research Software Distribution site.&nbsp; Update includes a few fixes
+in the package based on feedback from downloaders; plus ports to coldfire,
+sh2, 68K and powerPC.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug fixed in TFS, also some notes...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:12/15/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c</font></i>
+<p><font face="Arial,Helvetica">If a file exists in the monitor and a new
+version of that file is transferred in (typically via tftp), the old file
+is marked as stale while the new file is being added.&nbsp; Then, once
+the new file is installed and verified, the old "stale" file is removed.&nbsp;
+This is done so that the old version of the file is kept available just
+in case the new file does not successfully get loaded into TFS.&nbsp; This
+protection mechanism means that TFS must have enough flash space to store
+two copies of a file.&nbsp; The bug found was this... if during the time
+when the old file is marked as stale and the new file is being loaded into
+TFS, a reset occurs, then code in TFS that runs at startup to see if the
+files are sane would get confused and cause files to be deleted erroneously.&nbsp;
+This was caused by the fact that this code was not taking into account
+the fact that the "stale" file's header will not pass the CRC test because
+a bit in the header was modified to make it stale.&nbsp; The result was
+that TFS detected corruption erroneously.&nbsp; This is now fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Embedded Systems Magazine Article Released</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:12/01/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code:</font></i>
+<br><i><font face="Arial,Helvetica">Files:</font></i>
+<p><font face="Arial,Helvetica">An <a href="http://www.embedded.com/internet/0012/0012ia2.htm">article</a>on
+TFS in Embedded Systems Magazine and the first public version (through
+Lucent Software Solutions Group) of the monitor released.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Fixed a few bugs in xmodem...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/21/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:xmodem.c</font></i>
+<p><font face="Arial,Helvetica">Two bugs were found recently in xmodem.&nbsp;
+One related to XMODEM 1K and another related to the use of the -a option...&nbsp;
+Prior to this fix, the XMODEM 1K protocol in the monitor did not consider
+the possibility that a mixture of 1K and 128-byte packets may be received.&nbsp;
+This is now fixed.&nbsp; Also, the -a option was not properly initializing
+a pointer used to transfer the incoming data to local memory.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Added -v option to CALL command...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/21/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:go.c</font></i>
+<p><font face="Arial,Helvetica">The call command allows the user to call
+a function anywhere in memory space.&nbsp; The return value is normally
+printed to the console after the function returns.&nbsp; This new option
+allows the user to place the hex return value into a specified shell variable
+for use in a script.&nbsp; Refer to the <a href="commands/call.html">call</a>
+command for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Changed -v option in DM command...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/9/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:memcmds.c</font></i>
+<p><font face="Arial,Helvetica">The -v option in the DM command allows
+the user to place the last element of the block being displayed into a
+specified shell variable.&nbsp; The output was normal DM output.&nbsp;
+This has been changed so that the -v option is quiet and it places the
+element pointed to by the address argument into the shell variable.&nbsp;
+There is only one memory access and the result of that access is quietly
+placed in the shell variable.&nbsp; Refer to the <a href="commands/dm.html">dm</a>
+command for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Added functionality and fixes to the 'cast' command...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/9/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:cast.c</font></i>
+<p><font face="Arial,Helvetica">The cast command will now dump the content
+of a character array or a string pointed to by a character pointer if the
+character type is "char.c".&nbsp; Also, a few parsing errors were fixed
+related to variable amounts of whitespace between tokens in the structfile.&nbsp;
+The indentation is cleaner and when structure members are printed they
+are now aligned vertically for easier viewing.&nbsp; Refer to the <a href="commands/cast.html">cast</a>
+command for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Flash operations no longer lock out interrupts...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:11/9/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:flash.c</font></i>
+<p><font face="Arial,Helvetica">For historical reasons that no longer apply,
+the flash operations were wrapped with intererupt lock out functions so
+whenever a flash operation was being done through the monitor's facilities,
+interrupts were off for the duration.&nbsp; This is obviously not healthy
+for a running system that uses this facility!&nbsp; The interrupt lock
+out functions have been removed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS "init" cleaned up...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/19/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c</font></i>
+<p><font face="Arial,Helvetica">The tfs init command will now properly
+deal with individual devices.&nbsp; Prior to this, tfs init would initialize
+all devices regardless of the presence of the -d option.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bugs fixed in TFS (defragmentation &amp; tfsclose())</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/19/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c</font></i>
+<p><font face="Arial,Helvetica">Defragmentation bug:</font>
+<br><font face="Arial,Helvetica">For flash devices configured with small
+sector sizes (battery-backed ram or BBRAM), there was a situation where
+the TFS defragmentation overhead would require more than just one sector
+of storage space.&nbsp; If this occurred, the defragmentation could corrupt
+a file in TFS.&nbsp; This has been fixed so that when a file is added to
+TFS, the overhead space requirement is verified NOT to exceed the sector
+space that it is allotted.&nbsp; The allocation of sector sizes for BBRAM
+flash devices has been re-worked so that the sector sizes do not have to
+all be the same size.&nbsp; Now the spare sector and the sector into which
+this defrag overhead grows can be a bit larger than the rest.</font>
+<br><font face="Arial,Helvetica">API tfsclose() bug:</font>
+<br><font face="Arial,Helvetica">If a file was opened for modification
+(tfsopen(...,TFS_APPEND)), then later when it was closed, the size of the
+new modified file was based on the position of the write pointer at the
+time of the close.&nbsp;&nbsp; This was wrong and has been fixed to more
+accurately mimic a unix-like file system.&nbsp; The size of the modified
+file is either the same size as the original (assuming the write pointer
+never exceeds the end of the original file size), or it is the high-water
+point of the write pointer which at one point during the opened file session
+must have exceeded the end of the original file size.</font>
+<br><font face="Arial,Helvetica">Based on this fix made to tfsclose(),
+a new api function (<a href="api/tfstruncate.html">tfstruncate</a>) is
+available to provide the ability to open a file and make it smaller than
+the original size.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug fixed in 'edit'...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/19/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:edit.c</font></i>
+<p><font face="Arial,Helvetica">The on-board editor was violating the warning
+discussed below for tfsadd() dated 6/9/2000.&nbsp; This has been fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New 'exit' option...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:8/3/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c</font></i>
+<p><font face="Arial,Helvetica"><font size=+0>To allow a script to be executed
+and automatically deleted upon completion of the script, there is a new
+option to the exit command.&nbsp; Refer to <a href="commands/exit.html">exit</a>
+for details.</font></font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS bugs fixed...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:7/27/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c</font></i>
+<p><font face="Arial,Helvetica">Two bugs have been fixed in TFS...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">If the tfsadd() api function is called on
+a file that already exists (meaning that the existing file will be replaced),
+then there was a small window of time during which if a reset occurred,
+the file could be lost.&nbsp; This situation was already handled if the
+tfsopen/close/read/write functions were used, but it was not considered
+in tfsadd().&nbsp; This has been fixed so that all file updates are protected
+against the situation where a reset occurs after the old file is deleted
+but before the new file is added.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The tfsnext() api function did not support
+the possibility of there being multiple file system devices.&nbsp; This
+is now fixed.</font></li>
+</ul>
+</blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS function tfseof() added to API...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/15/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c, moncom.c, monlib.c, tfs.h,
+monlib.h</font></i>
+<p><font face="Arial,Helvetica">A new function, <a href="api/tfseof.html">tfseof()</a>,
+has been added to the monitor's API.&nbsp; Refer to <a href="api/tfseof.html">man
+page</a> for more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS function tfsstat() warning...</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/9/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:tfs.c, moncom.c, monlib.c, tfs.h,
+monlib.h</font></i>
+<p><font face="Arial,Helvetica">For systems with application code that
+uses the <a href="api/tfsstat.html">tfsstat()</a> system call and have
+the possibility of the file system being automatically defragmented, the
+pointer returned by tfsstat() may become stale. The tfsstat() system call
+returns a TFILE pointer (pointer to a TFS file header structure).&nbsp;
+This pointer is pointing directly into the flash space containing the file.&nbsp;
+If at some point after the tfsstat() pointer is returned, a defragmentation
+is done, the pointer is likely to be pointing to space in flash that is
+no longer the tfs header that tfsstat() returned the pointer to earlier.&nbsp;
+This is because the defragmentation may move the file and its header, but
+the pointer retrieved by the application is left unaware.</font>
+<br><font face="Arial,Helvetica">There are a few&nbsp; workarounds for
+this...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">A new TFS API function, <a href="api/tfsfstat.html">tfsfstat()</a>,
+has been added.&nbsp; This is very similar to tfsstat(), but it returns
+an integer and expects to be passed a pointer to a TFILE structure that
+it will then populate.&nbsp; This way, the application code is not looking
+at a structure that is directly in the flash space.&nbsp; For any instances
+where the pointer returned by tfsstat() is used for more than just determining
+the existence of a file, use tfsfstat() instead.&nbsp; This obviously means
+that the underlying monitor must be updated.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Application code that uses the pointer that
+tfsstat() returns, and may have a defragmentation occur, should enter a
+critical section (or simply shut down preemption) and copy the structure
+pointed to by the tfsstat() pointer to a local structure...</font></li>
+
+<ul>&nbsp;
+<ul>
+<ul>
+<ul><tt>TFILE *tfp, localcopy;</tt>
+<p><tt>SHUT_DOWN_PREEMPTION();</tt>
+<br><tt>tfp = tfsstat();</tt>
+<br><tt>localcopy = *tfp;</tt>
+<br><tt>RESTORE_PREEMPTION();</tt></ul>
+</ul>
+</ul>
+</ul>
+</ul>
+
+<p><br><i><font face="Arial,Helvetica">Note that this is only an issue
+if the system is using TFS in application space <b>and </b>the tfsstat()
+function is called <b>and</b> defragmentation occurs <b>and</b> the pointer
+returned by tfsstat() is used after the defragmentation.</font></i></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+IPADD setting to 0.0.0.0 disables ethernet interface</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:6/2/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files:ethernet.c</font></i>
+<p><font face="Arial,Helvetica">For systems that have an ethernet interface,
+but for one reason or another, may need to have it startup disabled, logic
+has been added so that if the IPADD shell variable (typically loaded via
+monrc) contains 0.0.0.0, then the ethernet driver will not startup.&nbsp;
+It can be restarted at anytime by setting the IPADD shell variable to some
+valid address and executing "ether on" in a script.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Enhancements to the monitor's scripting capability</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:5/30/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: tfs.c, tfs.h, if.c, cmdtbl.c</font></i>
+<p><font face="Arial,Helvetica">The script-execution capability that comes
+with TFS has been improved so that cleaner scripts can be written...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The command "<a href="commands/exit.html">exit</a>"
+can be called anywhere within a script (including from within the "<a href="commands/if.html">if</a>"
+command) to terminate the execution of that script.</font></li>
+
+<li>
+<font face="Arial,Helvetica">As an enhancement to the current "<a href="commands/goto.html">goto</a>"
+command, scripts can now contain subroutines.&nbsp; A subroutine can be
+called at any point within a script (including from within the "if" command)
+using the "<a href="commands/gosub.html">gosub</a>" command and there can
+be upto 16 nested levels of subroutines.&nbsp; The end of the subroutine
+should have a "<a href="commands/return.html">return</a>" command, but
+the return can also be part of the "if" command.&nbsp; One important note:
+a script cannot currently be executed from within a subroutine.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The&nbsp; "<a href="commands/if.html">if</a>"
+command now supports "else".</font></li>
+</ul>
+<font face="Arial,Helvetica">Refer to <a href="scripts.html">scripts</a>
+webpage for some examples.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New CAST &amp; STRACE commands</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:5/15/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common, monitor
+common cpu</font></i>
+<br><i><font face="Arial,Helvetica">Files: cast.c strace_sh.c strace_ppc.c
+cmdtbl.c</font></i>
+<p><font face="Arial,Helvetica">To support the ability to debug in "debugger-less"
+environments, a new command called "cast" has been added to the monitor
+to allow users to symbolically display memory.&nbsp; This command overlays
+a structure definition onto a block of memory and displays the memory as
+if it were that structure.&nbsp; Refer to the <a href="commands/cast.html">cast</a>
+command description for more details.&nbsp; Also, to catch the source of
+exceptions, the SH2/4 and PowerPC based monitors now support a <a href="commands/strace.html">stack
+trace</a> command.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New ARGV command option</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/28/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: go.c</font></i>
+<p><font face="Arial,Helvetica">The <a href="commands/argv.html">argv</a>
+command now allows the user to re-initialize (clear) the argv list stored
+internally.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+XMODEM enhancements</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date:4/17/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: xmodem.c</font></i>
+<p><font face="Arial,Helvetica">The <a href="commands/xmodem.html">xmodem</a>
+command now supports XMODEM-1K for downloads as well as Ymodem (-y option
+to xmodem) batch downloads.</font>
+<br><font face="Arial,Helvetica">Also, in the process of adding this stuff,
+I noticed that the XMODEM CRC-16 (CRC-CCITT) function was messed up, so
+this too is fixed.&nbsp; The XMODEM-1k enhancement makes downloading a
+bit faster and the Ymodem extensions allow multiple files to be downloaded
+in one shot without the need to specify the filename and other attributes
+on the xmodem command line.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS enhancements: "directory-like" listing, runtime trace</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 3/10/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: tfs.c</font></i>
+<p><font face="Arial,Helvetica">TFS does not support any type of directory
+heirarchy aside from the forced directory-like breakup of TFS if it spans
+across multiple non-contiguous memory blocks.&nbsp; The file names, on
+the other hand, support the use of a slash in the name.&nbsp; To give the
+appearance of a directory-like listing, if files contain slashes, then
+those slashes will be treated like a delimiter in the file name and the
+listing will only show one file with the prefix up to the slash. In other
+words...if you have files <i>DIR/file1</i>,
+<i>DIR/file2</i> and
+<i>DIR/file3</i>,
+"tfs ls" will now print <i>DIR/</i> only.&nbsp; To get a full listing,type
+"tfs ls *".</font>
+<br><font face="Arial,Helvetica">Also, a new tfs subcommand,
+<i>trace</i>,now
+allows the user to enable a few levels of trace for TFS system calls.&nbsp;
+If you are writing any application code that uses TFS, then this can be
+quite useful for tracing the TFS system calls.&nbsp;&nbsp; Refer to the
+<a href="commands/tfs.html">tfs</a>
+command for further details on this.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+The newmon script now has an equivalent newmon.exe</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 3/4/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor tools</font></i>
+<br><i><font face="Arial,Helvetica">Files: newmon.c</font></i>
+<p><font face="Arial,Helvetica">To update a monitor to a new version, thus
+far we have been using a bash script called "newmon".&nbsp; This&nbsp;
+script works fine on UNIX platforms.&nbsp; It calls moncmd, ttftp and ping
+to verify target presence and to send the appropriate commands to the target
+to install a new monitor.&nbsp; On PCs; however, it has required that the
+user install the bash shell so that the underlying environment exists.&nbsp;
+To eliminate this, an ".exe" version of <a href="tools/doc/newmon.html">newmon</a>
+is now available.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS now dynamically configures itself</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 2/11/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.h common/tfs.c target_specific/tfsdev.h</font></i>
+<p><font face="Arial,Helvetica">Up to this point, the flash utility in
+the monitor has been able to configure itself based on the expectation
+that a device from a particular device family may be onboard.&nbsp; TFS,
+on the other hand, used hard coded values that did not allow it to work
+accross a particular device family.&nbsp; This has been updated so that
+TFS will now optionally (based on settings in tfsdev.h) retrieve the information
+on the underlying flash from the flash data structures instead of being
+hardcoded in tfsdev.h.&nbsp; Even if the target does not have any need
+for supporting different devices of the same family type, this can be used
+to simplify config.h and tfsdev.h.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+UDP/ICMP/IP portion of monitor now runs with LittleEndian CPU</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 2/4/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/ether.h common/ethernet.c
+common/arp.c common/icmp.c common/dhcpboot.c common/tftp.c</font></i>
+<p><font face="Arial,Helvetica">Up to this point, the monitor has not been
+run on any little-endian machines; hence, it was difficult to verify any
+of the network interfaces if the CPU was little-endian.&nbsp; This has
+now been tested on an ARM-based port of the monitor with the CPU running
+in little endian mode.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Elimination of UNIX crypt() from source code</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 1/4/2000</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/crypt.c</font></i>
+<p><font face="Arial,Helvetica">The monitor had supported the option to
+use UNIX crypt() (from BSD) by setting the INCLUDE_CRYPT macro in the config.h
+file.&nbsp; I've eliminated the UNIX crypt() source from my distribution
+just to keep things simple.&nbsp; If you need this and are within Lucent,
+<a href="mailto:esutter@lucent.com">contact
+the author</a>; otherwise, get it from some public BSD distribution and
+replace my simple stuff in crypt.c with that code.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New Boot-Sector Safety Support</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 11/1/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/bootblk.c</font></i>
+<p><font face="Arial,Helvetica">This is a new capability that allows the
+monitor to be built so that it can be verified prior to running.&nbsp;
+This is done by incorporating a small boot-sector saftey program at the
+startup of the system.&nbsp; Refer to <a href="appnotes/bootblock.html">appnotes</a>
+for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New shell variable, MONFLAGS, for configuring various monitor parameters
+at startup:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 10/21/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/misc.c common/tftp.c
+common/tfs.c common/ethernet.c</font></i>
+<p><font face="Arial,Helvetica">This is a general purpose flag variable
+whose content is read in at monitor startup and from that content a bit
+mask is constructed to control various apects of the monitor.&nbsp; The
+current controls are for printing the header at reset, printing the TFTP
+messages indicating a transfer and/or file addition, the defrag message
+and the moncmd message.&nbsp; Refer to <a href="shellvars.html#MONFLAGS">MONFLAGS</a>
+for syntax and more details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug found/fixed in TFS defragmentation:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 10/12/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c common/tfs.h</font></i>
+<p><font face="Arial,Helvetica">This is a fix that has to do with the bug
+that was "thought" to be fixed with the 9/10/1999 fix (see below).&nbsp;
+In the process of testing this fix, one additional fix was made in tfsclean()
+(the function that implements the defragmentation).&nbsp; This fixes the
+previously unconsidered case where the defragmentation header table spans
+across more than just one sector of TFS space.&nbsp; This will only be
+noticed in cases where the final sector (prior to the spare) is quite small
+or when an extremely large number (hundreds) of files are stored and TFS
+does a defragmentation.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New Shell Variables for Tuning TFTP, DHCP and ARP Timeout/Retry:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 9/28/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/ethernet.c</font></i>
+<p><font face="Arial,Helvetica">The TFTP, DHCP and ARP code within the
+monitor all use an exponential retry mechanism that is similar to what
+is specified for DHCP in <a href="rfcs/rfc2131.txt">RFC 2131</a> (section
+4.1). Each of these protocols has a different retry rate and give-up point.&nbsp;
+There are now three shell variables that allow these parameters to be tuned:
+<a href="shellvars.html#DHCPRETRYTUNE">DHCPRETRYTUNE</a>,
+<a href="shellvars.html#TFTPRETRYTUNE">TFTPRETRYTUNE</a>
+and <a href="shellvars.html#ARPRETRYTUNE">ARPRETRYTUNE</a>.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Additions to TFS:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 9/16/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c</font></i>
+<p><font face="Arial,Helvetica">There are three new arguments for <a href="api/tfsctrl.html">tfsctrl()</a>...
+TFS_DEFRAGDEV, TFS_CHECKDEV and TFS_INITDEV.&nbsp; They allow the application
+code on top of TFS to have better control over the sanity of the flash
+devices used by TFS.&nbsp; Also, for added corruption detection, when tfsopen()
+is called, if the file already exists in TFS, then a crc32 of the data
+is run on that file and if it fails, tfsopen() will immediately return
+TFSERR_BADCRC.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+PC-based DHCPSRVR.exe updated:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 9/13/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: dhcpsrvr support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrv/dhcpsrvr/*.[ch]</font></i>
+<p><font face="Arial,Helvetica">The <a href="tools/doc/dhcpsrvr.html">dhcpsrvr</a>
+tool was written to support the needs of some PPA developement work a while
+back.&nbsp; It was very PPA-centric in that the server only supported configuration
+of the DHCP options that were supported by the PPA; plus all of the option
+names were PPA-based descriptions instead of generic terminology.&nbsp;
+Now that others are using this tool, I eliminated all of the PPA-specific
+configuration parameters.&nbsp; This does not mean that the tool can no
+longer be used with PPAs, but it does extend its usefullness beyond the
+PPA application.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug found in TFS:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 9/10/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c</font></i>
+<p><font face="Arial,Helvetica">If, as a result of TFS defragmentation,
+a file is relocated within the flash space such that the header of that
+file overlaps a sector boundary, the defragmentation will fail and the
+file system will be corrupted.&nbsp; This bug has been in TFS's power-safe
+defragmentation algorithm since birth.&nbsp; It was never noticed because
+the odds of a file's header (typically 76 bytes) overlapping a sector (typically
+64K-128K bytes) boundary are low.&nbsp; It was found as a result of having
+added the multiple-device support.&nbsp;&nbsp; One project is overlaying
+TFS on an 8K battery-backed SRAM with "artificial" sector sizes of 128
+bytes (sector isn't much bigger than the TFS header); hence the odds are
+greatly increased!&nbsp; This problem has been fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS now supports multiple devices:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 9/1/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c common/tfs.h</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">TFS can now deal with multiple
+devices for file storage.&nbsp; This means that different memory devices
+existing in non-contiguous address space can be utilized by TFS. The initial
+intent of this feature is to support a system that has flash and battery-backed
+RAM, both of which can now store files.&nbsp; This immediately can be extended
+to support multiple flash devices (for example, an 8-bit boot device and
+then some other 16 or 32-bit storage device).</font>
+<br><font face="Arial,Helvetica">The idea here is that TFS can now be configured
+to support any number of different memory devices as long as the device
+can be made to "look" like on-board flash to TFS.&nbsp; Note that each
+device appears to be a directory to TFS.&nbsp; Files can be stored in any
+device, but cannot span across them.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New DHCPOFFRFLTR shell variable:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 8/25/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c common/dhcp_00.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">To&nbsp; make the common code
+that comes with the monitor's DHCP client more generic, a new shell variable
+is in place:&nbsp; DHCPOFFRFLTR (DHCP offer filter) will be scanned by
+the monitor to determine whether or not the incoming offer from a DHCP
+server should be accepted or ignored.&nbsp; Refer to definition of <a href="shellvars.html#DHCPOFFRFLTR">DHCPOFFRFLTR</a>
+for syntax.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+PC-based MONCMD.exe updated:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 8/25/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: moncmd support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/moncmd/moncmd.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">To support a more convenient mechanism
+for retrying if <a href="tools/doc/moncmd.html">moncmd</a> fails, a new
+-r option has been added.&nbsp; This option causes moncmd to automatically
+resend the UDP string to the target if a response is not received from
+the target by the time it would otherwise timeout.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New test for 'if' command:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 8/20/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/if.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">Since a file can be stored compressed
+or non-compressed, and since the way in which the file is stored can result
+in different steps taken; the 'if' command can now test to determine if
+a file is compressed.&nbsp; Refer to the <a href="commands/if.html">if</a>
+command for details of the new <i>iscmp</i> test.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Improvement made to TFS corruption detection:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 8/11/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">TFS is a linear file system.&nbsp;
+As each new file is added to the flash space, it is appended to the end
+of the address space currently used by TFS.&nbsp; Until now, if the unused
+space (typically cleared by tfs clean or tfs init) somehow gets erroneously
+written, TFS would not be able to write any more files to that flash space.&nbsp;
+This has been improved so that TFS now detects already-written flash and
+will automatically run a tfsclean() to clean it up.&nbsp; Also, a portion
+of the tfs header that was used only as padding to keep structure members
+32-bit aligned, is now used to store a TFS version number.&nbsp; This will
+be useful for future upgrades of TFS that require the monitor to automatically
+rebuild the file system because of a header modification.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug found in TFTP client:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 8/05/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tftp.c common/dhcp.c
+common/ethernet.c common/arp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The monitor's tftp client is invoked
+through the "tftp" command.&nbsp; The monitor's tftp server is active as
+long as the "tftp off" command has not been issued.&nbsp;&nbsp; In general,
+the monitor's client and server share the code that completes the file
+transfer, but the timeout mechanism used was still seperate.&nbsp; This
+seperate client/server timeout mechanism caused a problem that was only
+seen if the monitor's tftp client did not receive a packet for more than
+10 seconds from the host-based TFTP file server.&nbsp; After a 10 second
+period the monitor's client would timeout, then the host-based server sends
+the next TFTP_DAT packet.&nbsp; The client should have rejected this packet
+since it has timed out, but it was accepted and placed in memory. This
+is a bug. This code has been cleaned up (and a bug fixed) so that both
+the client and server in the monitor use the same timeout mechanism. As
+a result of this fix, the same timeout mechanism (exponential retry) is
+now used by tftp, dhcp/bootp and arp.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New DHCPVSA and DHCPRQSTLIST shell variables:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/28/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">To&nbsp; make the common code
+that comes with the monitor's DHCP client more generic, two new shell variables
+are in place:&nbsp; <a href="shellvars.html#DHCPRQSTLIST">DHCPRQSTLIST</a>
+will be scanned by the monitor to populate the DHCP Parameter Request List
+option; also the shell variable <a href="shellvars.html#DHCPVSA">DHCPVSA</a>
+will be populated by the client with an ascii-coded-hex copy of whatever
+is in the vendor-specific-area of the final DHCP or BOOTP reply from the
+server.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New DHCPLEASETIME shell variable:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/21/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">Although the monitor does not
+support DHCP lease renewal, it will now take the first step...&nbsp; If
+the server response contains the lease time option, it will be stored into
+the shell variable DHCPLEASETIME.&nbsp; Also, if this shell variable is
+populated in monrc (prior to DHCP startup), then its content will be used
+(as a minimum requirement) to determine if the incoming lease time received
+from the server is acceptable.&nbsp; if not acceptable, then the server's
+offer is ignored.&nbsp; Note that ignoring the server's response will only
+occur if the DHCPLEASETIME variable is set in monrc; otherwise, it is always
+accepted.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+DHCP/BOOTP retry rate is variable based on RFC:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/20/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The monitor's dhcp and bootp clients
+now use a variable retry interval as specified in RFC 2131.&nbsp; The variation
+(-1 to 1) is seeded from the 2 least significant bits of the least significant
+byte of the MAC address.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+New MONITORBUILT shell variable:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/19/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/misc.c common/env.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The monitor now automatically
+creates the shell variable <a href="shellvars.html#MONITORBUILT">MONITORBUILT</a>
+to be loaded with the date and time of the build of the monitor.&nbsp;
+The format is dd/mm/yy@hh:mm:ss, and can be used to automatically determine
+if a monitor update needs to be run.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+All UDP ports used by monitor are now configurable:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/8/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c common/tftp.c
+common/ethernet.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The monitor uses a few ports to
+establish its UDP interfaces... DHCP Client Port: 68, DHCP Server Port:
+67, TFTP port: 69, and MONCMD port: 777.&nbsp; These values are still used
+as the defaults, but can now be overridden by shell variables (that can
+be loaded in the monrc file)... <a href="shellvars.html#DCLIPORT">DCLIPORT</a>,
+<a href="shellvars.html#DSRVPORT">DSRVPORT</a>,
+<a href="shellvars.html#TFTPPORT">TFTPPORT</a>
+and <a href="shellvars.html#MCMDPORT">MCMDPORT</a>.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Modification to BOOTP client:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/8/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The BOOTP client was populating
+the GIPADD shell variable from the content of the giaddr field of the BOOTP
+response.&nbsp; While this appears to be what is commonly done, it's not
+quite right... the giaddr field contains the IP address of the relay agent
+(if any).&nbsp; The proper location to load the GIPADD shell variable from
+is the vendor-specific option # 3.&nbsp; As of this change, the RLYAGNT
+shell variable is loaded with the content of the giaddr field, and if the
+GIPADD shell variable is not loaded from option #3, it is loaded with the
+same value stored in RLYAGNT.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New 'heap' command added to monitor:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/2/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/sbrk.c common/malloc.c
+common/cmdtbl.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The zlib utilities can use a large
+amount of memory (via malloc), so an addition to the memory allocator has
+been made to allow the monitor to boot up and have a large amount of memory
+available for its heap (for use by zlib); then later, when the application
+takes over, this block of memory can be released and made available to
+the application.&nbsp; To support these extensions to managing the heap,
+a new <i><a href="commands/heap.html">heap</a></i> command has been added.
+Included in this change is the elimination of the
+<a href="shellvars.html#HEAPSPACE">HEAPSPACE</a>
+and <a href="shellvars.html#HEAPSIZE">HEAPSIZE</a> shell variables.&nbsp;
+Their functionality is replaced by options in the heap command.&nbsp; Also,
+the -H and -h options in <a href="commands/mstat.html">mstat</a> (which
+were used to dump heap statistics) have been removed because this is now
+supported by the new command.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Zlib compression/decompression supported for ELF &amp; COFF:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 7/1/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: elf &amp; coff support_tools</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/fileutil/elf.c toolsrc/fileutil/coff.c
+toolsrc/fileutil/utils.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The "<a href="tools/doc/elf.html">elf</a>"
+and "<a href="tools/doc/coff.html">coff</a>" tools now support compression
+and the TFS loader supports ELF &amp; COFF decompression.&nbsp; Both use
+the <a href="http://www.cdrom.com/pub/infozip/zlib/">ZLIB public domain
+compression libarary</a> and the <a href="tfs.html#decompression">method
+discussed under the tfs page</a>.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Bug fixed in TFTP client (tftp get):</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/23/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/ether.h common/tftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The tftp client in the monitor
+was found to incorrectly transfer a file to TFS under certain conditions
+where the TFTP transfer failed.&nbsp; This meant that an incomplete file
+was transferred to TFS and as far as TFS was concerned, it was a legal
+file.&nbsp; The case was hit if the transfer timed out due to heavy network
+traffic or loss of connection.&nbsp; This is fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Runtime configurable command user levels:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/17/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common, monitor
+target-specific</font></i>
+<br><i><font face="Arial,Helvetica">Files: target/config.h common/misccmds.c
+common/misccmds.c common/docmd.c common/tfs.h</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">Previously, the user level of
+each command in the monitor was set up at compile time.&nbsp; For each
+command in the monitor's command set, there was one command mask that defined
+it.&nbsp; This has been enhanced to allow commands to have their user level
+modified at runtime and the command mask is eliminated from the target-specific
+configuration file.&nbsp; A new option has been added to the <a href="commands/ulvl.html">ulvl</a>
+command (-c) to support the reconfiguration any command to some user level
+other than the default of zero.&nbsp; This enhancement improves the maintenance
+of the monitor because there is no target-specific command mask set to
+maintain; and it improves the flexibility of the monitor because the user
+can now simply add any reconfiguration of command's user level to the monrc
+file.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFS enhancements:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/11/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c common/tfs.h</font></i></blockquote>
+<font face="Arial,Helvetica"><font size=+1>&nbsp;&nbsp;&nbsp;&nbsp; </font>Some
+enhancements have been made to TFS...</font>
+<blockquote>
+<blockquote>
+<li>
+<font face="Arial,Helvetica">Until now, the monitor had to be configured
+(config.h) to have some maximum number of files in TFS.&nbsp; This configuration
+requirement has been removed, so TFS is limited only by the size of the
+heap with regard to the number of files that can be stored in flash.</font></li>
+
+<li>
+<font face="Arial,Helvetica">A new tfsctrl() function has been added: TFS_DOCOMMAND.&nbsp;
+This allows the application to tell the script runner within TFS to use
+the application's command interpreter.&nbsp; This means that an application
+that has a command line interface, can now inherit the scripting capabilities
+provided by the monitor.&nbsp; Refer to the <a href="api/tfsctrl.html">tfsctrl()
+api function</a>&nbsp; and
+<a href="scripts.html#docommand">scripting documentation</a>
+for more details.</font></li>
+</blockquote>
+</blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+New comparison tests in "if":</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/11/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/if.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The "if" command in the monitor
+now supports logical comparisons: "and" and "or".&nbsp; Refer to the <a href="commands/if.html">if
+man page</a> for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+New "item" command added to monitor command set:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/10/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/if.c common/cmdtbl.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">This new command allows users
+to quite easily process lists.&nbsp; Basically, the command is a very simple
+means of implementing the "for" construct in the Korn Shell.&nbsp; Refer
+to the <a href="commands/item.html">item man page</a> for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+BOOTP/DHCP Server support tool can broadcast reply:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/9/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: dhcpsrvr support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/dhcpsrvr/main.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">Until now, the BOOTP/DHCP server
+tool could only reply to a client by modifying the arp cache of the host
+it resides on and then sending a reply directly to the client.&nbsp; On
+WindowsNT this requires that the user be running in Administrator mode.&nbsp;
+To support the ability to run the server in non-admin mode, the server
+can now&nbsp; broadcast the replies to the client.&nbsp; Using a broadcasted
+reply eliminates the need for the underlying IP stack to need an IP &lt;->
+MAC correlation; hence, no need for an entry in the arp cache to be present.&nbsp;
+To use this feature in the server, add the "-bD" options to the command
+line...&nbsp; -b enables the broadcast and -D disables the use of arp.&nbsp;
+Refer to <a href="tools/doc/dhcpsrvr.html">dhcpsrvr</a> manpage for full
+details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+BOOTP &amp; DHCP Clients now support server broadcast:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/9/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/ethernet.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">For efficiency a BOOTP server
+will typically modify its own arp cache prior to issuing a reply to a client.
+In some cases, servers may not have the ability (or authority) to do this,
+so the server can broadcast the reply.&nbsp; The BOOTP &amp; DHCP clients
+in the monitor now support the ability to receive broadcasted replies from
+the server.&nbsp; Prior to this, almost all incoming ethernet broadcasts
+were dropped.&nbsp; Now, if a BOOTP or DHCP transaction is in progress,
+an incomnig broadcast will be processed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TTFTP Client Support Tool Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/9/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: ttftp support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/ttftp/ttftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The ttftp client was sending replies
+to the server using port 69 regardless of whether or not the server's source
+port changed. This is fixed so that the client sends all replies to the
+source port returned by the server.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+Bug fixed in "tfs info" and "tfs size" commands:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/9/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The tfs commands "info" and "size"
+are used to populate a shell variable with a file's information field and
+size respectively.&nbsp; If the file doesn't exist, the variable should
+be cleared.&nbsp; This was not being done, and is now fixed.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Added "?" as an alternative to "help":</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/8/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/cmdtbl.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The single character '?' can now
+be used as an alternative to the "help" command.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Modification made to DHCP client (and bug fixed):</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/3/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c common/ether.h</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The DHCP client has been modified
+to act more like the BOOTP client...&nbsp; If after the handshake is complete,
+both the <a href="shellvars.html#BOOTFILE">BOOTFILE</a> and <a href="shellvars.html#BOOTSRVR">BOOTSRVR</a>
+shell variables are set, then the client will attempt to transfer the file
+specified by BOOTFILE from the TFTP server specified by BOOTSRVR.&nbsp;
+After successful transfer, if the file is executable, it will be executed.</font>
+<p><font face="Arial,Helvetica"><b>NOTE:
+</b>in the process of making this
+modification, a bug was found<b> </b>in the file transfer process that
+until now, was only used by BOOTP...&nbsp; If the TFTP transfer (kicked
+off as a result of BOOTFILE &amp; BOOTSRVR being set) failed, there was
+no TFTP retry.&nbsp; This is fixed and is applicable to both the BOOTP
+and DHCP clients.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Modification made to tfsadd():</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/2/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tfs.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The <a href="api/tfsadd.html">tfsadd()</a>
+API function (used internally by the monitor as well as provided for use
+to the user through the API) has been made a little smarter...&nbsp; It
+will now check to see if the filename to be added already exists.&nbsp;
+If it does and all aspects of the already existent file and the new file
+are the same, there is no flash operation done.</font>
+<br><font face="Arial,Helvetica">If the filename already exists but the
+content of the file (data, info field or flags) is not identical, then
+the old file is removed and the new one is added automatically.</font>
+<br><font face="Arial,Helvetica">Note that this change, plus the next three
+changes (logged on 6/2/1999) are related, and provide an enhancement to
+overall flash write efficiency of the MicroMonitor package.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFTP Server Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/2/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">When a TFTP_WRQ request was received
+by the TFTP server, the server would look to see if a file with the same
+name existed in TFS and, if yes, a TFTP error was returned and the transfer
+was completed.&nbsp; This is changed so that even if the file name already
+exists in TFS, the file is still loaded; then the server uses the logic
+in tfsadd() to (possibly) load the new file into TFS (see change to tfsadd()
+above).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFTP Client Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/2/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The <a href="commands/tftp.html">tftp
+client</a> uses tfsadd() to copy an incoming file to TFS.&nbsp; It does
+not automatically delete a file in TFS if the name of the incoming file
+matches a file already there.&nbsp; The logic in tfsadd() handles that
+(see above).</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Change to BOOTP startup process:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 6/2/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/dhcpboot.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">If the monitor was configured
+to run <a href="startup.html#BOOTP">BOOTP at startup</a>, then, after the
+response was received from the BOOTP server, the monitor would look to
+see if the BOOTFILE name matched a file already in TFS.&nbsp; If it did,
+then BOOTP was considered done.&nbsp; This has been changed so that even
+if the BOOTFILE name matches a file that already exists in TFS, the new
+file is loaded and transferred into TFS using new logic in tfsadd().</font>
+<br><font face="Arial,Helvetica">This change is made so that BOOTP can
+be used to download an startup script from some server with the following
+flash-write efficiency... if the file being downloaded is identical to
+a file already in TFS, then no flash write is done; but, if the file has
+the same name, but is different than the file that exists in TFS, it will
+be updated appropriately.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+Enhanced Shell Variable Support:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/28/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/docmd.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The shell variable processing
+of the monitor's command interpreter is greatly improved.&nbsp; Up till
+now, only simple $ABC type strings would be properly processed as shell
+variables.&nbsp; I pulled in code from RUSH that supports the ${} syntax
+and overall stronger support for variable substitution.&nbsp; Refer to
+the <a href="shellvars.html">shell variable page</a> for details.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TTFTP Server Support Tool Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/28/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: ttftp support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/ttftp/ttftp.c toolsrc/ttftp/tftpsrvr.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The <a href="tools/doc/ttftp.html">ttftp</a>
+tool has the ability to run as a server.&nbsp; <i>Note that this is NOT
+the tftp server that is part of MicroMonitor target source code.&nbsp;</i>
+If the server received a request from some client, and then during the
+transaction, the client disappeared for some reason, then the server has
+timeout code so that it can eventually abort the transaction.&nbsp; This
+timeout was set to 10 seconds.&nbsp; It now defaults to 60 seconds, and
+can be changed on the command line with a new -t ## option.&nbsp; Also,
+the server did not support a verbose mode, now it does.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+TFTP Client Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/28/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">If the <a href="commands/tftp.html">TFTP
+client</a> retrieves a file from some remote server, and an older version
+of the same file already exists, the client does not remove the old copy
+and an error message is returned.&nbsp; This is changed so that the old
+copy (if any) is removed prior to the TFTP client updating TFS.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+Bug Fix in TFTP Server:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/25/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/tftp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The TFTP server accepts a comma
+delimited file name as the destination file.&nbsp; The comma delimiters
+are used to separate the filename from the file attributes (or flags) and
+file information field&nbsp; (file,flags,info).&nbsp; When a tftp client
+attempted to transfer a file to TFS through the MicroMonitor TFTP server,
+if the flags were invalid, the server would get confused.&nbsp; This is
+fixed.&nbsp; If the server detects an incorrect file flag, a TFTP error
+is generated and the transfer is terminated.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">&nbsp;
+moncmd Support Tool Modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/25/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: moncmd support_tool</font></i>
+<br><i><font face="Arial,Helvetica">Files: toolsrc/moncmd.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The <a href="tools/doc/moncmd.html">moncmd</a>
+tool interfaces to MicroMonitor's UDP port 777 server that runs to allow
+a monitor command to be invoked over UDP/ethernet.&nbsp; A few options
+have been added to support verbose mode (display the command string that
+is being sent) and quiet mode (don't print the timeout error).&nbsp; Also,
+the timeout error message corresponding to the fact that the command was
+received, but not completed, is now a bit more self-explanatory.</font></blockquote>
+
+<h3>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica">
+ICMP "echo" modification:</font></h3>
+
+<blockquote><i><font face="Arial,Helvetica">Date: 5/20/1999</font></i>
+<br><i><font face="Arial,Helvetica">Affected code: monitor common</font></i>
+<br><i><font face="Arial,Helvetica">Files: common/icmp.c</font></i></blockquote>
+
+<blockquote><font face="Arial,Helvetica">The "icmp" command allows the
+user of the monitor to send an "ICMP ECHO" (ping).&nbsp; The '-c' option
+allows the echo to be transmitted for some number of times, instead of
+the default of just 1.&nbsp; If the underlying arp failed though, the loop
+would immediately terminate with the arp failure.&nbsp; This is changed
+so that the arp will also retry (and print an error message if it fails)
+for the number of times specified by the argument attached to the -c option.</font></blockquote>
+
+</body>
+</html>

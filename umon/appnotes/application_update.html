@@ -1,0 +1,153 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Field Upgrade Options</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Field Upgrade Options</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; There are several
+ways an application (as well as the monitor itself) can be installed/upgraded
+on a system running MicroMonitor.&nbsp;&nbsp; One basic assumption is that
+the target system already has some version of the monitor installed and
+running on the target.&nbsp; With that as a given, the monitor's XMODEM
+and TFTP facilities provide mechanisms for upgrades through a serial port
+or over ethernet.&nbsp; The monitor itself has a TFTP client and server.&nbsp;
+As a client, TFTP can be used in conjunction with DHCP or BOOTP to automatically
+pull down an application from some server.&nbsp; Also, the TFTP client
+can be used with some other startup script based on specific application
+needs (refer to <a href="../startup.html">system startup</a> for a few
+examples).&nbsp; The TFTP server is always running when the monitor is
+in control, so pushing a new application down to the target is also an
+option.&nbsp; Finally, even without an ethernet connection, XMODEM can
+be used to transfer files to TFS or to install a new monitor.&nbsp; The
+bottom line is that without any consideration for field upgrade in your
+application, use of the monitor provides several basic alternatives right
+from the start.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The set of monitor-provided
+options do assume that the system is taken out of service during the download
+process.&nbsp; This may not be an option, so the running application may
+have to download the new application while in service.&nbsp;&nbsp;&nbsp;
+Since the files in TFS are copied from flash to DRAM, and then executed
+out of DRAM space, the update of the application stored in the FLASH is
+relatively straight-forward.&nbsp; The application must have its own <a href="servers.html">TFTP
+or FTP server</a> (or some proprietary interface) to support the ability
+to download a new application file from a host, but that's it.&nbsp; The
+application can do whatever it wants to TFS.&nbsp; This means that the
+application (now in DRAM space) can install a new copy of itself in TFS.&nbsp;
+Then at some point in the future, the system can be reset and the new application
+will automatically boot.&nbsp; If during the overwrite process something
+causes the system to reset, then TFS has facilities built in so that the
+old copy of the application file is re-installed and it would simply start
+back up.&nbsp; It is important to realize that TFS has this fallback mechanism
+in place because although it provides the security of knowing that a file
+can be updated safely, it does require that that the old file not be removed
+from flash space until the new one is 100% installed in flash; hence, this
+overhead space must be considered.</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>Upgrade
+of a multi-file application:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The above scenerio is acceptable if the application consists of one file,
+but what about the case where the application is made up of several files?&nbsp;
+Say our application consists of files: app, data1, data2, data3.&nbsp;
+TFS provides the security needed if a reset occurs in the middle of any
+one file transfer; but what if a reset occurs in the middle of a group
+of files?&nbsp; Now we have (for example) a new "app" and "data1", but
+the older "data2" and "data3" files are still installed.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; This becomes the responsibility
+of the application, the file system cannot help out here because it has
+no idea what files constitute a full set of application files.&nbsp; The
+application must be able to determine if the other files within TFS are
+the files that it wants, so an easy way of doing this is to include some
+kind of "version_sanity" file that contains the name and CRCs of each of
+the files in a given application build.&nbsp; The application code would
+then look to this file and make sure that all of the files exist and have
+the correct CRC.&nbsp; If something fails, the application must deal with
+this by notifying an administrator or kicking off a TFTP; or perhaps just
+knowing about it is enough for it to deal with it internally somehow.&nbsp;
+This gets a bit application specific.&nbsp; The point is that a multi-file
+application can easily be dealt with using TFS.</font></blockquote>
+
+<h1>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>Remote
+update of monitor binary:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Update of the
+monitor binary itself is a bit different.&nbsp; This is because the monitor
+is not a file in TFS (since the monitor contains the code that is TFS);
+so a different set of steps must be followed.&nbsp; <i><font color="#CC0000"><b>Note
+that in the case of a monitor update, there is a small window of time during
+which the target's reset vector is erased; hence, during that time if the
+target is reset or power-cycled, it will not reboot</b>.</font>&nbsp; </i>I
+mention this warning because it is a possibility although I have never
+had it happen in a field situation; also, refer to <a href="bootblock.html">boot-block
+safety appnote</a> for an optional mechanism that can be part of the monitor
+that will protect against the "can't reboot" case.&nbsp; The update is
+a multi-step process that is typically handled with a host-resident tool
+(<a href="../tools/doc/newmon.html">newmon</a>)...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Reset the target and don't restart the application.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Optional step (see note below)</font></li>
+
+<li>
+<font face="Arial,Helvetica">Download the new image of the monitor into
+RAM.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Erase the old monitor image.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Burn the new monitor image into the boot flash.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Reset the target and allow it to autoboot
+the applications that were in TFS prior to the monitor upgrade.</font></li>
+</ul>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Depending on what has been
+updated in the monitor, this is usually all it takes.&nbsp; If; however,
+the new monitor includes a modification to the header structure of TFS,
+then additional steps are necessary for bootup.&nbsp; This is because the
+monitor-upgrade process does not affect the files stored in TFS flash space;
+so if the monitor code expects the files to have one header structure and
+the files have a different header structure; the monitor will claim that
+TFS space is corrupt and no files will be visable.&nbsp; At this point,
+the file system would have to be re-initialized (tfs init) and all files
+re-installed.&nbsp; TFS header updates are rare.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; <b>Note:</b> If the
+monitor does include a TFS header update, then the binary image that newmon
+transfers to the target could be configured to include the monitor and
+all the files currently resident on the target.&nbsp; This would require
+that all files be transferred up to the host and the <a href="../tools/doc/f2mem.html">f2mem</a>
+utility be used to build an image that includes these files and the new
+monitor image.</font></blockquote>
+
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: monsym</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>MONSYM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">monsym</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Convert a file of tabulated data
+into the format used by MicroMonitor's command-line symbol retrieval.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">monsym [-d:l:p:s:vV] {filename}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool does some very simple
+column re-arranging of tabulated data in files.&nbsp; The monitor has the
+ability to process "symbols" (see <a href="../../shellvars.html">discussion
+on shell variables and symbols</a>).&nbsp; This is done through a file
+in TFS that is assumed to contain lines of data where each line is of the
+format:</font>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote><font face="Arial,Helvetica">{symbol} whitespace {data}</font></blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">Typically, the output of nm or some other
+tool that generates a readable listing of symbols contains a lot of information
+that is of no value for basic symbol lookup.&nbsp; This tool simply extracts
+the data field and symbol-name field from each line of the input file and
+prints to stdout in the format above.&nbsp; This file can then be transferred
+to a target and used by the monitor for symbol lookup.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-d {col #}</font></li>
+
+<br><font face="Arial,Helvetica">column number from which the data is to
+be extracted from the incoming file (default = 1);</font>
+<li>
+<font face="Arial,Helvetica">-l {size}</font></li>
+
+<br><font face="Arial,Helvetica">maximum size of an incoming line (default
+= 64);</font>
+<li>
+<font face="Arial,Helvetica">-s {col #}</font></li>
+
+<br><font face="Arial,Helvetica">column number from which the data is to
+be extracted from the incoming file (default = 3);</font>
+<li>
+<font face="Arial,Helvetica">-p {data prefix string}</font></li>
+
+<br><font face="Arial,Helvetica">a prefix attached to the data prior to
+output;</font>
+<li>
+<font face="Arial,Helvetica">-S {x|d}</font></li>
+
+<br><font face="Arial,Helvetica">sort the output based on the content of
+the data colum being hex (x) or decimal (d).</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose (debug) mode</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">print the time/date the tool was built</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">This tool is typically used on a file that
+was created by "nm" (or some equivalent).</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">monsym -p0x ias.sym</font></li>
+
+<br><font face="Arial,Helvetica">From the incoming file ias.sym, output
+column 3&nbsp; followed by whitespace and column 1.&nbsp; The data from
+column 3 is prefixed by 0x.&nbsp; For example if the ias.sym file contained...</font>
+<ul>
+<ul>
+<ul>
+<ul>
+<ul>&nbsp;
+<br><tt>00018000 T _sysInit</tt>
+<br><tt>00018000 t gcc2_compiled.</tt>
+<br><tt>0001805c t vxpbi1</tt>
+<br><tt>0001809c t gcc2_compiled.</tt>
+<br><tt>0001809c T sysSerialIntEnable</tt>
+<br><tt>0001811c T sysSerialIntDisable</tt>
+<br><tt>0001819c T sysSerialHwInit</tt>
+<br><tt>00018308 T sysSerialHwInit2</tt>
+<br><tt>00018364 T sysSerialChanGet</tt>
+<br><tt>000183bc T sysSerialReset</tt></ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<font face="Arial,Helvetica">then the result would be...</font></ul>
+
+<ul>
+<ul>
+<ul>
+<ul>
+<ul>
+<ul><tt>_sysInit 0x00018000</tt>
+<br><tt>gcc2_compiled. 0x00018000</tt>
+<br><tt>vxpbi1 0x0001805c</tt>
+<br><tt>gcc2_compiled. 0x0001809c</tt>
+<br><tt>sysSerialIntEnable 0x0001809c</tt>
+<br><tt>sysSerialIntDisable 0x0001811c</tt>
+<br><tt>sysSerialHwInit 0x0001819c</tt>
+<br><tt>sysSerialHwInit2 0x00018308</tt>
+<br><tt>sysSerialChanGet 0x00018364</tt>
+<br><tt>sysSerialReset 0x000183bc</tt></ul>
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/monsym.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/monsym">Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+</ul>
+
+</body>
+</html>

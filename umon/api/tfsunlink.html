@@ -1,0 +1,74 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: tfsunlink</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsunlink()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsunlink()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Remove a file from TFS flash space.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsunlink(char
+*filename);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the application to remove
+a file from TFS flash space.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *filename</font></li>
+
+<br><font face="Arial,Helvetica">name of the file to be removed.</font></ul>
+
+<p><br><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFS_OKAY if successful,
+else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_NOFILE</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_USERDENIED</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FLASHFAILURE</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfs.c.html#tfsunlink">tfs.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

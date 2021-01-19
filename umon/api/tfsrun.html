@@ -1,0 +1,85 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: tfsrun</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsrun()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsrun()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Execute a file in TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsrun(char *arglist[],
+int verbose);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the application to execute
+a file in TFS flash space.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *arglist[]</font></li>
+
+<br><font face="Arial,Helvetica">an argument list (similar to argv[] passed
+into main()) with a null pointer after the last entry.</font>
+<li>
+<font face="Arial,Helvetica">int verbose</font></li>
+
+<br><font face="Arial,Helvetica">verbosity level (0, 1 or 2)...</font>
+<br><font face="Arial,Helvetica">0: no verbosity</font>
+<br><font face="Arial,Helvetica">1: print list of arguments for each command
+in script after tokenization</font>
+<br><font face="Arial,Helvetica">2: print list of arguments showing value
+in shell variables.</font></ul>
+
+<p><br><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFS_OKAY if successful,
+else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_NOFILE</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_USERDENIED</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_NOTEXEC</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADCRC</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfs.c.html#tfsrun">tfs.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

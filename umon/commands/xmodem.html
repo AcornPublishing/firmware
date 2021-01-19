@@ -1,0 +1,241 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: XMODEM</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>XMODEM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">xmodem</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Initiate an XMODEM (or YMODEM)
+data transfer.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">xmodem -[a:BcdF:f:i:ks:t:uvy]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">XMODEM is a very simple protocol
+that allows files to be transferred between 2 machines that understand
+the XMODEM protocol. This monitor supports XMODEM because it is small,
+and universal for probably all terminal emulation packages on the PC. Options
+allow the user to upload and download, and if enabled, transfer the downloaded
+file to the file system (see TFS).&nbsp; When downloading to the target,
+the data is initially placed in system RAM.&nbsp; Upon completion of the
+download, that downloaded data may be transferred to a file in TFS.&nbsp;
+By default, the RAM address used is the value established by the monitor
+at boot time known as APPRAMBASE (stored in the APPRAMBASE shell variable
+and also displayed on the console at reset).</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a {addr}</font></li>
+
+<br><font face="Arial,Helvetica">address used to override the default APPRAMBASE
+download destination address.</font>
+<li>
+<font face="Arial,Helvetica">-B</font></li>
+
+<br><font face="Arial,Helvetica">new boot monitor load (see notes below);</font>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">use CRC instead of checksum;</font>
+<li>
+<font face="Arial,Helvetica">-d</font></li>
+
+<br><font face="Arial,Helvetica">download a block of data.&nbsp; This,
+along with other options, allows the downloaded file to be placed in RAM
+or the file system.&nbsp; Note that even if the downloaded file is destined
+for the file system, it is initially downloaded to RAM and then copied
+to the file system, so the address specified must be writeable RAM space;</font>
+<li>
+<font face="Arial,Helvetica">-f {flags}</font></li>
+
+<br><font face="Arial,Helvetica">for downloading to a file in TFS, this
+specifies the flags that will be assigned to the file after the download
+has completed</font>
+<li>
+<font face="Arial,Helvetica">-F {filename}</font></li>
+
+<br><font face="Arial,Helvetica">for upload or download, specifies the
+name of the file to transfer.</font>
+<li>
+<font face="Arial,Helvetica">-i {info}</font></li>
+
+<br><font face="Arial,Helvetica">for downloading to a file in TFS, this
+specifies the information field that will be assigned to the file after
+the download has completed;</font>
+<li>
+<font face="Arial,Helvetica">-k</font></li>
+
+<br><font face="Arial,Helvetica">use 1K block size (instead of default
+128-byte);</font>
+<li>
+<font face="Arial,Helvetica">-s {size}</font></li>
+
+<br><font face="Arial,Helvetica">since XMODEM transfers in fixed block
+sizes of 128 bytes,&nbsp; the computed download size of a file is likely
+to be incorrect.&nbsp; This option allows the user to override the compute
+size with the value specified by "size".</font>
+<li>
+<font face="Arial,Helvetica">-t {address}</font></li>
+
+<br><font face="Arial,Helvetica">enable tracing to a buffer specified by
+"address".&nbsp; This is primarily used for debugging xmodem itself.</font>
+<li>
+<font face="Arial,Helvetica">-u</font></li>
+
+<br><font face="Arial,Helvetica">upload a file or block of data.&nbsp;
+If the upload is a file then the -F option must also be specified.&nbsp;
+If upload of raw data, then address and size must be specified on the command
+line;</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verify only</font>
+<li>
+<font face="Arial,Helvetica">-y</font></li>
+
+<br><font face="Arial,Helvetica">support the YMODEM extensions to XMODEM.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">xmodem -u -F filename</font></li>
+
+<br><font face="Arial,Helvetica">Upload the file "filename" from TFS to
+the host machine.</font>
+<li>
+<font face="Arial,Helvetica">xmodem -u -a 0x200400 -s 500</font></li>
+
+<br><font face="Arial,Helvetica">Upload 500 bytes of data starting at location
+0x200400 to the host.</font>
+<li>
+<font face="Arial,Helvetica">xmodem -d -a 0x6000</font></li>
+
+<br><font face="Arial,Helvetica">Download a file from the host to location
+0x6000 in memory.</font>
+<li>
+<font face="Arial,Helvetica">&nbsp;xmodem -d</font></li>
+
+<br><font face="Arial,Helvetica">Download a file from the host to the start
+of application RAM space.</font>
+<li>
+<font face="Arial,Helvetica">xmodem -d -F AppFile -f eCB -i 02_24_97 -a
+0x6000 -s 23456</font></li>
+
+<br><font face="Arial,Helvetica">Download a file from host to TFS file
+'AppFile'.&nbsp; When the file is created in TFS assign flags 'eCB' (see
+TFS man page) and information field '02_24_97'. The file will be downloaded
+into ram starting at location 0x6000 and the final file size used to place
+the file in TFS will be 23456 bytes.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">The command requires that either -u or -d
+be specified (-B implies -d).</font></li>
+
+<li>
+<font face="Arial,Helvetica">The -v (verify) option allows the user to
+download a block of data to some address, then invoke the same download
+with the -v option to verify that the data was transferred correctly.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The basic XMODEM protocol forces all transfers
+to be some multiple of 128 bytes.&nbsp; This means the files may have junk
+at the end of them.&nbsp; For a download to TFS, this can be overridden
+by supplying the final size with the -s option.&nbsp; Then after the download
+is completed, instead of using the download size computed by XMODEM, it
+uses the value specified on the command line.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The -B option makes it more convenient to
+rebuild the monitor onboard. <b><font color="#CC0000">Be careful with this
+because it will take the binary file transferred and use it to rebuild
+the boot flash; hence, if the binary file is incorrect, the boot will be
+corrupted.</font></b> When rebuilding the monitor, the sequence of events
+(without using -B) would be:</font></li>
+</ul>
+
+<ul>
+<ol>
+<li>
+<font face="Arial,Helvetica">uMON> xmodem -d {ram_address}</font></li>
+
+<li>
+<font face="Arial,Helvetica">Hyperterm: xmodem {monitor-binary}</font></li>
+
+<li>
+<font face="Arial,Helvetica">uMON> flash opw</font></li>
+
+<li>
+<font face="Arial,Helvetica">uMON> flash ewrite {boot_address} {ram_address}
+{size_of_monitor-binary}</font></li>
+</ol>
+
+<br>&nbsp;
+<ul><font face="Arial,Helvetica">This is somewhat error prone, so the -B
+option automates these steps because it knows the ram_address, boot_address
+and the size of the space allocated to the monitor in flash.&nbsp; The
+above steps are replaced with...</font></ul>
+
+<br>&nbsp;
+<ol>
+<li>
+<font face="Arial,Helvetica">uMON> xmodem -B</font></li>
+
+<li>
+<font face="Arial,Helvetica">Hyperterm: xmodem {monitor-binary}</font></li>
+</ol>
+
+<br>&nbsp;
+<ul><font face="Arial,Helvetica">After the download completes, xmodem -B
+will then query the user for approval, at which time a carriage return
+or <i>y</i> approves, and all other characters will abort.&nbsp; Once you
+give approval, allow time for the bootflash to be reprogrammed.&nbsp; This
+can take several seconds, depending on the speed of the flash device interface
+and the size of the monitor binary being programmed.</font></ul>
+</ul>
+
+</body>
+</html>

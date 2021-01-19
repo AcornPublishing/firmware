@@ -1,0 +1,81 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>decompress</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_decompress()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_decompress()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Decompress a block of data that
+has been previously compressed.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_decompress(char
+*src, int srcsize, char *dest);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the application to decompress
+memory (or a data file) that was previously compressed with gzip.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *src</font></li>
+
+<br><font face="Arial,Helvetica">pointer to starting location of compressed
+data.</font>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; srcsize</font></li>
+
+<br><font face="Arial,Helvetica">size of the block of compressed data in
+bytes.</font>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *dest</font></li>
+
+<br><font face="Arial,Helvetica">point to location into which the decompressed
+data is to be placed.</font></ul>
+
+<p><br><font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The size of the decompressed
+data or -1 if failure.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/zlib/gzio.c.html#decompress">zlib/gzio.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

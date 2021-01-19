@@ -1,0 +1,237 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: f2mem</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>F2MEM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">f2mem</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Convert a series of files into
+a memory image for transfer to a flash device</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">f2mem [a:B:b:f:m:O:o:p:s:S:T:t:Vv]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">f2mem (files to memory translator)
+is a tool that allows the user to take a group of files and generate a
+file that is suitable for a flash programmer.&nbsp; The intent is to feed
+it a monitor binary followed by a list of files that are destined to exist
+in TFS (Tiny File System).&nbsp; The monitor binary is placed at the base
+of the memory, then, starting at the offset specified by -t, each of the
+remaining files are processed and made to look as if they were residing
+in flash memory under TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">&nbsp;-a {tfsname}</font></li>
+
+<br><font face="Arial,Helvetica">ascii file for TFS</font>
+<br><font face="Arial,Helvetica">For all files that are destined for TFS,
+and are considered ascii files, this option is used.&nbsp; The conversion
+made here is to replace "\r\n" with "\r" in the ascii data.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-B {address}</font></li>
+
+<br><font face="Arial,Helvetica">address flash base in CPU memory (default=0)</font>
+<br><font face="Arial,Helvetica">This address is the actual address that
+the base of FLASH will be residing at when the device is part of the system
+CPU's memory map.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-b {tfsname}</font></li>
+
+<br><font face="Arial,Helvetica">binary file for TFS</font>
+<br><font face="Arial,Helvetica">Similar to the -a option, but there is
+no conversion of any kind made on the file.&nbsp; It is placed in TFS just
+as it exists on the host.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-f {hexbyte}</font></li>
+
+<br><font face="Arial,Helvetica">byte to be used as filler (default=0xff)</font>
+<br><font face="Arial,Helvetica">The default of 0xff is used so that all
+of the unwritten flash can be written (1-to-0 transition in flash space).&nbsp;
+If this is not the desirable case, then use this option to override the
+default.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-m {filename}</font></li>
+
+<br><font face="Arial,Helvetica">monitor file</font>
+<br><font face="Arial,Helvetica">This is a required option, since this
+tool is assumed to be building a bootable memory image and the monitor
+is what does the booting.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-O 's|b'</font></li>
+
+<br><font face="Arial,Helvetica">output type: S3-record or binary (default=S3)</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-o {filename}</font></li>
+
+<br><font face="Arial,Helvetica">output file (default = mem.bin | mem.srec)</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-p {pad-to size}</font></li>
+
+<br><font face="Arial,Helvetica">pad the file out to the specified size
+using the fill byte specified by -f as the pad (default is no padding);</font></ul>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">&nbsp;-s {m|a}</font></li>
+
+<br><font face="Arial,Helvetica">swap bytes in monitor binary (m) or all
+bytes (a)</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-S [address}</font></li>
+
+<br><font face="Arial,Helvetica">s-record base address (default=0)</font>
+<br><font face="Arial,Helvetica">In some cases, the S-record file will
+be used to program a device using a flash programmer that is external to
+the actual system that the flash will reside in.&nbsp; In this case, it
+is likely that the S-record base will be 0 because the addresses will be
+relative to the base of the flash device.&nbsp; In other cases, the S-record
+is used to program memory while it is part of the CPU's memory space, so
+the base address used in the S-record file will be relative to the CPU
+space and will typically be the same value used for the -B option</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-T {#}</font></li>
+
+<br><font face="Arial,Helvetica">TFS header version (default is 0).</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-t {###}</font></li>
+
+<br><font face="Arial,Helvetica">offset relative to base of flash for TFS
+offset.</font>
+<br><font face="Arial,Helvetica">This is a required option that tells f2mem
+where the beginning of TFS space is relative to the base of the flash.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">&nbsp;-V</font></li>
+
+<br><font face="Arial,Helvetica">show version</font>
+<li>
+<font face="Arial,Helvetica">&nbsp;-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">The -m and -t options are required.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Syntax for tfsname: name,flags[,info]</font></li>
+
+<li>
+<font face="Arial,Helvetica">Currently, this tool assumes the monitor is
+the first piece of binary destined for the flash part.&nbsp; As the need
+arises, we will support other configurations.</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<b><font face="Arial,Helvetica">f2mem -v -Ob -m monppc.bin -a monrc,e -t
+0x40000 -B 0x80000000</font></b></li>
+
+<br><font face="Arial,Helvetica">Build a memory image with the monitor
+binary being monppc.bin, and a monrc file as the only file in TFS.&nbsp;
+TFS starts at offset 0x40000 relative to the base of the flash and the
+base of the flash is at address 0x80000000 relative to the CPU's address
+bus.&nbsp; The output is binary, and stored in the file mem.bin.&nbsp;
+Note that the file specification of monrc contains a ",e" after it.&nbsp;
+This is the notation used by TFS to indicate that it is to be stored in
+TFS with the "e" flag set (executable).&nbsp; Note also that since monrc
+is an ascii file, it is an argument to the '-a' option.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">f2mem -v -Os -o ias.srec -m monppc.bin
+-a monrc,e -b ias,eEB -t -x40000 -b 0x80000000</font></b></li>
+
+<br><font face="Arial,Helvetica">Build a memory image with the monitor,
+monrc file and an ELF based executable called "ias".&nbsp; The output is
+in S3-record format and will be stored in the file ias.srec.&nbsp; Note
+that the ias file is a binary file, so it is an argument to the -b option.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">f2mem -v -Os -o ias.srec -m monppc.bin
+-a monrc,e -t -x40000 -b 0x80000000 -S 0x80000000</font></b></li>
+
+<br><font face="Arial,Helvetica">Build a memory image with monitor and
+monrc file, but set up the S-record so that the base address is relative
+to the CPU's memory space, not the FLASH device.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/f2mem.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/f2mem">Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+</ul>
+
+</body>
+</html>

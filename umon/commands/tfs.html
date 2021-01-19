@@ -1,0 +1,387 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: TFS</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>TFS</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">tfs</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Tiny file system command line
+interface.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">tfs -[d:f:i:mv] {operation} [args]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">TFS provides a small "file-system-like"
+capability on a target that contains FLASH memory.&nbsp; It provides a
+core set of commands that allow the user to add, delete, list, display,
+execute, load, and copy files within flash memory.&nbsp; In addition to
+the user interface command "TFS" there is also a set of application entry
+points (or functions) that the application can access through a shared
+vector table seen by both the monitor and the application.&nbsp; This allows
+the monitor to store files that can be accessed by the application.&nbsp;
+It provides a clean way to interface to non-volatile memory and also a
+means to allow a given application to configure itself based on files in
+the file system instead of through rebuilds of source code.</font>
+<p><font face="Arial,Helvetica">File Operations:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><b>add</b> {name} {src_address} {size}</font></li>
+
+<br><font face="Arial,Helvetica">Create the file named 'name' to contain
+the data starting at location "src_address of size "size".&nbsp; Options
+-f and -i can be used to specify the flags and information field associated
+with the newly created file.</font>
+<li>
+<font face="Arial,Helvetica"><b>cat</b> {name}</font></li>
+
+<br><font face="Arial,Helvetica">Print the specified file.&nbsp; Assumes
+the file is ascii.</font>
+<li>
+<font face="Arial,Helvetica"><b>check</b> [varname]</font></li>
+
+<br><font face="Arial,Helvetica">Check the sanity of the files stored in
+TFS by running various tests (like a crc32 on the data and header).&nbsp;
+If the -d option is specified, then only check files in the specified device.&nbsp;
+If a variable name is specified, then that shell variable will be loaded
+with the string "PASS" or "FAIL" based on the result of the FS check.</font>
+<li>
+<font face="Arial,Helvetica"><b>clean</b>[r]</font></li>
+
+<br><font face="Arial,Helvetica">Cleanup (defragment) the file system to
+free-up flash space.&nbsp; If 'r' is appended then the system will automatically
+restart after the cleanup.&nbsp; If the -d option is present, then only
+cleanup the device specified.</font>
+<li>
+<font face="Arial,Helvetica"><b>cp</b> {name} {newfilename | hex address}</font></li>
+
+<br><font face="Arial,Helvetica">Copy the named file to the new named file.&nbsp;
+If the destination begins with '0x', then it is assumed to be a hex address
+pointing to RAM.&nbsp; The source file is first copied to memory pointed
+to by <a href="../shellvars.html#APPRAMBASE">APPRAMBASE</a>, then the new
+file is created from the data in RAM.</font>
+<li>
+<font face="Arial,Helvetica"><b>freemem</b> [varname]</font></li>
+
+<br><font face="Arial,Helvetica">Return (or store in 'varname') the amount
+of flash memory that is still available for use by TFS.&nbsp; If the -d
+option is specified, then list the memory that is available for that device
+only.&nbsp; Note that since there is per-file overhead, the value returned
+here is the amount of data space available if ONE more file is stored in
+TFS; if additional files are to be stored, then the user must take into
+account the <a href="../tfs.html#tfs_overhead">TFS overhead</a>.</font>
+<li>
+<font face="Arial,Helvetica"><b>info</b> {filename} {varname}</font></li>
+
+<br><font face="Arial,Helvetica">Load the shell variable specified by 'varname'
+with the information field stored with the file specified by 'filename'.</font>
+<li>
+<b><font face="Arial,Helvetica">init</font></b></li>
+
+<br><font face="Arial,Helvetica">Initialize the file system (remove all
+files and erase flash).</font>
+<li>
+<b><font face="Arial,Helvetica">ld[v] {file}</font></b></li>
+
+<br><font face="Arial,Helvetica">Load the executable COFF, ELF or AOUT
+file from flash to RAM.&nbsp; If the file is compressed, ld will automatically
+decompress.&nbsp; Refer to <a href="../tfs.html#decompression">decompression
+discussion on TFS</a>.</font></ul>
+</blockquote>
+
+<blockquote>
+<ul>
+<li>
+<b><font face="Arial,Helvetica">ldv</font></b></li>
+
+<br><font face="Arial,Helvetica">Verify that the executable COFF, ELF or
+AOUT file in flash space matches what is in RAM space.</font>
+<li>
+<font face="Arial,Helvetica"><b>ln </b>{source} {target}</font></li>
+
+<br><font face="Arial,Helvetica">Link the already existing file 'source'
+to the new-to-be-created link file 'target'.&nbsp; See <a href="../api/tfslink.html">tfslink()</a>
+for details on links in TFS.</font>
+<li>
+<font face="Arial,Helvetica"><b>log</b> [{on|off} {message}]</font></li>
+
+<br><font face="Arial,Helvetica">Turn on or off (or determine the current
+state of) the change-log facility.</font>
+<li>
+<font face="Arial,Helvetica"><b>ls</b> [filter] [filter...]</font></li>
+
+<br><font face="Arial,Helvetica">List the current set of files in the file
+system.&nbsp; There are 4 different levels of verbosity for ls:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">lvl 0 No verbosity, short list of all active
+files.</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 1 Display "hidden" files (beginning with
+'.') in short format.</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 2 Display active files in long format.</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 3 Display active and deleted files in
+long format.</font></li>
+</ul>
+<font face="Arial,Helvetica">Specifying the filter can limit the number
+of files listed...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><i>*filter</i> indicates a suffix match</font></li>
+
+<li>
+<font face="Arial,Helvetica"><i>filter*</i> indicates a prefix match</font></li>
+
+<li>
+<font face="Arial,Helvetica"><i>filter</i> indicates a full filename match</font></li>
+</ul>
+<font face="Arial,Helvetica">See notes below for some additional detals.</font>
+<li>
+<font face="Arial,Helvetica"><b>rm</b> {filter} [filter ...]</font></li>
+
+<br><font face="Arial,Helvetica">Remove the specified file(s) (see note
+below).&nbsp; See discussion on "ls" above for details on the filter.</font>
+<li>
+<font face="Arial,Helvetica"><b>rms</b> {size} [except_file1] [except_file2]
+...</font></li>
+
+<br><font face="Arial,Helvetica">Remove space.&nbsp; Remove files until
+"size" bytes have been removed.&nbsp; Do not remove any of the "except"
+files.&nbsp; This is primarily used for testing TFS with scripts.</font>
+<li>
+<font face="Arial,Helvetica"><b>run</b> {name}</font></li>
+
+<br><font face="Arial,Helvetica">Run the specified file based on the creation
+attributes (see below).</font>
+<li>
+<font face="Arial,Helvetica"><b>size</b> {filename} {varname}</font></li>
+
+<br><font face="Arial,Helvetica">Load the shell variable specified by 'varname'
+with the size of the file 'filename'.</font>
+<li>
+<b><font face="Arial,Helvetica">stat</font></b></li>
+
+<br><font face="Arial,Helvetica">Dump the current state of TFS.&nbsp; This
+includes information regarding the location of multiple non-contiguous
+directories (if any), the amount of space taken up by file overhead, amount
+of space that would be released if a defragmentation was done, etc...</font>
+<li>
+<font face="Arial,Helvetica"><b>trace</b> [trace-level]</font></li>
+
+<br><font face="Arial,Helvetica">Establish a runtime trace of the TFS system
+calls.&nbsp; If no trace level is specified, then the current level is
+displayed.&nbsp; This tracing is useful for debugging application code
+that uses TFS system calls...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">lvl 0 No runtime trace</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 1 Trace for all TFS system calls except
+tfswrite(), tfsread() and tfsgetline().</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 2 Trace for all TFS system calls including
+tfswrite(), tfsread() and tfsgetline().</font></li>
+
+<li>
+<font face="Arial,Helvetica">lvl 3 Trace for all above plus the flash operations.</font></li>
+</ul>
+
+<li>
+<font face="Arial,Helvetica"><b>uname</b> {prefix} {varname}</font></li>
+
+<br><font face="Arial,Helvetica">Load the shell variable specified by 'varname'
+with a filename (starting with the specified prefix) that is not currently
+being used for file storage in TFS.</font></ul>
+</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-d {device-prefix}</font></li>
+
+<br><font face="Arial,Helvetica">apply the command to the specified <a href="../tfs.html#multiple-devices">TFS
+device</a></font>
+<li>
+<font face="Arial,Helvetica">-f {flags}</font></li>
+
+<br><font face="Arial,Helvetica">flags (see below) applied to the file</font>
+<li>
+<font face="Arial,Helvetica">-i {info}</font></li>
+
+<br><font face="Arial,Helvetica">information field included with the file
+created</font>
+<li>
+<font face="Arial,Helvetica">-m</font></li>
+
+<br><font face="Arial,Helvetica">enable 'more' when displaying a file or
+list of files</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">enable verbosity level (-v=lvl1, -vv=lvl2,
+-vvv=lvl3).</font>
+<li>
+<font face="Arial,Helvetica">-x</font></li>
+
+<br><font face="Arial,Helvetica">set the script exit flag if there is an
+error with the tfs command.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">tfs ls</font></li>
+
+<br><font face="Arial,Helvetica">Displays the current set of files and
+their attributes in alphabetical order.</font>
+<li>
+<font face="Arial,Helvetica">tfs -v list</font></li>
+
+<br><font face="Arial,Helvetica">Displays the current set of standard and
+hidden files (see notes below for more details on the output).</font>
+<li>
+<font face="Arial,Helvetica">tfs -vv list</font></li>
+
+<br><font face="Arial,Helvetica">Displays the current set of files and
+their data structure verbosely. Note that this list is displayed in the
+order in which they exist in the file system, not alphabetical.</font>
+<li>
+<font face="Arial,Helvetica">tfs -i test -f e add myfile 0xa0100000 459</font></li>
+
+<br><font face="Arial,Helvetica">Add the file "myfile" to the file system.&nbsp;
+It will contain a information field of "test" and have attributes "e" (executable
+script).&nbsp; The actual file will contain 459 bytes of data starting
+at location 0xa0100000.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">The user must be aware of the fact that the
+file system is in flash and that there are certain limitations imposed
+by the underlying technology and microprocessor to memory interface.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Refer to the <a href="../tfs.html">tfs</a>
+page for more detailed information on the file system.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The "tfs ls" output can be formatted with
+varying levels of additional verbosity (see -v option above).&nbsp; In
+the simplest case, "tfs ls", the output would look like this:</font></li>
+</ul>
+
+<ul>
+<ul><font face="Arial,Helvetica">&nbsp;</font><tt>Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Size&nbsp;&nbsp; Location&nbsp;&nbsp; Flags&nbsp; Info</tt>
+<br><tt>&nbsp;//BBRAM/</tt>
+<br><tt>&nbsp;cfg/</tt>
+<br><tt>&nbsp;html/</tt>
+<br><tt>&nbsp;monrc&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+177&nbsp; 0xfc0dc99c&nbsp; e</tt>
+<br><tt>&nbsp;r2.5e/</tt>
+<br><tt>&nbsp;dirnam&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+6&nbsp; 0xfc274abc</tt>
+<br><tt>&nbsp;sfile101&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+17608&nbsp; 0xfc27059c&nbsp; BeE</tt>
+<br><tt>&nbsp;sfile101R&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+17608&nbsp; 0xfc00004c&nbsp; BeE</tt>
+<p><tt>Total: 9 items listed (35399 bytes).</tt></ul>
+
+<p><br><font face="Arial,Helvetica">Notice that although there is no directory
+hierarchy in TFS, filenames can include a slash and the output of this
+listing will attempt to treat that as if it was a directory.&nbsp; This
+allows the user to organize filenames in groups. Also, the above case demonstrates
+the situation where TFS spans across multiple, non-contiguous devices.&nbsp;
+//BBRAM/ is a battery backed ram and all other files are in flash.&nbsp;
+To see all files regardless of the slash, use "tfs ls *", or "tfs ls cfg/*"
+for a subset.&nbsp; The size of each file shown is the size of the data
+space within the flash that is used by the file; this does not include
+the overhead space needed for each file header and the space needed at
+the end of TFS flash area for defrag (refer to description of <a href="../tfs.html/#tfs_overhead">tfs
+overhead</a> for details on this).&nbsp; The total item count displays
+the total number of entries listed, some of which may be what the "ls"
+is displaying as if it was a directory.&nbsp; The total bytes shown at
+the bottom of this listing also, does not include the overhead or files
+not displayed because of the slash.</font>
+<p><font face="Arial,Helvetica">The "tfs -vv" ls output displays more information
+about each file.&nbsp; This includes the&nbsp; information field, file
+attributes and other header-related items.&nbsp; The output is not in alphabetical
+order as it is for the lower level of verbosity and the default filter
+ignores the slash within the filename.&nbsp; The output in this level is
+in the order the files are stored in flash.&nbsp; One additional note for
+this level of verbosity, the total size displayed includes the overhead
+of the file (header and defrag space needed).&nbsp; Following is an example
+of the verbose output...</font>
+<br>&nbsp;
+<ul><tt>&nbsp;Name:&nbsp; 'monrc'</tt>
+<br><tt>&nbsp;Info:&nbsp; ''</tt>
+<br><tt>&nbsp;Flags: executable,</tt>
+<br><tt>&nbsp;Addr:&nbsp; 0xfc0dc99c (hdr @ 0xfc0dc950, nxtptr = 0xfc0dca50)</tt>
+<br><tt>&nbsp;Size:&nbsp; 177 bytes</tt>
+<p><tt>&nbsp;Name:&nbsp; 'dirnam'</tt>
+<br><tt>&nbsp;Info:&nbsp; ''</tt>
+<br><tt>&nbsp;Flags:</tt>
+<br><tt>&nbsp;Addr:&nbsp; 0xfc274abc (hdr @ 0xfc274a70, nxtptr = 0xfc274ad0)</tt>
+<br><tt>&nbsp;Size:&nbsp; 6 bytes</tt>
+<p><tt>&nbsp;Name:&nbsp; 'sfile101R'</tt>
+<br><tt>&nbsp;Info:&nbsp; ''</tt>
+<br><tt>&nbsp;Flags: qry_run_at_boot, executable, elf,</tt>
+<br><tt>&nbsp;Addr:&nbsp; 0xfc00004c (hdr @ 0xfc000000, nxtptr = 0xfc004520)</tt>
+<br><tt>&nbsp;Size:&nbsp; 17608 bytes</tt>
+<p><tt>&nbsp;Name:&nbsp; 'sfile101'</tt>
+<br><tt>&nbsp;Info:&nbsp; ''</tt>
+<br><tt>&nbsp;Flags: qry_run_at_boot, executable, elf,</tt>
+<br><tt>&nbsp;Addr:&nbsp; 0xfc27059c (hdr @ 0xfc270550, nxtptr = 0xfc274a70)</tt>
+<br><tt>&nbsp;Size:&nbsp; 17608 bytes</tt>
+<br>&nbsp;
+<p><tt>Total: 4 accessible files (36619 bytes).</tt></ul>
+</ul>
+
+</body>
+</html>

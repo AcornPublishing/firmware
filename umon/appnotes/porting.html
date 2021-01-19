@@ -1,0 +1,522 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Porting the Monitor to a New Target</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Porting to a New Target</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">One of the design goals of this
+monitor package was to make it simple to port to new processors and target
+hardware.&nbsp; There are a few things in the monitor (timing in particular)
+which suffer a bit just to keep the porting effort to a minimum. The two
+most significant points are...</font>
+<ul>
+<li>
+<b><font face="Arial,Helvetica">The monitor does not use any interrupts
+from the CPU</font></b></li>
+
+<br><font face="Arial,Helvetica">From the porting point of view this is
+a real luxury.&nbsp; It makes it much easier to get a port to a new processor
+up and running.&nbsp; You don't have to worry about how a processor's interrupt
+handler mechanism is set up and you don't have to worry about making sure
+you save all the registers appropriately.&nbsp; Additionally, the serial
+port and ethernet drivers are much less complex because everything is polled.&nbsp;
+Not having interrupts means that it is a bit more difficult (and somewhat
+inaccurate) to deal with elapsed time.&nbsp; If you have no clock reference,
+then you don't really know how much time has passed; however, to get around
+this a bit, there is a calibration that is made by the "sleep" command
+that allows you to tweek this timing a bit.&nbsp; Still, it is admittedly
+inaccurate, but worth it.&nbsp; Keep in mind that the drivers in the monitor
+are not intended to be reused by the application anyway.&nbsp; If the overlaying
+application needs a real driver, then that application needs to provide
+it.</font>
+<li>
+<b><font face="Arial,Helvetica">The monitor code assumes that initialized
+data is not writeable</font></b></li>
+
+<br><font face="Arial,Helvetica">The monitor code is running (fetching
+instructions) directly out of flash (see note1 below).&nbsp; The monitor
+does not copy any .data space to ram, so it too is accessed in runtime
+from flash.&nbsp; This means that the monitor's initialized data is not
+writeable.&nbsp; Yep, this is something to be aware of; but, once again,
+it makes the port much easier because now there is no need to figure out
+how the compiler toolset allows the data section to be remapped to ram
+space and there is no need to copy the data section into ram space (see
+note2 below).&nbsp; On the other hand, the monitor DOES assume that on
+startup the .bss section is initialized to zero (see <a href="../src/common/monitor/start.c.html#start">start.c</a>).&nbsp;
+This is ok because it is easy to clear a block of memory regardless of
+the toolset.</font>
+<br><font face="Arial,Helvetica"><b>Note1:</b> the functions that perform
+write/erase operations on the flash are executed out of RAM.&nbsp; This
+is necessary because most flash devices do not allow the device to be modified
+if instructions are being fetched from it at the same time.</font>
+<br><font face="Arial,Helvetica"><b>Note2:</b> initialized data in an embedded
+system must exist in non-volatile memory, and prior to application startup,
+if the data is to be writeable, it must be copied from non-volatile space
+to ram.&nbsp; This is done so that at startup the data is properly initialized
+and at runtime the application has the option to change it.&nbsp; This
+means that some compiler-specific directives must be used to make sure
+that the data space in flash is copied from flash to some space in RAM
+where the application code will be able to access/modify it.&nbsp; This
+complexity is avoided in the monitor by carefully making sure that no initialized
+data is modified in the monitor code.</font></ul>
+<b><font face="Arial,Helvetica"><font size=+1>Porting details...</font></font></b>
+<p><font face="Arial,Helvetica"><b>First things first:</b>&nbsp; Before
+beginning your port, make sure you are aware of what the monitor needs
+and provides. It assumes a CPU with linear address space (no bank switching,
+and if x86, then use a memory model that eliminates the need for C-code
+to deal with segmentation).&nbsp; To use TFS, an obvious assumption is
+flash.&nbsp; TFS assumes that the flash is accessible directly on the address/data
+bus, there is no IDE or I2C (or any other) interface between the memory
+allocated to TFS and the CPU.&nbsp; Make sure you are aware of the <a href="../tfs.html#flash_life">flash
+life expectancy issues with TFS</a> and based on the features that you
+decide to use within the monitor platform, make sure you have the memory
+space to allocate for it.</font>
+<p><font face="Arial,Helvetica">There are 4 sections of code within the
+monitor that need to be modified when porting to a new target.&nbsp; Based
+on the ports already available, some of these sections may be re-usable
+from other ports that have already been made, so it is wise to check with
+the <a href="mailto:esutter@lucent.com">author</a> prior to starting this
+work.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Code to handle CPU reset, basic exception
+handling and getting up to 'C' level (see <a href="../src/targets/target_dirname/monitor/reset.s.html">reset.s</a>
+and <a href="../src/common/monitor/start.c.html">start.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a polled serial port driver (see
+<a href="../src/targets/target_dirname/monitor/cpuio.c.html">cpuio.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a&nbsp; flash device driver (see
+<a href="../src/common/flash/flash_dirname/flashdev.c.html">flashdev.c</a>
+and <a href="../src/common/flash/flash_dirname/flashpic.c.html">flashpic.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a polled ethernet driver (see <a href="../src/targets/target_dirname/monitor/etherdev.c.html">etherdev.c</a>).</font></li>
+</ul>
+<font face="Arial,Helvetica">There are currently two top-level directories
+that contain the code... the <a href="../src/common">common</a> directory
+and the <a href="../src/targets">target-specific</a> directory.&nbsp; The&nbsp;
+code under the common directory should be left untouched.&nbsp; Those files
+have been designed to interface to the target-specific code found under
+the targets/<i>targetname</i>/monitor (where <i>targetname</i> is the name
+of some target platform) directory and the common/flash/<i>flashname</i>
+(where <i>flashname</i> is some flash device name) directory.&nbsp;&nbsp;
+The only exception to this rule is if you are writing a new flash driver;
+then, a new common/flash/<i>new_flashname</i> directory would be created
+and the new drivers would be written similar to one of the existing flash
+device drivers.</font>
+<p><font face="Arial,Helvetica">When starting a port, retrieve the latest
+tar file from the author and copy it to some workspace.&nbsp; Change the
+name of the target-specific directory.&nbsp; Change the name to something
+that contains an acronym for your target followed by a string representing
+the CPU (ie.. abcsh2 is the ABC board with the Hitachi SH2 processor).&nbsp;
+Also, under the common directory, if you will be writing a new flash device
+driver, change the name of the directory containing the flash code to the
+name of the device you are going to be using.&nbsp; For the sake of this
+discussion, let's assume the target-specific directory name is ABC960 and
+the common/flash directory is 29XX32.</font>
+<p><font face="Arial,Helvetica">At this point we are ready to start modifying
+code.&nbsp; The first thing to do is to reduce the complexity of the monitor
+by turning off the majority of the features established by the ABC960/monitor/config.h
+file.&nbsp; In this file there is a block of INCLUDE_<i>FEATURE</i> macros
+(where <i>FEATURE</i> is some feature-specific string).&nbsp; Following
+is what can be used as the minimal configuration...</font>
+<br>&nbsp;
+<blockquote><tt>#define INCLUDE_MEMCMDS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1</tt>
+<br><tt>#define INCLUDE_PIO&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EDIT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DEBUG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DISASSEMBLER&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_UNPACK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_UNZIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_ETHERNET&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFTP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DHCPBOOT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_XMODEM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1</tt>
+<br><tt>#define INCLUDE_LINEEDIT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_FLASH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_CRYPT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSAPI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSCLEAN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSSYMTBL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_TFSSCRIPT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_TFSCLI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_GDB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_STRACE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_CAST&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EXCTEST&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_IDEV&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt></blockquote>
+<font face="Arial,Helvetica">This configuration provides a very basic monitor...
+a serial port driver with xmodem for download and memory commands for interfacing
+to target memory.&nbsp; Refer to the file <a href="../src/common/monitor/inc_check.h.html">inc_check.h</a>
+for the most up-to-date list of these definitions and their meaning. The
+files that need the work now are reset.s and cpuio.c.&nbsp; If this is
+the first attempt at this processor, then spend some time looking for some
+example code from the CPU manufacturer's website.&nbsp; This is usually
+not too hard to find.&nbsp; For the very first build attempt, don't even
+worry about the exception handlers.&nbsp; Once this is working, then add
+the exception handling stuff found in ABC960/monitor/except.c and ABC960/monitor/vectors.s.</font>
+<p><font face="Arial,Helvetica">At this point, you have a basic monitor
+working.&nbsp; Next, enable INCLUDE_FLASH and start working on the files
+under <a href="../src/common/flash/flash_dirname">common/flash/flash_dirname</a>.&nbsp;
+Use the current code as a model. You can use XMODEM to download small programs
+and run them by executing the "<a href="../commands/call.html">cal</a>l"
+comand.&nbsp; Once the flash driver is operational, the <a href="../commands/xmodem.html">Xmodem
+-B</a> command can be used to download new monitor binaries without the
+need for an external programmer.&nbsp;&nbsp; After that, enable INCLUDE_TFS
+and the file system stuff will be active.&nbsp; Note that there are a few
+additional configuration macros in config.h that must be established for
+TFS, plus look at <a href="../src/targets/target_dirname/monitor/tfsdev.h.html">tfsdev.h</a>
+to configure each of the flash devices within TFS.&nbsp; The final step
+is to enable INCLUDE_ETHERNET and work on the code in etherdev.c.&nbsp;&nbsp;
+At this point, since you have a working monitor with TFS, you can download
+small applications that include your ethernet code to conveniently test
+it out.&nbsp; That will give you the ethernet interface.&nbsp; Once this
+works, all of the other macros can be enabled as needed and the port is
+completed.</font>
+<p><b><font face="Arial,Helvetica">Description of FLASH configuration parameters
+in config.h...</font></b>
+<br>&nbsp;
+<table BORDER WIDTH="80%" >
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>FLASHBANKS</td>
+
+<td>Set this to the number of different banks of flash your target system
+will have.&nbsp; In general, "BANK" means device, except when devices are
+in parallel.&nbsp; So, if you have a single 16-bit flash device or 2 8-bit
+flash devices in parallel to form a 16-bit access to flash, both configurations
+would be considered a single bank.&nbsp; If you have two 16-bit devices
+back-to-back in memory space, this would be considered 2 banks.</td>
+</tr>
+
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>FLASH_BANK0_WIDTH</td>
+
+<td>Set to the width of flash bank zero.&nbsp; This is in 8-bit increments,
+so a 16-bit bank has a width of 2.</td>
+</tr>
+
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>FLASH_BANK0_BASE_ADDR</td>
+
+<td>Base address of flash bank zero.</td>
+</tr>
+
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>FLASH_LARGEST_SECTOR</td>
+
+<td>Size of the largest sector in all of the flash banks.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>FLASH_PROTECT_SIZE</td>
+
+<td>This is a definition used in some of the early flash drivers. This
+value would be set to the highest location in flash that needs software
+protection.&nbsp; The assumption was that all sectors occupying the space
+between 0 and this value would be protected.&nbsp; This doesn't work well
+with targets that do not have their boot flash at address 0, so it has
+been replaced with FLASH_PROTECT_RANGE. If you are writing a new flash
+driver, use FLASH_PROTECT_RANGE instead of this.</td>
+</tr>
+
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>FLASH_PROTECT_RANGE</td>
+
+<td>This is some string formatted as individual, comma-delimited or dash-delimited
+ranges.&nbsp; A few valid choices would be "0", "0-3", "0-3.8".&nbsp; Protected
+flash simply means that the flash command will require preliminary "opw"
+request for those banks to be modified.&nbsp; See the <a href="../commands/flash.html">flash</a>
+command for more details.&nbsp; This is a replacement for FLASH_PROTECT_SIZE.&nbsp;
+If you are writing a new flash driver, use this instead of FLASH_PROTECT_SIZE.</td>
+</tr>
+
+<tr>
+<td ALIGN=LEFT VALIGN=TOP>WIDTHX</td>
+
+<td>This macro is only used with flash drivers that are written to be configurable
+for different widths simply by establishing this macro.&nbsp; Currently,
+the only device that supports this in the monitor code is the 29F040.&nbsp;
+Refer to that header file for details.</td>
+</tr>
+</table>
+
+<p><font face="Arial,Helvetica">Note that if there was more than one flash
+bank in your target system, then there would be an additional set of FLASH_BANKN_XXX
+macros for each additional bank.</font>
+<br>&nbsp;
+<p><b><font face="Arial,Helvetica">Description of TFS configuration parameters
+in config.h...</font></b>
+<br>&nbsp;
+<table BORDER WIDTH="80%" >
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFSSPARESIZE</td>
+
+<td>This value should be set to the size of the largest flash sector that
+is dedicated to TFS in&nbsp;</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFSSECTORCOUNT</td>
+
+<td>This should be set to the number of sectors that are to be dedicated
+to TFS file storage space.&nbsp; This does not including the SPARE sector.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFS_DEVTOT</td>
+
+<td>Total number of non-contiguous devices that TFS spans.&nbsp; This is
+usually just 1, but depends on the target configuration.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFSSTART</td>
+
+<td>Base address of the beginning of TFS.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFSEND</td>
+
+<td>End address of TFS file storage space that started at TFSSTART.&nbsp;
+Note that this address should NOT include the space used by the spare sector.&nbsp;
+Usually, TFSEND is 1 byte less than TFSSPARE because the spare sector lies
+just after the end of TFS storage space.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFSSPARE</td>
+
+<td>Base address of the spare sector that is to be used by the TFS storage
+space starting at TFSSTART.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>TFS_EBIN_ELF
+<br>TFS_EBIN_COFF
+<br>TFS_EBIN_AOUT</td>
+
+<td>If there is a need to use TFS's loader, then one (and only one) of
+these three definitions should be set.&nbsp; The choice here depends on
+the cross compilation toolset being used to build the application code.</td>
+</tr>
+</table>
+
+<p>There is also tfsdev.h.&nbsp; This header file is used to help the tfs
+code with the possibility of there being more than one memory device over
+which TFS will span.&nbsp; For most targets, TFS will only span one contiguous
+block of flash; however, TFS does support multiple non-contiguous blocks.&nbsp;
+The tfsdev.h structure establishes this.&nbsp; So for most targets, the
+structure will look like this...
+<pre><tt>struct tfsdev tfsdevtbl[] = {</tt></pre>
+
+<pre><tt>&nbsp;{ "//040/",&nbsp; TFSSTART,&nbsp; TFSEND,&nbsp; TFSSPARE,&nbsp; TFSSPARESIZE,&nbsp; TFSSECTORCOUNT,&nbsp; TFS_DEVTYPE_FLASH, },</tt></pre>
+
+<pre><tt>&nbsp;{ 0, TFSEOT, 0, 0, 0, 0, 0 }</tt></pre>
+
+<pre><tt>};</tt></pre>
+The first member of the first entry in the table is the name to be associated
+with the device.&nbsp; See <a href="../src/common/monitor/tfsprivate.h.html">tfsprivate.h</a>
+for details.
+<br>TFS can be set up so that the device used is somewhat dynamic (within
+a family).&nbsp; If you have a target that may be configured with a 29F040
+or a 29F010 for example, then set the TFS_DEVTYPE_DYNAMIC bit and all other
+entries NULL.&nbsp; This assumes that you have written your flash driver
+to deal with this.&nbsp; See the 29F040 code for an example.
+<pre><tt>struct tfsdev tfsdevtbl[] = {</tt></pre>
+
+<pre><tt>&nbsp;{ "//040/",&nbsp; TFSSTART,&nbsp; 0,&nbsp; 0,&nbsp; 0,&nbsp; 0,&nbsp; TFS_DEVTYPE_FLASH | TFS_DEVINFO_DYNAMIC, },</tt></pre>
+
+<pre><tt>&nbsp;{ 0, TFSEOT, 0, 0, 0, 0, 0 }</tt></pre>
+<tt>};</tt>
+<p>If there is a need to configure a second device, then the parameters
+for that second entry would be taken from a second set of parameters that
+would be established for the second device in config.h (like TFSSTART_1,
+TFSEND_1, TFSSPARE_1, etc...).&nbsp; The structure would then simply have
+a third entry...
+<br>&nbsp;
+<pre><tt>struct tfsdev tfsdevtbl[] = {</tt></pre>
+
+<pre><tt>&nbsp;{ "//040/",&nbsp;&nbsp; TFSSTART,&nbsp;&nbsp; TFSEND,&nbsp;&nbsp; TFSSPARE,&nbsp;&nbsp; TFSSPARESIZE,&nbsp;&nbsp; TFSSECTORCOUNT,&nbsp;&nbsp; TFS_DEVTYPE_FLASH, },</tt></pre>
+
+<pre><tt>&nbsp;{ "//NVRAM/", TFSSTART_1, TFSEND_1, TFSSPARE_1, TFSSPARESIZE_1, TFSSECTORCOUNT_1, TFS_DEVTYPE_RAM, },</tt></pre>
+
+<pre><tt>&nbsp;{ 0, TFSEOT, 0, 0, 0, 0, 0 }</tt></pre>
+<tt>};</tt>
+<br>&nbsp;
+<p><b><font face="Arial,Helvetica">Other miscellaneous entries in config.h...</font></b>
+<br>&nbsp;
+<table BORDER WIDTH="80%" >
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>DEFAULT_ETHERADD</td>
+
+<td>If all else fails, this will be the ethernet address used by the monitor.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>DEFAULT_IPADD</td>
+
+<td>If all else fails, this will be the IP address used by the monitor.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>APPRAMBASE_OVERRIDE</td>
+
+<td>By default, the monitor will automatically establish a base address
+at which the application code can start assuming ownership of.&nbsp; This
+is done by simply finding the next 0x1000 modulo address after the end
+of the monitor's .bss section.&nbsp; This address is loaded into the APPRAMBASE
+shell variable and used by both the monitor and user for various things.&nbsp;
+If there is a reason to override this default setting, then put the override
+value in this definition; otherwise, this can be omitted.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>BOOTROMBASE_OVERRIDE</td>
+
+<td>Similar to APPRAMBASE_OVERRIDE, this value is automatically set to
+what the monitor sees as its base FLASH address.&nbsp; If for some reason
+this needs to be overridden, then it should be loaded into this macro.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>FORCE_BSS_INIT</td>
+
+<td>When the monitor first starts up, if it is a warmstart, then the .bss
+space of the monitor is not initialized to zero so that certain state variables
+(and shell variables) will survive a warmstart.&nbsp; If this is not desireable,
+then set this flag and all of the monitor's restart options will look like
+a coldstart.&nbsp; For source code use of these three macros, see <a href="../src/common/monitor/start.c.html">start.c</a>.&nbsp;</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>LOOPS_PER_SECOND</td>
+
+<td>Since the monitor does not use any interrupts, all timing is based
+on loop counts.&nbsp; To get this at-least close to being accurate, this
+macro should be set to the appropriate value.&nbsp; Use the sleep -c option
+to determine what the optimum setting is for this macro.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>SYMFILE</td>
+
+<td>This macro defines the filename used by the monitor as the symbol-table
+file.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>CPU_NAME</td>
+
+<td>String that contains the name of the CPU.&nbsp; This is displayed as
+part of the boot-up header.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>PLATFORM_NAME</td>
+
+<td>STring that contains the name of the target platform.&nbsp; This is
+displayed as part of the boot-up header.</td>
+</tr>
+
+<tr ALIGN=LEFT VALIGN=TOP>
+<td>ALLOCSIZE</td>
+
+<td>The amount of memory space that is to be allocated to the monitor's
+own heap.&nbsp; The heap in the monitor does not simply grow up from the
+end of .bss.&nbsp; It is a statically allocated array within the monitor's
+own .bss space.&nbsp; This avoids a conflict with other applications that
+may want to use the memory in some other way.</td>
+</tr>
+</table>
+
+<br>&nbsp;
+<p><b><font face="Arial,Helvetica">A few suggestions...</font></b>
+<ul>
+<li>
+<font face="Arial,Helvetica">It is important to take little steps when
+doing a port.&nbsp; The config.h INCLUDE_XXX macros allow you to do this.&nbsp;
+Don't try to build the whole platform in one shot.&nbsp; One step at a
+time will get you there a lot faster!!!</font></li>
+
+<li>
+<font face="Arial,Helvetica">Don't even enable cache if your CPU has it.&nbsp;
+Just leave it off until you have the port complete and you build up some
+confidence in what you have.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Make sure optimization is turned off.&nbsp;
+Eventually, you can enable it and things should be made to work with optimization;
+however, eliminate that complexity when starting a new port.</font></li>
+
+<li>
+<font face="Arial,Helvetica">In all of the driver polling loops insert
+some type of timeout.&nbsp; If the timeout occurs, depending on where it
+occurs, you can do a few different things: if the timeout occurs in a UART-related
+poll, then blink an LED, or do SOMETHING to let the outside world know
+where the code is.&nbsp; If the timeout occurs somewhere after the uart
+interface is known to be up and running, then call some simple error message
+that will print out the serial port.</font></li>
+
+<li>
+<font face="Arial,Helvetica">In the start() function, make sure that ramstart
+&amp; ramend variables are properly pointing to the beginning and end of
+the monitor-owned .bss space.&nbsp; Also, when first bringing up a new
+port, force this bss initialization to be done by defining the FORCE_BSS_INIT
+macro in config.h.</font></li>
+</ul>
+</blockquote>
+
+</body>
+</html>

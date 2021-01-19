@@ -1,0 +1,186 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: AT</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>AT</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">at</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Complex breakpoint facility.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">at -[Dd:f:Iilrs:v:] {address}
+[if condition] [action]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command provides a state-machine-like
+capability for breakpoints.&nbsp; It uses the processors breakpoint facility
+as a way of entering the monitor from active application.&nbsp; Upon entry
+into the monitor, a few different things can happen:</font>
+<ol>
+<li>
+<font face="Arial,Helvetica">&nbsp;an action can be taken and then application
+is resumed;</font></li>
+
+<li>
+<font face="Arial,Helvetica">&nbsp;a condition is checked and if the condition
+is met, an action is taken;</font></li>
+</ol>
+<font face="Arial,Helvetica">It is basically an elaboration of the counting
+breakpoint (break at address HHHH the Nth time).&nbsp; The counting breakpoint
+uses the break trap to temporarily enter the monitor, increment the break
+count and if the count has reached the desired value,&nbsp; then break;
+else resume application.&nbsp; In this case the condition is met because
+the break count was reached, and the action taken is stoppage of the application.&nbsp;
+The "at" command simply takes this idea a bit further by providing several
+different conditions and actions.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-D</font></li>
+
+<br><font face="Arial,Helvetica">delete all at-points;</font>
+<li>
+<font face="Arial,Helvetica">-d {#}</font></li>
+
+<br><font face="Arial,Helvetica">delete at-point number #;</font>
+<li>
+<font face="Arial,Helvetica">-f {xx}</font></li>
+
+<br><font face="Arial,Helvetica">set at-flag to xx</font>
+<li>
+<font face="Arial,Helvetica">-I</font></li>
+
+<br><font face="Arial,Helvetica">initialize 'at' structures;</font>
+<li>
+<font face="Arial,Helvetica">-i</font></li>
+
+<br><font face="Arial,Helvetica">install at-points;</font>
+<li>
+<font face="Arial,Helvetica">-l</font></li>
+
+<br><font face="Arial,Helvetica">list current at-point state;</font>
+<li>
+<font face="Arial,Helvetica">-r</font></li>
+
+<br><font face="Arial,Helvetica">remove at-points;</font>
+<li>
+<font face="Arial,Helvetica">-s</font></li>
+
+<br><font face="Arial,Helvetica">{x,y}&nbsp; swap at x with at y</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>CONDITIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">%VV==##</font></li>
+
+<br><font face="Arial,Helvetica">at-var VV equals ##</font>
+<li>
+<font face="Arial,Helvetica">PCNT==##</font></li>
+
+<br><font face="Arial,Helvetica">pass count == ##</font>
+<li>
+<font face="Arial,Helvetica">0xFFF()==##</font></li>
+
+<br><font face="Arial,Helvetica">function at 0xFFF returns</font>
+<li>
+<font face="Arial,Helvetica">FEQUXX</font></li>
+
+<br><font face="Arial,Helvetica">at-flag == XX</font>
+<li>
+<font face="Arial,Helvetica">FALLXX</font></li>
+
+<br><font face="Arial,Helvetica">at-flag OR XX == XX</font>
+<li>
+<font face="Arial,Helvetica">FANYXX</font></li>
+
+<br><font face="Arial,Helvetica">at-flag AND XX is non-zero</font>
+<li>
+<font face="Arial,Helvetica">%VV[.s]==*YY</font></li>
+
+<br><font face="Arial,Helvetica">at-var VV&AElig; (size 's') equals *YY</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">at 0x400000 %01++</font></li>
+
+<br><font face="Arial,Helvetica">If location 0x400000 is hit, then increment
+at variable &aelig;01&AElig;.</font>
+<li>
+<font face="Arial,Helvetica">at 0x408010 if %01==12 BREAK</font></li>
+
+<br><font face="Arial,Helvetica">If location 0x408010 is hit and at variable
+01 equals 12, then break to the monitor.</font>
+<li>
+<font face="Arial,Helvetica">at -l</font></li>
+
+<br><font face="Arial,Helvetica">Lists the current at point conditions,
+variables and flag.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">There are 8 AT variables (%VV in comments
+above) whose names are specified as %00 through %07.</font></li>
+
+<li>
+<font face="Arial,Helvetica">By default, the actual traps are installed
+by the <i><a href="go.html">go</a></i> command and they are removed when
+a break point occurs.&nbsp; The traps can be inserted or removed forcefully
+with the -i and -r options.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Since the % sign is used within the syntax
+of the at command, it may be necessary to avoid symbol table lookup by
+preceding it with a backslash (\).</font></li>
+
+<li>
+<font face="Arial,Helvetica">This command is extremely CPU dependent, so
+before assuming this works on your target verify that it has been ported!</font></li>
+</blockquote>
+
+</body>
+</html>

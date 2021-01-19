@@ -1,0 +1,659 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/xmodem.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* xmodem.c:
+ * Command to upload or download via XMODEM protocol.  Xmodem is quite
+ * limited, but adequate for simple file up/down load.
+ * This also supports XMODEM-1K and YMODEM.  YMODEM is an extension to XMODEM
+ * that uses a 1K packet size, CRC and the first packet (seqno=0) contains
+ * information about the file being downloaded (in partiuclar, the name).
+ * YMODEM also supports BATCH downloads (multiple files downloaded in one
+ * transaction).  This code supports incoming BATCH downloads (not tested
+ * because I can't find any terminal emulators that do it), but not for 
+ * uploads.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "flash.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "cli.h"
+
+#if INCLUDE_XMODEM
+
+/* struct xinfo:
+ * Used to contain information pertaining to the current transaction.
+ * The structure is built by the command Xmodem, then passed to the other
+ * support functions (Xup, Xdown, etc..) for reference and update.
+ */
+struct xinfo {
+    uchar   sno;            /* Sequence number. */
+    uchar   pad;            /* Unused, padding. */
+    int     xfertot;        /* Running total of transfer. */
+    int     pktlen;         /* Length of packet (128 or 1024). */
+    int     pktcnt;         /* Running tally of number of packets processed. */
+    int     filcnt;         /* Number of files transferred by ymodem. */
+    long    size;           /* Size of upload. */
+    ulong   flags;          /* Storage for various runtime flags. */
+    ulong   base;           /* Starting address for data transfer. */
+    ulong   dataddr;        /* Running address for data transfer. */
+    int     errcnt;         /* Keep track of errors (used in verify mode). */
+    char    *firsterrat;    /* Pointer to location of error detected when */
+                            /* transfer is in verify mode. */
+    char    fname[TFSNAMESIZE];
+};
+
+/* Runtime flags: */
+#define USECRC  (1&lt;&lt;0)
+#define VERIFY  (1&lt;&lt;1)
+#define YMODEM  (1&lt;&lt;2)
+
+/* Current xmodem operation: */
+#define XNULL   0
+#define XUP     1
+#define XDOWN   2
+
+/* X/Ymodem protocol: */
+#define SOH     0x01
+#define STX     0x02
+#define EOT     0x04
+#define ACK     0x06
+#define NAK     0x15
+#define CAN     0x18
+#define ESC     0x1b
+
+#define PKTLEN_128  128
+#define PKTLEN_1K   1024
+
+static int Xup(struct xinfo *);
+static int Xdown(struct xinfo *);
+static int getPacket(uchar *,struct xinfo *);
+static int putPacket(uchar *,struct xinfo *);
+
+char *XmodemHelp[] = {
+    "Xmodem file transfer",
+    "-[a:BdF:f:i:s:t:uvy]",
+    "Options:",
+    " -a{##}     address (overrides default of APPRAMBASE)",
+#if INCLUDE_FLASH
+    " -B         boot sector reload",
+#endif
+    " -c         use crc (default = checksum)",
+    " -d         download",
+#if INCLUDE_TFS
+    " -F{name}   filename",
+    " -f{flags}  file flags (see tfs)",
+    " -i{info}   file info (see tfs)",
+#endif
+    " -s{##}     size (overrides computed size)",
+    " -t{##}     address for xmodem trace buffer",
+    " -u         upload",
+    " -v         verify only",
+#if INCLUDE_TFS
+    " -y         use Ymodem extensions",
+#endif
+    "Notes:",
+    " * Either -d or -u must be specified (-B implies -d).",
+    " * XMODEM forces a 128-byte modulo on file size.  The -s option",
+    "   can be used to override this when transferring a file to TFS.",
+    " * File upload requires no address or size (size will be mod 128).",
+    " * When using -B, it should be the ONLY command line option,",
+    "   it's purpose is to reprogram the boot sector, so be careful!",
+    (char *)0,
+};
+
+int
+<A NAME="Xmodem">Xmodem</A>(int argc,char *argv[])
+{
+#if INCLUDE_TFS
+    TFILE   *tfp;
+#endif
+    char    *info, *flags;
+    struct  xinfo xi;
+    int opt, xop, newboot;
+
+    xop = XNULL;
+    newboot = 0;
+    info = (char *)0;
+    flags = (char *)0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#MtraceInit>MtraceInit</A>(0,0);
+    xi.fname[0] = 0;
+    xi.size = 0;
+    xi.flags = 0;
+    xi.filcnt = 0;
+    xi.pktlen = PKTLEN_128;
+    xi.base = xi.dataddr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>();
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"a:Bci:f:dF:ks:t:uvy")) != -1) {
+        switch(opt) {
+        case 'a':
+            xi.dataddr = xi.base = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,(char **)0,0);
+            break;
+        case 'B':
+            xop = XDOWN;
+            newboot = 1;
+            break;
+        case 'c':
+            xi.flags |= USECRC;
+            break;
+        case 'd':
+            xop = XDOWN;
+            break;
+#if INCLUDE_TFS
+        case 'F':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(xi.fname,optarg,TFSNAMESIZE);
+            break;
+        case 'f':
+            flags = optarg;
+            break;
+        case 'i':
+            info = optarg;
+            break;
+#endif
+        case 'k':
+            xi.pktlen = PKTLEN_1K;
+            break;
+        case 's':
+            xi.size = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,(char **)0,0);
+            break;
+        case 't':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#MtraceInit>MtraceInit</A>((char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,(char **)0,0),99999999);
+            break;
+        case 'u':
+            xop = XUP;
+            break;
+        case 'v':
+            xi.flags |= VERIFY;
+            break;
+#if INCLUDE_TFS
+        case 'y':
+            xi.flags |= (YMODEM | USECRC);
+            xi.pktlen = PKTLEN_1K;
+            break;
+#endif
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    /* There should be no arguments after the option list. */
+    if (argc != optind)
+        return(CMD_PARAM_ERROR);
+
+    if (xop == XUP) {
+        if ((xi.flags & YMODEM) && !(xi.fname[0]))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Ymodem upload needs filename\n");
+        else {
+            if (xi.fname[0]) {  /* Causes -a and -s options to be ignored. */
+#if INCLUDE_TFS
+                tfp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(xi.fname);
+                if (!tfp) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: file not found\n",xi.fname);
+                    return(CMD_FAILURE);
+                }
+                xi.base = xi.dataddr = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(tfp);
+                xi.size = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(tfp);
+#endif
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rawon>rawon</A>();
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#Xup>Xup</A>(&xi);
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rawoff>rawoff</A>();
+        }
+    }
+    else if (xop == XDOWN) {
+        long    tmpsize;
+
+        if ((xi.flags & YMODEM) && (xi.fname[0]))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Ymodem download gets name from protocol, '%s' ignored\n",
+                xi.fname);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rawon>rawon</A>();
+        tmpsize = (long)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#Xdown>Xdown</A>(&xi);
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rawoff>rawoff</A>();
+        if ((!xi.size) || (tmpsize &lt; 0))
+            xi.size = tmpsize;
+
+#if INCLUDE_FLASH
+#if INCLUDE_TFS
+        if ((xi.fname[0]) && (xi.size &gt; 0)) {
+            int err;
+
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Writing to file '%s'...\n",xi.fname);
+            err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(xi.fname,info,flags,(uchar *)xi.base,xi.size);
+            if (err != TFS_OKAY) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",xi.fname,(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+                return(CMD_FAILURE);
+            }
+        }
+        else
+#endif
+        if ((newboot) && (xi.size &gt; 0)) {
+            extern  int FlashProtectWindow;
+            char    *bb;
+            ulong   bootbase;
+
+            bb = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("BOOTROMBASE");
+            if (bb)
+                bootbase = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(bb,0,0);
+            else
+                bootbase = BOOTROM_BASE;
+
+            FlashProtectWindow = 1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Reprogramming boot @ 0x%lx from 0x%lx, %ld bytes.\n",
+                bootbase,xi.base,xi.size);
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#askuser>askuser</A>("OK?")) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#flashewrite>flashewrite</A>(&FlashBank[0],(char *)bootbase,
+                  (char *)xi.base,xi.size) == -1) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("failed\n");
+                    return(CMD_FAILURE);
+                }
+            }
+        }
+#endif
+    }
+    else
+        return(CMD_PARAM_ERROR);
+    return(CMD_SUCCESS);
+}
+
+/* putPacket():
+ * Used by Xup to send packets.
+ */
+static int
+<A NAME="putPacket">putPacket</A>(uchar *tmppkt, struct xinfo *xip)
+{
+    int     c, i;
+    uchar   *cp;
+    ushort  chksm;
+
+    cp = (uchar *)&chksm;
+    chksm = 0;
+    
+    if (xip-&gt;pktlen == PKTLEN_128)
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(SOH);
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(STX);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(xip-&gt;sno);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>((uchar)~(xip-&gt;sno));
+
+    if (xip-&gt;flags & USECRC) {
+        for(i=0;i&lt;xip-&gt;pktlen;i++) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(*tmppkt);
+            chksm = (chksm&lt;&lt;8)^xcrc16tab[(chksm&gt;&gt;8)^*tmppkt++];
+        }
+        /* An "endian independent way to extract the CRC bytes. */
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>((char)(chksm &gt;&gt; 8));
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>((char)chksm);
+    }
+    else {
+        for(i=0;i&lt;xip-&gt;pktlen;i++) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(*tmppkt);
+            chksm = ((chksm+*tmppkt++)&0xff);
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>((uchar)(chksm&0x00ff));
+    }
+    c = <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();          /* Wait for ack */
+
+    /* If pktcnt == -1, then this is the first packet sent by
+     * YMODEM (filename) and we must wait for one additional
+     * character in the response.
+     */
+    if (xip-&gt;pktcnt == -1)
+        c = <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+    return(c);
+}
+
+/* getPacket():
+ * Used by Xdown to retrieve packets.
+ */
+static int
+<A NAME="getPacket">getPacket</A>(uchar *tmppkt, struct xinfo *xip)
+{
+    int     i;
+    char    *pkt;
+    uchar   seq[2];
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#getbytes>getbytes</A>(seq,2,1);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("*");
+    if (xip-&gt;flags & VERIFY) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#getbytes>getbytes</A>(tmppkt,xip-&gt;pktlen,1);
+        for(i=0;i&lt;xip-&gt;pktlen;i++) {
+            if (tmppkt[i] != ((char *)xip-&gt;dataddr)[i]) {
+                if (xip-&gt;errcnt++ == 0)
+                    xip-&gt;firsterrat = (char *)(xip-&gt;dataddr+i);
+            }
+        }
+        pkt = (char *)tmppkt;
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#getbytes>getbytes</A>((char *)xip-&gt;dataddr,xip-&gt;pktlen,1);
+        pkt = (char *)xip-&gt;dataddr;
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("*");
+
+    if (xip-&gt;flags & USECRC) {
+        ushort  crc, xcrc;
+        
+        /* An "endian independent way to combine the CRC bytes. */
+        crc  = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>() &lt;&lt; 8;
+        crc += (ushort)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        xcrc = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#xcrc16>xcrc16</A>((uchar *)pkt,(ulong)(xip-&gt;pktlen));
+        if (crc != xcrc) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(CAN);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("1 %04x != %04x",crc,xcrc);
+            return(-1);
+        }
+    }
+    else {
+        uchar   csum, xcsum;
+
+        xcsum = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("*");
+        csum = 0;
+        for(i=0;i&lt;xip-&gt;pktlen;i++)
+            csum += *pkt++;
+        if (csum != xcsum) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(CAN);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("2");
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("2 %02x != %02x",csum,xcsum);
+            return(-1);
+        }
+    }
+    if ((uchar)seq[0] !=  xip-&gt;sno) {
+        if ((xip-&gt;sno == 0x02) && (seq[0] == 0x01)) {   /* TeraTerm has a */
+            xip-&gt;sno = 0x01;                            /* "peculiarity". */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("--TERABUG--");
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(CAN);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("3 %02x != %02x",seq[0],xip-&gt;sno);
+            return(-1);
+        }
+    }
+    if ((uchar)seq[1] != (uchar)~(xip-&gt;sno)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(CAN);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("4 %02x != %02x",seq[1],(uchar)~(xip-&gt;sno));
+        return(-1);
+    }
+    /* First packet of YMODEM contains information about the transfer: */
+    /* FILENAME SP FILESIZE SP MOD_DATE SP FILEMODE SP FILE_SNO */
+    /* Only the FILENAME is required and if others are present, then none */
+    /* can be skipped. */
+    if ((xip-&gt;flags & YMODEM) && (xip-&gt;pktcnt == 0)) {
+        char *slash, *space, *fname;
+
+        slash = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strrchr>strrchr</A>((char *)(xip-&gt;dataddr),'/');
+        space = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>((char *)(xip-&gt;dataddr),' ');
+        if (slash)
+            fname = slash+1;
+        else
+            fname = (char *)(xip-&gt;dataddr);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("&lt;fname=%s&gt;",fname);
+        if (space) {
+            *space = 0;
+            xip-&gt;size = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(space+1);
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(xip-&gt;fname,fname);
+        if (fname[0])
+            xip-&gt;filcnt++;
+    }
+    else
+        xip-&gt;dataddr += xip-&gt;pktlen;
+    xip-&gt;sno++;
+    xip-&gt;pktcnt++;
+    xip-&gt;xfertot += xip-&gt;pktlen;
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(ACK);
+    if (xip-&gt;flags & YMODEM) {
+        if (xip-&gt;fname[0] == 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nRcvd %d file%c\n",
+                xip-&gt;filcnt,xip-&gt;filcnt &gt; 1 ? 's' : ' ');
+            return(1);
+        }
+    }
+    return(0);
+}
+
+/* Xup():
+ * Called when a transfer from target to host is being made (considered
+ * an upload).
+ */
+static int
+<A NAME="Xup">Xup</A>(struct xinfo *xip)
+{
+    uchar   c, buf[PKTLEN_128];
+    int     done, pktlen;
+    long    actualsize;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("Xup starting");
+
+    actualsize = xip-&gt;size;
+
+    if (xip-&gt;size & 0x7f) {
+        xip-&gt;size += 128;
+        xip-&gt;size &= 0xffffff80L;
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Upload %ld bytes from 0x%lx\n",xip-&gt;size,(ulong)xip-&gt;base);
+
+    /* Startup synchronization... */
+    /* Wait to receive a NAK or 'C' from receiver. */
+    done = 0;
+    while(!done) {
+        c = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        switch(c) {
+        case NAK:
+            done = 1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("CSM");
+            break;
+        case 'C':
+            xip-&gt;flags |= USECRC;
+            done = 1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("CRC");
+            break;
+        case 'q':   /* ELS addition, not part of XMODEM spec. */
+            return(0);
+        default:
+            break;
+        }
+    }
+
+
+    if (xip-&gt;flags & YMODEM) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("SNO_0");
+        xip-&gt;sno = 0;
+        xip-&gt;pktcnt = -1;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)buf,0,PKTLEN_128);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%s",xip-&gt;fname);
+        pktlen = xip-&gt;pktlen;
+        xip-&gt;pktlen = PKTLEN_128;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#putPacket>putPacket</A>(buf,xip);
+        xip-&gt;pktlen = pktlen;
+    }
+
+    done = 0;
+    xip-&gt;sno = 1;
+    xip-&gt;pktcnt = 0;
+    while(!done) {
+        c = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#putPacket>putPacket</A>((uchar *)(xip-&gt;dataddr),xip);
+        switch(c) {
+        case ACK:
+            xip-&gt;sno++;
+            xip-&gt;pktcnt++;
+            xip-&gt;size -= xip-&gt;pktlen;
+            xip-&gt;dataddr += xip-&gt;pktlen;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("A");
+            break;
+        case NAK:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("N");
+            break;
+        case CAN:
+            done = -1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("C");
+            break;
+        case EOT:
+            done = -1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("E");
+            break;
+        default:
+            done = -1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("&lt;%2x&gt;",c);
+            break;
+        }
+        if (xip-&gt;size &lt;= 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(EOT);
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();  /* Flush the ACK */
+            break;
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("!");
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("Xup_almost");
+    if ((done != -1) && (xip-&gt;flags & YMODEM)) { 
+        xip-&gt;sno = 0;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)buf,0,PKTLEN_128);
+        pktlen = xip-&gt;pktlen;
+        xip-&gt;pktlen = PKTLEN_128;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#putPacket>putPacket</A>(buf,xip);
+        xip-&gt;pktlen = pktlen;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("Xup_done.");
+    return(0);
+}
+
+
+/* Xdown():
+ * Called when a transfer from host to target is being made (considered
+ * an download).
+ */
+
+static int
+<A NAME="Xdown">Xdown</A>(struct xinfo *xip)
+{
+    long    timeout;
+    char    c, *tmppkt;
+    int     done;
+
+    tmppkt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(PKTLEN_1K);
+    if (!tmppkt) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("malloc failed");
+        return(-1);
+    }
+
+nextfile:
+    if (xip-&gt;flags & YMODEM)
+        xip-&gt;sno = 0x00;
+    else
+        xip-&gt;sno = 0x01;
+    xip-&gt;pktcnt = 0;
+    xip-&gt;errcnt = 0;
+    xip-&gt;xfertot = 0;
+    xip-&gt;firsterrat = 0;
+
+    /* Startup synchronization... */
+    /* Continuously send NAK or 'C' until sender responds. */
+restart:
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("Xdown");
+    while(1) {
+        if (xip-&gt;flags & USECRC)
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>('C');
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(NAK);
+        timeout = LoopsPerSecond;
+        while(!<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>() && timeout)
+            timeout--;
+        if (timeout)
+            break;
+    }
+
+    done = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("Got response");
+    while(done == 0) {
+        c = (char)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        switch(c) {
+        case SOH:               /* 128-byte incoming packet */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("O");
+            xip-&gt;pktlen = 128;
+            done = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#getPacket>getPacket</A>(tmppkt,xip);
+            if (!done && (xip-&gt;pktcnt == 1) && (xip-&gt;flags & YMODEM))
+                goto restart;
+            break;
+        case STX:               /* 1024-byte incoming packet */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("T");
+            xip-&gt;pktlen = 1024;
+            done = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ian_xmodem.c.html#getPacket>getPacket</A>(tmppkt,xip);
+            if (!done && (xip-&gt;pktcnt == 1) && (xip-&gt;flags & YMODEM))
+                goto restart;
+            break;
+        case CAN:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("C");
+            done = -1;
+            break;
+        case EOT:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("E");
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(ACK);
+            if (xip-&gt;flags & YMODEM) {
+#if INCLUDE_TFS
+                if (!xip-&gt;size)
+                    xip-&gt;size = xip-&gt;pktcnt * xip-&gt;pktlen;
+                if (xip-&gt;fname[0])
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(xip-&gt;fname,0,0,(uchar *)xip-&gt;base,xip-&gt;size);
+                xip-&gt;dataddr = xip-&gt;base;
+#endif
+                goto nextfile;
+            }
+            else {
+                done = xip-&gt;xfertot;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nRcvd %d pkt%c (%d bytes)\n",xip-&gt;pktcnt,
+                        xip-&gt;pktcnt &gt; 1 ? 's' : ' ',xip-&gt;xfertot);
+            }
+            break;
+        case ESC:       /* User-invoked abort */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("X");
+            done = -1;
+            break;
+        default:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("&lt;%02x&gt;",c);
+            done = -1;
+            break;
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/memtrace.c.html#Mtrace>Mtrace</A>("!");
+    }
+    if (xip-&gt;flags & VERIFY) {
+        if (xip-&gt;errcnt)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d errors, first at 0x%lx\n",
+                xip-&gt;errcnt,(ulong)(xip-&gt;firsterrat));
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("verification passed\n");
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(tmppkt);
+    return(done);
+}
+
+
+#endif
+</HTML>
+</PRE>
+</BODY>

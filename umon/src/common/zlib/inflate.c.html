@@ -1,0 +1,376 @@
+<HTML>
+<HEADER>
+<TITLE>common/zlib/inflate.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* inflate.c -- zlib interface to inflate modules
+ * Copyright (C) 1995-1998 Mark Adler
+ * For conditions of distribution and use, see copyright notice in zlib.h 
+ */
+
+#include "zutil.h"
+#include "infblock.h"
+
+struct inflate_blocks_state {int dummy;}; /* for buggy compilers */
+
+typedef enum {
+      METHOD,   /* waiting for method byte */
+      FLAG,     /* waiting for flag byte */
+      DICT4,    /* four dictionary check bytes to go */
+      DICT3,    /* three dictionary check bytes to go */
+      DICT2,    /* two dictionary check bytes to go */
+      DICT1,    /* one dictionary check byte to go */
+      DICT0,    /* waiting for inflateSetDictionary */
+      BLOCKS,   /* decompressing blocks */
+      CHECK4,   /* four check bytes to go */
+      CHECK3,   /* three check bytes to go */
+      CHECK2,   /* two check bytes to go */
+      CHECK1,   /* one check byte to go */
+      DONE,     /* finished check, done */
+      BAD}      /* got an error--stay here */
+inflate_mode;
+
+/* inflate private state */
+struct internal_state {
+
+  /* mode */
+  inflate_mode  mode;   /* current inflate mode */
+
+  /* mode dependent information */
+  union {
+    uInt method;        /* if FLAGS, method byte */
+    struct {
+      uLong was;                /* computed check value */
+      uLong need;               /* stream check value */
+    } check;            /* if CHECK, check values to compare */
+    uInt marker;        /* if BAD, inflateSync's marker bytes count */
+  } sub;        /* submode */
+
+  /* mode independent information */
+  int  nowrap;          /* flag for no wrapper */
+  uInt wbits;           /* log2(window size)  (8..15, defaults to 15) */
+  inflate_blocks_statef 
+    *blocks;            /* current inflate_blocks state */
+
+};
+
+
+int ZEXPORT <A NAME="inflateReset">inflateReset</A>(z)
+z_streamp z;
+{
+  if (z == Z_NULL || z-&gt;state == Z_NULL)
+    return Z_STREAM_ERROR;
+  z-&gt;total_in = z-&gt;total_out = 0;
+  z-&gt;msg = Z_NULL;
+  z-&gt;state-&gt;mode = z-&gt;state-&gt;nowrap ? BLOCKS : METHOD;
+  <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks_reset>inflate_blocks_reset</A>(z-&gt;state-&gt;blocks, z, Z_NULL);
+  Tracev((stderr, "inflate: reset\n"));
+  return Z_OK;
+}
+
+
+int ZEXPORT <A NAME="inflateEnd">inflateEnd</A>(z)
+z_streamp z;
+{
+  if (z == Z_NULL || z-&gt;state == Z_NULL || z-&gt;zfree == Z_NULL)
+    return Z_STREAM_ERROR;
+  if (z-&gt;state-&gt;blocks != Z_NULL)
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks_free>inflate_blocks_free</A>(z-&gt;state-&gt;blocks, z);
+  ZFREE(z, z-&gt;state);
+  z-&gt;state = Z_NULL;
+  Tracev((stderr, "inflate: end\n"));
+  return Z_OK;
+}
+
+
+int ZEXPORT <A NAME="inflateInit2_">inflateInit2_</A>(z, w, version, stream_size)
+z_streamp z;
+int w;
+const char *version;
+int stream_size;
+{
+  if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
+      stream_size != <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(z_stream))
+      return Z_VERSION_ERROR;
+
+  /* initialize state */
+  if (z == Z_NULL)
+    return Z_STREAM_ERROR;
+  z-&gt;msg = Z_NULL;
+  if (z-&gt;zalloc == Z_NULL)
+  {
+    z-&gt;zalloc = zcalloc;
+    z-&gt;opaque = (voidpf)0;
+  }
+  if (z-&gt;zfree == Z_NULL) z-&gt;zfree = zcfree;
+  if ((z-&gt;state = (struct internal_state FAR *)
+       ZALLOC(z,1,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct internal_state))) == Z_NULL)
+    return Z_MEM_ERROR;
+  z-&gt;state-&gt;blocks = Z_NULL;
+
+  /* handle undocumented nowrap option (no zlib header or check) */
+  z-&gt;state-&gt;nowrap = 0;
+  if (w &lt; 0)
+  {
+    w = - w;
+    z-&gt;state-&gt;nowrap = 1;
+  }
+
+  /* set window size */
+  if (w &lt; 8 || w &gt; 15)
+  {
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateEnd>inflateEnd</A>(z);
+    return Z_STREAM_ERROR;
+  }
+  z-&gt;state-&gt;wbits = (uInt)w;
+
+  /* create inflate_blocks state */
+  if ((z-&gt;state-&gt;blocks =
+      <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks_new>inflate_blocks_new</A>(z, z-&gt;state-&gt;nowrap ? Z_NULL : adler32, (uInt)1 &lt;&lt; w))
+      == Z_NULL)
+  {
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateEnd>inflateEnd</A>(z);
+    return Z_MEM_ERROR;
+  }
+  Tracev((stderr, "inflate: allocated\n"));
+
+  /* reset state */
+  <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateReset>inflateReset</A>(z);
+  return Z_OK;
+}
+
+
+int ZEXPORT <A NAME="inflateInit_">inflateInit_</A>(z, version, stream_size)
+z_streamp z;
+const char *version;
+int stream_size;
+{
+  return <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateInit2_>inflateInit2_</A>(z, DEF_WBITS, version, stream_size);
+}
+
+
+#define NEEDBYTE {if(z-&gt;avail_in==0)return r;r=f;}
+#define NEXTBYTE (z-&gt;avail_in--,z-&gt;total_in++,*z-&gt;next_in++)
+
+int ZEXPORT <A NAME="inflate">inflate</A>(z, f)
+z_streamp z;
+int f;
+{
+  int r;
+  uInt b;
+
+  if (z == Z_NULL || z-&gt;state == Z_NULL || z-&gt;next_in == Z_NULL)
+    return Z_STREAM_ERROR;
+  f = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
+  r = Z_BUF_ERROR;
+  while (1) switch (z-&gt;state-&gt;mode)
+  {
+    case METHOD:
+      NEEDBYTE
+      if (((z-&gt;state-&gt;sub.method = NEXTBYTE) & 0xf) != Z_DEFLATED)
+      {
+        z-&gt;state-&gt;mode = BAD;
+        z-&gt;msg = (char*)"unknown compression method";
+        z-&gt;state-&gt;sub.marker = 5;       /* can't try inflateSync */
+        break;
+      }
+      if ((z-&gt;state-&gt;sub.method &gt;&gt; 4) + 8 &gt; z-&gt;state-&gt;wbits)
+      {
+        z-&gt;state-&gt;mode = BAD;
+        z-&gt;msg = (char*)"invalid window size";
+        z-&gt;state-&gt;sub.marker = 5;       /* can't try inflateSync */
+        break;
+      }
+      z-&gt;state-&gt;mode = FLAG;
+    case FLAG:
+      NEEDBYTE
+      b = NEXTBYTE;
+      if (((z-&gt;state-&gt;sub.method &lt;&lt; 8) + b) % 31)
+      {
+        z-&gt;state-&gt;mode = BAD;
+        z-&gt;msg = (char*)"incorrect header check";
+        z-&gt;state-&gt;sub.marker = 5;       /* can't try inflateSync */
+        break;
+      }
+      Tracev((stderr, "inflate: zlib header ok\n"));
+      if (!(b & PRESET_DICT))
+      {
+        z-&gt;state-&gt;mode = BLOCKS;
+        break;
+      }
+      z-&gt;state-&gt;mode = DICT4;
+    case DICT4:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need = (uLong)NEXTBYTE &lt;&lt; 24;
+      z-&gt;state-&gt;mode = DICT3;
+    case DICT3:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE &lt;&lt; 16;
+      z-&gt;state-&gt;mode = DICT2;
+    case DICT2:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE &lt;&lt; 8;
+      z-&gt;state-&gt;mode = DICT1;
+    case DICT1:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE;
+      z-&gt;adler = z-&gt;state-&gt;sub.check.need;
+      z-&gt;state-&gt;mode = DICT0;
+      return Z_NEED_DICT;
+    case DICT0:
+      z-&gt;state-&gt;mode = BAD;
+      z-&gt;msg = (char*)"need dictionary";
+      z-&gt;state-&gt;sub.marker = 0;       /* can try inflateSync */
+      return Z_STREAM_ERROR;
+    case BLOCKS:
+      r = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks>inflate_blocks</A>(z-&gt;state-&gt;blocks, z, r);
+      if (r == Z_DATA_ERROR)
+      {
+        z-&gt;state-&gt;mode = BAD;
+        z-&gt;state-&gt;sub.marker = 0;       /* can try inflateSync */
+        break;
+      }
+      if (r == Z_OK)
+        r = f;
+      if (r != Z_STREAM_END)
+        return r;
+      r = f;
+      <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks_reset>inflate_blocks_reset</A>(z-&gt;state-&gt;blocks, z, &z-&gt;state-&gt;sub.check.was);
+      if (z-&gt;state-&gt;nowrap)
+      {
+        z-&gt;state-&gt;mode = DONE;
+        break;
+      }
+      z-&gt;state-&gt;mode = CHECK4;
+    case CHECK4:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need = (uLong)NEXTBYTE &lt;&lt; 24;
+      z-&gt;state-&gt;mode = CHECK3;
+    case CHECK3:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE &lt;&lt; 16;
+      z-&gt;state-&gt;mode = CHECK2;
+    case CHECK2:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE &lt;&lt; 8;
+      z-&gt;state-&gt;mode = CHECK1;
+    case CHECK1:
+      NEEDBYTE
+      z-&gt;state-&gt;sub.check.need += (uLong)NEXTBYTE;
+
+      if (z-&gt;state-&gt;sub.check.was != z-&gt;state-&gt;sub.check.need)
+      {
+        z-&gt;state-&gt;mode = BAD;
+        z-&gt;msg = (char*)"incorrect data check";
+        z-&gt;state-&gt;sub.marker = 5;       /* can't try inflateSync */
+        break;
+      }
+      Tracev((stderr, "inflate: zlib check ok\n"));
+      z-&gt;state-&gt;mode = DONE;
+    case DONE:
+      return Z_STREAM_END;
+    case BAD:
+      return Z_DATA_ERROR;
+    default:
+      return Z_STREAM_ERROR;
+  }
+#ifdef NEED_DUMMY_RETURN
+  return Z_STREAM_ERROR;  /* Some dumb compilers complain without this */
+#endif
+}
+
+
+int ZEXPORT <A NAME="inflateSetDictionary">inflateSetDictionary</A>(z, dictionary, dictLength)
+z_streamp z;
+const Bytef *dictionary;
+uInt  dictLength;
+{
+  uInt length = dictLength;
+
+  if (z == Z_NULL || z-&gt;state == Z_NULL || z-&gt;state-&gt;mode != DICT0)
+    return Z_STREAM_ERROR;
+
+  if (<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/adler32.c.html#adler32>adler32</A>(1L, dictionary, dictLength) != z-&gt;adler) return Z_DATA_ERROR;
+  z-&gt;adler = 1L;
+
+  if (length &gt;= ((uInt)1&lt;&lt;z-&gt;state-&gt;wbits))
+  {
+    length = (1&lt;&lt;z-&gt;state-&gt;wbits)-1;
+    dictionary += dictLength - length;
+  }
+  <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_set_dictionary>inflate_set_dictionary</A>(z-&gt;state-&gt;blocks, dictionary, length);
+  z-&gt;state-&gt;mode = BLOCKS;
+  return Z_OK;
+}
+
+
+int ZEXPORT <A NAME="inflateSync">inflateSync</A>(z)
+z_streamp z;
+{
+  uInt n;       /* number of bytes to look at */
+  Bytef *p;     /* pointer to bytes */
+  uInt m;       /* number of marker bytes found in a row */
+  uLong r, w;   /* temporaries to save total_in and total_out */
+
+  /* set up */
+  if (z == Z_NULL || z-&gt;state == Z_NULL)
+    return Z_STREAM_ERROR;
+  if (z-&gt;state-&gt;mode != BAD)
+  {
+    z-&gt;state-&gt;mode = BAD;
+    z-&gt;state-&gt;sub.marker = 0;
+  }
+  if ((n = z-&gt;avail_in) == 0)
+    return Z_BUF_ERROR;
+  p = z-&gt;next_in;
+  m = z-&gt;state-&gt;sub.marker;
+
+  /* search */
+  while (n && m &lt; 4)
+  {
+    static Byte mark[4] = {0, 0, 0xff, 0xff};
+    if (*p == mark[m])
+      m++;
+    else if (*p)
+      m = 0;
+    else
+      m = 4 - m;
+    p++, n--;
+  }
+
+  /* restore */
+  z-&gt;total_in += p - z-&gt;next_in;
+  z-&gt;next_in = p;
+  z-&gt;avail_in = n;
+  z-&gt;state-&gt;sub.marker = m;
+
+  /* return no joy or set up to restart on a new block */
+  if (m != 4)
+    return Z_DATA_ERROR;
+  r = z-&gt;total_in;  w = z-&gt;total_out;
+  <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateReset>inflateReset</A>(z);
+  z-&gt;total_in = r;  z-&gt;total_out = w;
+  z-&gt;state-&gt;mode = BLOCKS;
+  return Z_OK;
+}
+
+
+/* Returns true if inflate is currently at the end of a block generated
+ * by Z_SYNC_FLUSH or Z_FULL_FLUSH. This function is used by one PPP
+ * implementation to provide an additional safety check. PPP uses Z_SYNC_FLUSH
+ * but removes the length bytes of the resulting empty stored block. When
+ * decompressing, PPP checks that at the end of input packet, inflate is
+ * waiting for these length bytes.
+ */
+int ZEXPORT <A NAME="inflateSyncPoint">inflateSyncPoint</A>(z)
+z_streamp z;
+{
+  if (z == Z_NULL || z-&gt;state == Z_NULL || z-&gt;state-&gt;blocks == Z_NULL)
+    return Z_STREAM_ERROR;
+  return <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/infblock.c.html#inflate_blocks_sync_point>inflate_blocks_sync_point</A>(z-&gt;state-&gt;blocks);
+}
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,140 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Data-Driven Editor</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>A Data-Driven Editor</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The monitor
+and TFS provide a very flexible mechanism to allow an application to be
+written in a "file-driven" mode.&nbsp; In other words, a lot of an application's
+configuration can be based on the content of files that exist in TFS as
+normal, ascii, editable files.&nbsp; An ascii file with simple name/value
+pairs can be used by the application for retrieval of all kinds of configuration
+parameters.&nbsp; The ascii file can easliy be edited on the target and
+the personality of the application is changed.&nbsp; With this flexibility
+comes the fact that users can now modify these files fairly easily and
+potentially corrupt the data in the file that is read by the application.&nbsp;
+Some of this can be avoided by establishing different user levels for different
+files such that, only administrators with passwords are able to access
+the files.&nbsp; There is still the problem that the administrator may
+mistakenly modify a file incorrectly and cause the application to crash
+because of a syntax error in the configuration file.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The data-driven editor
+solves this problem. The idea is that you have ascii files that are used
+by an application to configure itself.&nbsp; For example, an application
+may look to a file to retrieve its IP address, a port number to run some
+server on, etc...&nbsp; Without this information, the application would
+be unable to do its job.&nbsp; The file contains data that is configured
+as name/value pairs; where the name is read by the application code as
+an identifier of the string following the name.&nbsp; Extending the example
+then, the file may have an entry like this...</font>
+<blockquote>
+<blockquote>
+<blockquote><tt>IPADD: 135.3.94.10</tt></blockquote>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Since the monitor has an
+editor, it is feasible that administration of this parameter be handled
+by allowing the user to edit the file to change the IP address.&nbsp; Unfortunately,
+this allows the user to change the value to <i>135.3.abc.def</i> and no
+error would be detected until the application tried to use this parameter.&nbsp;
+Another forseeable error would be that the name was accidentally changed...
+IPDD: 135.3.94.10.&nbsp; This too would confuse the application code.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The data-driven editor
+solves this by requiring some additional information be added to the <i>name:value</i>
+pair declaration.&nbsp; After the last character of the name and prior
+to the colon, an optional set of parens can be added to establish attributes
+that are applicable to that particular entry in the file.&nbsp; Then instead
+of using an editor to modify the file, a program (from hereon referred
+to as ddedit) is run that can parse the parameters and only allow modifications
+that the parameters define as being legal. The new line would be as follows...</font>
+<blockquote>
+<blockquote>
+<blockquote><tt>IP_ADD(prompt=IP Address of system|ipa): 123.45.67.89</tt></blockquote>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The attributes within the
+parenthesis are pipe delimited and in this case provide ddedit with a prompt
+to feed the user when asking for a new value and information about what
+type of entry syntax to accept (in this case ipa, or IP address type).&nbsp;
+Following is an example of a more complicated file that could be edited
+by ddedit.&nbsp; The comments explain the attributes...</font>
+<blockquote><tt>#</tt>
+<br><tt># This is an example data file that can be edited by dedit().</tt>
+<br><tt># Notice that all lines that are not starting with a '#' or are</tt>
+<br><tt># not entirely blank, are lines that are processed by dedit().</tt>
+<br><tt># The format of each line is</tt>
+<br><tt>#</tt>
+<br><tt># NAME(attribute1|attribute2|attributeN): Value</tt>
+<br><tt>#</tt>
+<br><tt># Where the data enclosed within the parenthesis (including the
+parens</tt>
+<br><tt># themselves) is optional; but, if present, provides some information</tt>
+<br><tt># about how that particular line can be processed by dedit().</tt>
+<br><tt>#</tt>
+<br><tt># Current attributes are:</tt>
+<br><tt># * prompt=string</tt>
+<br><tt>#&nbsp;&nbsp;&nbsp; where "string" is some string of characters
+that is used in place</tt>
+<br><tt>#&nbsp;&nbsp;&nbsp; of the name to prompt the user for a new value.</tt>
+<br><tt># * ipa: input is IP address</tt>
+<br><tt># * mac: input is MAC address</tt>
+<br><tt># * rng: input is a numeric range</tt>
+<br><tt># * ipr: input is an IP range</tt>
+<br><tt># * num: input is numeric</tt>
+<br><tt># * str: input simple string</tt>
+<br><tt># * del: line can be deleted by user if only whitespace is entered</tt>
+<br><tt># * mul: user can create additional entries of this name and type</tt>
+<br><tt># * 232: line is a colon-delimited set of RS-232 parameters...</tt>
+<br><tt>#&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; baudrate:data_bits:parity:stop_bits:flow_control</tt>
+<br><tt># * rdo: line is read-only</tt>
+<br><tt>#</tt>
+<br><tt>#</tt>
+<br><tt>SYS_NAME(prompt=Name of the system): iad</tt>
+<br><tt>IP_ADD(prompt=IP Address of system|ipa): 123.45.67.89</tt>
+<br><tt>MAC_ADD(prompt=MAC address of system|mac): 11:22:33:44:55:66</tt>
+<br><tt>FR_CHAN_RNG(prompt=Range of channels for framerelay|rng): 1-8</tt>
+<br><tt>VT_CHAN_RNG(prompt=Range of channels for voice|rng): 9-24</tt>
+<br><tt>DHCP_IP_RANGE(prompt=IP range for DHCP server|ipr):1.2.3.4-5.6.7.8</tt>
+<br><tt>SERIAL1(prompt=Serial port #1|232): 19200:8:even:1:none</tt>
+<br><tt>MULTIPLE_ENTRY(prompt=Multiple Entry Parameter|mul): last entry</tt>
+<br><tt>READONLY(rdo): Ha_Ha_You_Can't_Change_Me!</tt>
+<br><tt>CANT_DELETE_NUMBER(num): 99</tt>
+<br><tt>CAN_DELETE_NUMBER(num|del): 88</tt>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>&nbsp;</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+</body>
+</html>

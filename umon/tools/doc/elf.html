@@ -1,0 +1,159 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: elf</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<hr WIDTH="100%">
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ELF</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">elf</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Extract information from or compress
+sections of an ELF file.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">elf [-a:B:cfMm:P:sS:vz] {elf_filename}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool is one of three tools
+(coff, elf &amp; aout) that basically perform the same tasks, but on different
+file formats.&nbsp; It&nbsp; allows the user to dump different portions
+of the file header to stdout in a readable format.&nbsp; Also, future plans
+include support for using zlib to compress each of the .text and .data
+sections so that TFS can store a compressed file in flash and decompress
+directly from TFS to the absolute-linked location for the application to
+run in.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a {filename}</font></li>
+
+<br><font face="Arial,Helvetica">append file to end of -S file;</font>
+<li>
+<font face="Arial,Helvetica">-B {bin_filename}</font></li>
+
+<br><font face="Arial,Helvetica">convert file (elf_filename) to binary
+(bin_filename) for transfer to absolute memory space;</font>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">BE-to-LE convert... By default, this tool
+assumes the elf file was built with big-endian control structures.&nbsp;
+This option will convert to little endian control structures.</font>
+<li>
+<font face="Arial,Helvetica">-f</font></li>
+
+<br><font face="Arial,Helvetica">show ELF file header;</font>
+<li>
+<font face="Arial,Helvetica">-M</font></li>
+
+<br><font face="Arial,Helvetica">show ELF map with file offsets;</font>
+<li>
+<font face="Arial,Helvetica">-m</font></li>
+
+<br><font face="Arial,Helvetica">show ELF map without file offsets;</font>
+<li>
+<font face="Arial,Helvetica">-P {pad-byte}</font></li>
+
+<br><font face="Arial,Helvetica">by default, 0xff is used, this provides
+an override;</font>
+<li>
+<font face="Arial,Helvetica">-s</font></li>
+
+<br><font face="Arial,Helvetica">show ELF section headers;</font>
+<li>
+<font face="Arial,Helvetica">-S {filename}</font></li>
+
+<br><font face="Arial,Helvetica">strip to specified file</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose (debug) mode</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">print the time/date the tool was built</font>
+<li>
+<font face="Arial,Helvetica">z {zip level}</font></li>
+
+<br><font face="Arial,Helvetica">compress the COFF sections using zlib
+compression level "zip level".&nbsp; Refer to <a href="../../tfs.html#decompression">TFS
+decompression</a> for more details on this.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">If, after running this tool, some type of
+file error (read, write, lseek, etc...) occurs, it is likely that the executable
+being operated on was built with control structures of a different endian-type.&nbsp;
+Try re-running with the -c option.</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">elf -z6 app</font></li>
+
+<br><font face="Arial,Helvetica">Compress the elf file "app" using zlib
+compression level 6.&nbsp; The output is placed in the file app.ezip.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/elf.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/elf">Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+</ul>
+
+</body>
+</html>

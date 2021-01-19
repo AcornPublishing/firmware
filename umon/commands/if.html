@@ -1,0 +1,188 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: IF</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>IF</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">if</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Conditional test with branching.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">if -[t:] [{arg1} {compare} {arg2}]
+{action} else {action}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">To support scripting capability
+through TFS files, this commands allows the user to build conditional tests
+that result it branches to different points within a executable script.&nbsp;
+The most common use of this is to make a string or numerical comparison
+between two different arguments.&nbsp; If the -t option is specified, then
+that overrides the basic comparison and the argument to -t is considered
+to be the test.</font><font face="Arial,Helvetica"></font>
+<p><b><font face="Arial,Helvetica">Numerical comparisons:</font></b>
+<blockquote>
+<li>
+<font face="Arial,Helvetica">gt</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is greater than arg2</font>
+<li>
+<font face="Arial,Helvetica">lt</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is less than arg2</font>
+<li>
+<font face="Arial,Helvetica">le</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is less than or equal to
+arg2</font>
+<li>
+<font face="Arial,Helvetica">ge</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is greater than or equal
+to arg2</font>
+<li>
+<font face="Arial,Helvetica">eq</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is equal to&nbsp; arg2</font>
+<li>
+<font face="Arial,Helvetica">ne</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 is not equal to arg2</font></blockquote>
+<b><font face="Arial,Helvetica">Logical comparisons:</font></b>
+<blockquote>
+<li>
+<font face="Arial,Helvetica">and</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 AND arg2 is non-zero</font>
+<li>
+<font face="Arial,Helvetica">or</font></li>
+
+<br><font face="Arial,Helvetica">true if arg1 OR arg2 is non-zero</font></blockquote>
+<b><font face="Arial,Helvetica">String comparisons:</font></b>
+<blockquote>
+<li>
+<font face="Arial,Helvetica">seq</font></li>
+
+<br><font face="Arial,Helvetica">true if the string of arg1 is identical
+to the string of arg2</font>
+<li>
+<font face="Arial,Helvetica">sne</font></li>
+
+<br><font face="Arial,Helvetica">true if the string of arg1 is not identical
+to the string of arg2</font></blockquote>
+<b><font face="Arial,Helvetica">Actions:</font></b>
+<blockquote>
+<li>
+<font face="Arial,Helvetica">goto tag</font></li>
+
+<br><font face="Arial,Helvetica">Jump to the location in the script specified
+by "tag".</font>
+<li>
+<font face="Arial,Helvetica">gosub tag</font></li>
+
+<br><font face="Arial,Helvetica">Call the subroutine specified by "tag"</font>
+<li>
+<font face="Arial,Helvetica">return</font></li>
+
+<br><font face="Arial,Helvetica">Return from the currently active subroutine.</font>
+<li>
+<font face="Arial,Helvetica">exit</font></li>
+
+<br><font face="Arial,Helvetica">Terminate the currently active script.</font></blockquote>
+</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-t {testtype}</font></li>
+
+<br><font face="Arial,Helvetica">override the default "arg1 compare arg2"
+comparison;</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; testtypes:</font>
+<br>&nbsp;
+<center><table COLS=2 WIDTH="80%" >
+<tr>
+<td WIDTH="20%"><font face="Arial,Helvetica">gc</font></td>
+
+<td><font face="Arial,Helvetica">"gotchar"... a character is present on
+the UART interface</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">ngc</font></td>
+
+<td><font face="Arial,Helvetica">"not-gotchar"... a character is not present
+on the UART interface</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">iscmp {filename}</font></td>
+
+<td><font face="Arial,Helvetica">"is-compressed"... specified file is compressed</font></td>
+</tr>
+</table></center>
+</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">if $VAR1 seq $STR1 goto MATCH</font></li>
+
+<br><font face="Arial,Helvetica">if the string contained within $VAR1 is
+the same as the string contained in $STR1 then branch to the line containing
+the tag 'MATCH'.</font>
+<li>
+<font face="Arial,Helvetica">if -t gc goto GOT_ONE</font></li>
+
+<br><font face="Arial,Helvetica">if there is a character pending on the
+UART interface, branch to the line containing the tag 'GOT_ONE'.</font>
+<li>
+<font face="Arial,Helvetica">if -t iscmp app_file gosub COMPRESSED</font></li>
+
+<br><font face="Arial,Helvetica">if the file "app_file" is compressed,
+then call the subroutine 'COMPRESSED'.</font>
+<li>
+<font face="Arial,Helvetica">if $VAR seq \$VAR goto VAR_NOT_SET</font></li>
+
+<br><font face="Arial,Helvetica">If the shell variable 'VAR' does not exist,
+branch to the subroutine 'VAR_NOT_SET'</font></ul>
+
+</body>
+</html>

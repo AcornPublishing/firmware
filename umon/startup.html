@@ -1,0 +1,508 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: STARTUP</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a></h1></center>
+
+<center>
+<hr WIDTH="100%"></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>System Startup</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica">The following discussion focuses on the
+options provided by the monitor for system startup.&nbsp; This text references
+an embedded system project that uses Micro Monitor as the base platform.&nbsp;
+As such, it is providing an example, not a single fixed method of bootup.</font>
+<p><font face="Arial,Helvetica"><a href="#bootup_sequence">The Startup-up
+Sequence</a></font>
+<br><font face="Arial,Helvetica"><a href="#Stage_1">Stage 1: The monrc
+file</a></font>
+<br><font face="Arial,Helvetica"><a href="#Stage_2">Stage 2: A top-level
+startup script</a></font>
+<br><font face="Arial,Helvetica"><a href="#no_monrc_file">If monrc doesn't
+exist...</a></font>
+<br><font face="Arial,Helvetica"><a href="#factory_mac">Factory-installed
+MAC address</a></font>
+<br><font face="Arial,Helvetica"><a href="#example1">Startup Example</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<hr WIDTH="100%">
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="bootup_sequence"></a><font face="Arial,Helvetica">The
+Startup Sequence</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp; There
+can potentially be multiple stages of startup in a system that uses MicroMonitor
+as its base platform.&nbsp; The initial stage is for the monitor itself
+and all subsequent stages are established by the user based on the content
+of <a href="tfs.html#attributes">auto-bootable files</a> found in TFS.&nbsp;
+This page discusses the initial stage and an example stage 2.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="Stage_1"></a><font face="Arial,Helvetica">Stage
+1: The monrc file</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In this stage, the system is taken from a hard reset state to a point where
+it is able to communicate with a host to retrieve system configuration
+information or it may just startup in a standalone mode with all the configuration
+parameters it needs on-board.&nbsp; After a hard-reset, the monitor firmware
+runs the lowest levels of initialization, and prior to starting its peripherals,
+it attempts to execute a&nbsp; script file called "monrc".&nbsp; This file,
+like any other run-control file, is used to allow the monitor to establish
+some of its basic configuration at startup.&nbsp; It allows the same monitor
+program to start up in different ways based on the content of the file.&nbsp;
+The monrc file is automatically executed by the monitor in the early stages
+of system startup.&nbsp; It is the only executable file in TFS that is
+automatically executed at startup despite the fact that it is not flagged
+as an auto-bootable file.&nbsp; Typically, the only thing that is in this
+file is a few <i><a href="commands/set.html">set</a></i> commands.&nbsp;
+They are used to establish things like the IP and MAC addresses (shell
+variable names: IPADD and ETHERADD respectively); but other things (like
+a <i><a href="commands/sleep.html">sleep</a> -l,</i> setting <i><a href="commands/pio.html">pio</a></i>
+lines, etc) can be put in the monrc file so that the board boots up with
+its own personality without the need to recompile a unique monitor per
+system.&nbsp;<b> It is&nbsp; important to be aware of the fact that when
+the monitor executes the monrc file it is still in the process of initializing
+itself.</b>&nbsp; The monitor has not yet turned up its own ethernet interface
+(the ethernet driver will use the content of shell variables ETHERADD and
+IPADD to configure itself), so the monrc file should contain only the most
+basic startup sequences as mentioned above, anything beyond this basic
+stuff should be done with an auto-bootable script, outside the context
+of monrc execution.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The value loaded into the IPADD shell variable is typically going to be
+some IP address, but the monitor also supports automatic boot-up using
+BOOTP or DHCP (automatic allocation mode only).&nbsp; If the content of
+IPADD is the string "DHCP", then the monitor will broadcast a DHCP_DISCOVER
+request.&nbsp; If the content of the IPADD shell variable is the string
+"BOOTP", then the monitor will initiate a BOOTP broadcast.&nbsp; The monitor
+can be built to run a <a href="commands/dhcp.html">DHCP client</a> in several
+different ways.&nbsp; With either DHCP or BOOTP, the result of the handshake
+is that some shell variables are loaded and possibly a file has been downloaded
+and executed.&nbsp; Note that for both the "DHCP" and "BOOTP" string loaded
+into the IPADD shell variable, if the character 'v' or 'V' is appended
+to the string (ie.. DHCPv, DHCPV, BOOTPv or BOOTPV) a low (v) or high (V)
+level of verbosity is enabled during the DHCP/BOOTP handshake.&nbsp; One
+final note regarding the IPADD shell variable...&nbsp; if it is loaded
+with "0.0.0.0", this tells the monitor to not startup the ethernet driver
+at all.&nbsp; It can then be restarted later in a script by re-assigning
+the IPADD shell variable and issuing the "ether on" and (optionally) the
+"dhcp" commands.</font></blockquote>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+During development, we usually don't need (or want) the BOOTP/DHCP server
+to complicate things, so the monrc file would be loaded with a real IP
+address (along with <a href="shellvars.html#shellvars_used">all of the
+other environment variables that are typically established by DHCP or BOOTP</a>)
+and the board doesn't use DHCP.&nbsp; <i>Note that this is all configurable
+based on the content of this small ASCII file resident on the target, there
+is no recompilation of the monitor or application to acquire the per-board
+uniqueness.</i>&nbsp; Following are a few example monrc files with shell
+variable settings that apply to specific applications...</font>
+<h4>
+<i><font face="Arial,Helvetica">Monrc file example #1</font></i></h4>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This example establishes the information needed by the Packet Phone Adapter
+for configuration without the requirement of a DHCP server (note that the
+IPADD setting is an IP address, not the DHCP string).</font>
+<blockquote><tt><font face="Arial,Helvetica">set ETHERADD 00:60:1D:02:09:9B</font></tt>
+<br><tt><font face="Arial,Helvetica">set IPADD 135.3.131.87</font></tt>
+<br><tt><font face="Arial,Helvetica">set GIPADD 135.3.130.1</font></tt>
+<br><tt><font face="Arial,Helvetica">set NETMASK 255.255.254.0</font></tt>
+<br><tt><font face="Arial,Helvetica">set PROXY_IP 208.3.248.167</font></tt>
+<br><tt><font face="Arial,Helvetica">set LINE0_NUMBER 2072221113</font></tt>
+<br><tt><font face="Arial,Helvetica">set CODER PCM</font></tt>
+<br><tt><font face="Arial,Helvetica">set CODERCTL 0000</font></tt>
+<br><tt><font face="Arial,Helvetica">set MIN_NET_DELAY 30</font></tt>
+<br><tt><font face="Arial,Helvetica">set MAX_NET_DELAY 150</font></tt></blockquote>
+
+<h4>
+<i><font face="Arial,Helvetica">Monrc file example #2</font></i></h4>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This example establishes the basic bootup information needed by the target
+so that it retrieves its configuration information from the DHCP server.&nbsp;
+Note that the DHCP client code that comes with the monitor is in two parts:
+generic code and application specific hooks.&nbsp; For the PPA, there are
+hooks added to support the retrieval of several different vendor-specific
+options unique to the PPA application.&nbsp; The mechanism used by the
+PPA, although specific to that application, is very re-usable for other
+sets of vendor-specific options, and this code is available for reference.&nbsp;
+The current DHCP client code is set up so that in most cases there is no
+need to modify the monitor source code; howerver, if source code modification
+is necessary, then hooks have been installed into the common code (<a href="src/common/monitor/dhcpboot.c.html">dhcpboot.c</a>)
+that allow the user to add target-specific extensions&nbsp;&nbsp;&nbsp;&nbsp;
+(<a href="src/common/monitor/dhcp_00.c.html">dhcp_00.c</a>) without touching
+the common source code.</font>
+<br>&nbsp;
+<blockquote><tt><font face="Arial,Helvetica">set ETHERADD 00:60:1D:02:09:9B</font></tt>
+<br><tt><font face="Arial,Helvetica">set IPADD DHCP</font></tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="Stage_2"></a></font>Stage
+2: A top level startup script</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Once the monitor has run the monrc file, it will then complete its own
+initialization based on the presence (or lack of) <a href="shellvars.html#shellvars_used">shell
+variables</a>.&nbsp; The monitor will then run through the files in TFS
+looking for any other auto-bootable, executable file. In the case of the
+PPA, the only auto-bootable file will be the PPAgo script.&nbsp; Using
+the <a href="scripts.html">scripting capabilities of the monitor</a>, the
+PPAgo file is the top-level application file resident on the PPA.&nbsp;
+The actual PPA application code is not even auto-bootable; rather, it is
+started up through this auto-bootable PPAgo script.&nbsp; The script is
+responsible for completion of the DHCP handshake, getting the current ICMP
+timestamp, determining if the current application resident on the PPA is
+up to date; and if not, kicking off a TFTP transfer to get the latest one.</font>
+<br>&nbsp;
+<blockquote><tt># Packet Phone Adapter (PPA) Startup Script</tt>
+<br><tt># Poll the IPADD shell variable until DHCP has completed.</tt>
+<br><tt># If after 8 seconds, DHCP has not completed, then reset.</tt>
+<p><tt>set go</tt>
+<br><tt>set retry 0</tt>
+<br><tt>set APPNAME ppaapp.str</tt>
+<p><tt># DO_DHCP:</tt>
+<br><tt>sleep 1</tt>
+<br><tt>if $retry gt 8 goto DHCP_FAIL</tt>
+<br><tt>set -i retry</tt>
+<br><tt>if $IPADD seq DHCP goto DO_DHCP</tt>
+<br><tt>if $IPADD seq DHCPV goto DO_DHCP</tt>
+<br><tt>if $IPADD seq DHCPv goto DO_DHCP</tt>
+<br><tt># Uncomment these next 2 lines for ICMP Timestamp...</tt>
+<br><tt>#set TIMESTAMP</tt>
+<br><tt>#icmp -d -5 -fd -v TIMESTAMP time $PROXY_IP</tt>
+<br><tt>goto DO_TFTP</tt>
+<p><tt># DHCP_FAIL:</tt>
+<br><tt>echo DHCP Failed, trying again...</tt>
+<br><tt># RESET:</tt>
+<br><tt>reset</tt>
+<p><tt># DO_TFTP:</tt>
+<br><tt># If the APPINFO variable is set, then assume the</tt>
+<br><tt># DHCP server is supplying enough information for us to</tt>
+<br><tt># decide whether or not we want to update the current</tt>
+<br><tt># application...</tt>
+<br><tt>if $APPINFO seq \$APPINFO goto DO_BOOT</tt>
+<br><tt>TFS info $APPNAME INFO</tt>
+<br><tt>if $INFO seq $APPINFO goto DO_BOOT</tt>
+<br><tt>TFS rm $APPNAME</tt>
+<br><tt>TFS rm errlog</tt>
+<br><tt>TFS clean</tt>
+<br><tt>TFTP -feA -F $APPNAME -i $APPINFO $TFTPSRVR get $BOOTFILE 0x10000</tt>
+<br><tt>TFS info $APPNAME INFO</tt>
+<br><tt>if $INFO sne \$INFO goto DO_BOOT</tt>
+<br><tt>echo TFTP Failed, trying again...</tt>
+<br><tt>reset</tt>
+<p><tt># DO_BOOT:</tt>
+<br><tt># Setup the BOOT LINE used by VxWorks:</tt>
+<br><tt>fm 0x10000 0x10100 0</tt>
+<br><tt>pm -s 0x10000 "mbc(0,0) e=" $IPADD</tt>
+<p><tt># Query user to kick off the application...</tt>
+<br><tt># If query times out, then start ppa...</tt>
+<br><tt>echo Start PPA with IP $IPADD ?\c</tt>
+<br><tt>read -t1000 go</tt>
+<br><tt>if $go sne \$go goto END</tt>
+<p><tt># Start application:</tt>
+<br><tt># If application does not exist, restart.</tt>
+<br><tt>set go</tt>
+<br><tt>set retry</tt>
+<br><tt>TFS info $APPNAME INFO</tt>
+<br><tt>if $INFO seq \$INFO goto RESET</tt>
+<br><tt>echo</tt>
+<br><tt>echo Turning control over to $APPNAME ...</tt>
+<br><tt>ether off</tt>
+<br><tt>$APPNAME&nbsp; # (This will not return.)</tt>
+<p><tt># END</tt></blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="no_monrc_file"></a><font face="Arial,Helvetica">If
+monrc doesn't exist...</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+As discussed above, the monitor will look to the monrc file for boot-up
+parameters.&nbsp; If the monitor boots up and does not find a monrc file,
+it will make one additional attempt at it by looking for "monrc.bak".&nbsp;
+This is done to provide protection from the cases where a system is updating
+its monrc file... While updating it, copy the old version to monrc.bak,
+then if somehow the target crashes in the middle of the update, the monitor
+will still have the monrc.bak file to boot from.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+What happens if both monrc and monrc.bak do not exist?&nbsp; The flash
+used by the file system is not necessarily protected; hence, there is the
+possibility of the monitor booting up and TFS being empty or the monrc
+file just not being there.&nbsp; Assuming the target has an ethernet interface,
+the two most important parameters that the target must get from somewhere
+are the MAC address and IP address.&nbsp;&nbsp; For the MAC address, there
+will probably be some non-volatile storage device (typically serial EEPROM)
+that will be loaded with the MAC address, so assuming the hardware is functional,
+even if the monrc file exists, in a final product, the MAC address is retrieved
+from some peripheral, not the monrc file (see
+<a href="#factory_mac">MAC
+storage discussion</a> below).&nbsp; If however, there is no MAC address
+stored, then the last-resort MAC address can be a hard-coded value that
+is either a MAC address or a string indicating that the target is to startup
+with ethernet disabled (see DEFAULT_ETHERADD in <a href="src/targets/target_dirname/monitor/config.h.html">config.h</a>).&nbsp;
+For the IP address, the monitor can be configured to run with a hard-coded
+(see DEFAULT_IPADD in <a href="src/targets/target_dirname/monitor/config.h.html">config.h</a>)
+IP address, BOOTP or DHCP.&nbsp; Following is a discussion of each of these
+modes...</font>
+<p><b><font face="Arial,Helvetica">Fixed IP Address Startup</font></b>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor can be configured to simply boot up with a fixed IP address
+as a last resort.&nbsp; If this is the case, then there is no server interaction
+at boot up, the monitor simply starts up with the default MAC and IP addresses.&nbsp;
+The DEFAULT_IPADD macro in config.h must be set to the appropriate IP address
+as a string.</font>
+<p><b><font face="Arial,Helvetica">Ethernet Disabled at Startup</font></b>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor can be configured to simply boot up the ethernet interface
+disabled.&nbsp; The bootup will post a warning at the console and all ethernet
+activity is disabled.&nbsp; This is done by setting the DEFAULT_ETHERADD
+macro in config.h to "ETHER_OFF".</font>
+<h3>
+<a NAME="BOOTP"></a><a NAME="DHCP"></a><b><font face="Arial,Helvetica"><font size=+1>BOOTP/DHCP
+Startup</font></font></b></h3>
+<font face="Arial,Helvetica"><b>&nbsp;&nbsp;&nbsp; </b>In this case, the
+monitor has been built with the DEFAULT_IPADD macro loaded with "BOOTP"
+or "DHCP" and will automatically broadcast the appropriate request on the
+subnet it is connected.&nbsp; For a detailed discussion of this startup
+sequence, refer to the <a href="commands/dhcp.html#dhcpdetails">dhcp</a>
+command reference.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="factory_mac"></a><font face="Arial,Helvetica">Factory
+installed MAC address</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The convenient (during development) mechanism used to assign MAC addresses
+to each target is through the monrc file using the ETHERADD shell variable.&nbsp;
+This is adequate during field trials and application development but it
+is impractical when a large number of targets are deployed.&nbsp; As mentioned
+above, the hardware will typically have some non-volatile storage device
+that allows the MAC address to be stored away.&nbsp; Following is a discussion
+on some different techniques that have been considered for a factory-installed
+MAC (and possibly IP) address.</font>
+<ul>
+<li>
+<b><font face="Arial,Helvetica">DALLAS Semiconductor UNIQUEWARE (DS2502/5/6)</font></b></li>
+
+<br><font face="Arial,Helvetica">Dallas Semiconductor makes a device that
+can be programmed in the factory (by Dallas) for an additional charge of
+about $.25 per part.&nbsp; There are a few different versions of the part
+that have varying amounts of programmable space available.&nbsp;&nbsp;
+According to Dallas technical support, a small quantity of parts can be
+ordered to verify that the data is what you want, then a larger quantity
+of parts can be ordered (note that large quantity does not necessarily
+mean tens of thousands, although it could).&nbsp; The part would then contain
+a unique 48-bit ID number followed by the data that you tell Dallas to
+put in the parts programmable memory. It will be read-only; so, unless
+the device is physically removed from the circuit board,&nbsp; it&nbsp;
+provides each board with a programmed MAC address and a guaranteed unique
+ID number that can be used as its tracking number for maintenance records.&nbsp;
+Refer to <a href="http://www.dalsemi.com/DocControl/PDFs/appindex.html">Application
+Note 99</a> at <a href="http://www.dalsemi.com">Dallas Semiconductor</a>'s
+web-site for more details.</font>
+<p><font face="Arial,Helvetica">PROs:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The data will stay with the hardware, so each
+circuit pack is guaranteed to have some unique ID and MAC address.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The&nbsp; part is small (3-pin package).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Allows a factory run of targets to be built
+with basically no concern for any uniqueness per board, the installation
+of this part&nbsp; makes it happen automatically.</font></li>
+</ul>
+<font face="Arial,Helvetica">CONs:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">The part has limited storage space.</font></li>
+</ul>
+
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">Serial EEPROM</font></b></li>
+
+<br><font face="Arial,Helvetica">Several vendors have various kinds of
+serial EEPROM ranging in storage size from bytes to Kbytes.&nbsp; A device
+like this could be used and programmed by the factory to contain MAC address
+and other project-specific information.&nbsp; Access to the device is not
+directly through a memory address, so it is unlikely that the device would
+ever be "accidentally" modified as a result of some code bug.&nbsp; There
+are probably arrangements (similar to those provided by Dallas) that can
+be made with the manufacturers of these parts as well.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">MAC (and optionally IP) in read-only section
+of flash</font></b></li>
+
+<br><font face="Arial,Helvetica">The monitor is set up to be provisioned
+with the MAC and IP address stored in locations of the boot flash that
+are conveniently accessible by factory personell that are programming the
+devices.&nbsp; This means that each flash could be loaded with a unique
+MAC and/or IP address and the monitor will deal with that.&nbsp; The sectors
+used by the monitor could be made read-only when programmed, so this would
+provide a mechanism that does not require any additional hardware, but
+each flash device would have to be uniquely programmed and the monitor
+would not be remotely updateable.</font>
+<p><font face="Arial,Helvetica">PROs:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">No additional parts involved.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Monitor already supports this.</font></li>
+</ul>
+<font face="Arial,Helvetica">CONs:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">If the monitor is made read-only so that the
+MAC cannot be overwritten, then the monitor also cannot be modified.&nbsp;
+An exception to this is that the flash boot sector could contain enough
+code to jump out of the read-only sector to the remainder of the monitor
+that would not be read-only.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Each FLASH device would have to be uniquely
+programmed.</font></li>
+</ul>
+
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">First sector(s) of TFS made read-only</font></b></li>
+
+<br><font face="Arial,Helvetica">The initial sector of flash allocated
+to TFS could be made read-only after programming of certain configuration
+files has been done.&nbsp; This supports a variety of site-dependent data
+that can be stored away as a file in TFS and accessible by the application
+(read-only).</font></ul>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+If some mechanism of making the flash read-only is used, then optionally,
+some flash devices provide a mechanism that allows a sector to be temporarily
+un-protected.&nbsp; This means that a jumper could be installed into the
+hardware to allow the read-only sectors to be writeable if necessary.&nbsp;
+In the case of the serial EEPROM, a layer of software protection can be
+added if access to the EEPROM is only made through the command line of
+the monitor... One command can be used to open a protection window, and
+a second command can be used to actually make the EEPROM modifications
+only if the protection window is opened.&nbsp; This eliminates any one
+leg of code from being accidentally called to modify EEPROM content.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The point of this whole discussion is that the monc file can provide a
+convenient means of storage for the MAC address during development, but
+it is not a practical means for product deployment (unless it is made read-only),
+so plan ahead!</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="example1"></a><font face="Arial,Helvetica">Startup
+Example:</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This section discusses another example of a bootup scenerio that doesn't
+use BOOTP or DHCP but still has the ability to intelligently re-download
+its application and even a new monitor if necessary.&nbsp; The first script,
+called <i>Go</i>, is an autobootable script that simply retreives a second
+script (called S<i>ysStart</i>) and executes it.&nbsp; The second script
+is where the smarts are.&nbsp; Note that this example assumes that the
+final application (called SysApp) is simply an executable script (flags
+= 'e').&nbsp; For a real application, the flags are likely to be different.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The idea here is that all targets are loaded with the "Go" script, then
+as the application and/or monitor changes, the content of the "SysStart"
+script is modified on the TFTP server to cause a new download of the appropriate
+file (monitor and/or application).&nbsp; Note that this does cause a TFTP
+file transfer to be done on every reset; but, it does not cause any excessive
+wear on the flash because TFS is smart enough to NOT touch the flash if
+the file being added is identical to what is already there.</font>
+<p><b><font face="Arial,Helvetica">The "Go" script:</font></b>
+<blockquote><tt>#</tt>
+<br><tt># Go:</tt>
+<br><tt># Startup script for system...</tt>
+<br><tt># Retrieve the SysStart script from the TFTP server and run it.</tt>
+<br><tt># The logic in that script will do the rest.&nbsp; Note that if
+the</tt>
+<br><tt># shell variable BOOTSRVR is populated (possibly from earlier</tt>
+<br><tt># BOOTP or DHCP transaction) then use it; else load a default.</tt>
+<br><tt>#</tt>
+<br><tt>if $BOOTSRVR sne \$BOOTSRVR goto GETFILE</tt>
+<br><tt>set BOOTSRVR 135.3.94.76</tt>
+<p><tt># GETFILE:</tt>
+<br><tt>tftp -F SysStart -fe $BOOTSRVR get SysStart</tt>
+<p><tt>SysStart</tt></blockquote>
+<b><font face="Arial,Helvetica">The "SysStart" script:</font></b>
+<blockquote><tt>#</tt>
+<br><tt># SysStart:</tt>
+<br><tt># This script is part of a 2-phase bootup in which the system</tt>
+<br><tt># retrieves this file from a tftp server and uses the logic in</tt>
+<br><tt># this script to determine if the monitor and/or the application</tt>
+<br><tt># needs to be downloaded.&nbsp; The content of the following three</tt>
+<br><tt># shell variables must be adjusted on the server to reflect the</tt>
+<br><tt># content of the monitor.bin and SysApp files also on the server...</tt>
+<br><tt>#</tt>
+<br><tt>set INFO 10/14/99&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Date of application build on server</tt>
+<br><tt>set MONBUILD 10/13/99@09:56:38&nbsp; # Date of monitor build on
+server</tt>
+<br><tt>set MONSIZE 129356&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Size of monitor binary on server</tt>
+<p><tt># If the current build date of the monitor ($MONITORBUILT) does</tt>
+<br><tt># not match the build date of the monitor binary that is available</tt>
+<br><tt># on the server ($MONBUILD), then download a new monitor...</tt>
+<br><tt># Note1: the "<a href="commands/flash.html">flash ewrite</a>" command
+executes out of RAM, so it is legal to</tt>
+<br><tt># modify the boot flash with this command.</tt>
+<br><tt># Note2: after the "ewrite" command executes, a new monitor</tt>
+<br><tt># is installed and the target resets.&nbsp; The next pass through
+this</tt>
+<br><tt># script (as a result of the reset) would miss this step</tt>
+<br><tt># because the content of MONBUILD will match MONITORBUILT.</tt>
+<br><tt>#</tt>
+<br><tt>if $MONBUILD seq $MONITORBUILT goto GOTMONITOR</tt>
+<br><tt>tftp $BOOTSRVR get monitor.bin</tt>
+<br><tt>if $TFTPGET ne $MONSIZE goto GOTMONITOR</tt>
+<br><tt>echo Updating monitor, size = $TFTPGET...</tt>
+<br><tt>flash opw</tt>
+<br><tt>flash ewrite $BOOTROMBASE $APPRAMBASE $TFTPGET</tt>
+<p><tt># GOTMONITOR:</tt>
+<br><tt># If the info field of the current application does not match</tt>
+<br><tt># the info field of the application available on the server</tt>
+<br><tt># ($INFO), then download a new application...</tt>
+<br><tt>#</tt>
+<br><tt>tfs info SysApp APPINFO</tt>
+<br><tt>if $APPINFO seq $INFO goto GO_APP</tt>
+<br><tt>tftp -f e -F SysApp -i $INFO $BOOTSRVR get SysApp</tt>
+<p><tt># GO_APP:</tt>
+<br><tt># Kick off the application...</tt>
+<br><tt>SysApp</tt>
+<p><tt># Should not get here!</tt>
+<br><tt>reset</tt>
+<br>&nbsp;</blockquote>
+</blockquote>
+
+</body>
+</html>

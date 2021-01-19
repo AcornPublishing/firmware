@@ -1,0 +1,917 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tfscli.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tfscli.c:
+ *  This file contains the TFS code that is only needed if the "tfs" command
+ *  is included in the command set.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "cli.h"
+
+#if INCLUDE_TFSCLI
+
+/* tfsprflags():
+ *   Print the specified set of flags.
+ */
+static void
+<A NAME="tfsprflags">tfsprflags</A>(long flags, int verbose)
+{
+    struct  tfsflg  *tfp;
+
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Flags: ");
+    tfp = tfsflgtbl;
+    while(tfp-&gt;sdesc) {
+        if ((flags & tfp-&gt;mask) == tfp-&gt;flag) {
+            if (verbose) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s", tfp-&gt;ldesc);
+                if ((tfp+1)-&gt;flag)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(", ");
+            }
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(tfp-&gt;sdesc);
+        }
+        tfp++;
+    }
+    if (!(flags & TFS_NSTALE)) 
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("stale");
+    
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+}
+
+static char *
+<A NAME="tfsmodebtoa">tfsmodebtoa</A>(ulong mode,char *buf)
+{
+    char    *pipe, *bp;
+
+    pipe = "";
+    bp = buf;
+    *bp = 0;
+    if (mode & TFS_RDONLY) {
+        bp += <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(bp,"rdonly");
+        pipe = "|";
+    }
+    if (mode & TFS_CREATE) {
+        bp += <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(bp,"%screate",pipe);
+        pipe = "|";
+    }
+    if (mode & TFS_APPEND)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(bp,"%sappend",pipe);
+
+    return(buf);
+}
+
+/* tfsld():
+ *  If the filename specified is AOUT, COFF or ELF, then load it.
+ */
+static int
+<A NAME="tfsld">tfsld</A>(char *name,int verbose,int verifyonly)
+{
+    int     err;
+    TFILE   *fp;
+
+    err = TFS_OKAY;
+    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(name);
+
+    if (!fp)
+        return (TFSERR_NOFILE);
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())
+        return(TFSERR_USERDENIED);
+
+    if (fp-&gt;flags & TFS_EBIN) {
+        long    entry;
+
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsloader.c.html#tfsloadebin>tfsloadebin</A>(fp,verbose,&entry,verifyonly);
+        if (err == TFS_OKAY) {
+            char buf[16];
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"0x%lx",entry);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("ENTRYPOINT",buf);
+        }
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("ENTRYPOINT",0);
+    }
+    else {
+        err = TFSERR_BADHDR;
+    }
+    
+    return(err);
+}
+
+/* listfilter():
+ *  If the incoming filename (fname) passes the incoming filter, then
+ *  return 1; else return 0.
+ *
+ *  Examples:
+ *      if filter is "*.html" and fname is "index.html" return 1.
+ *      if filter is "dir SLASH ASTERISK" and fname is "dir/abc" return 1.
+ *      if filter is "abc" and fname is "abc" return 1.
+ *
+ *  Notes:
+ *      * A valid filter will have the asterisk as either the first or last
+ *        character of the filter.  If first, assume filter is a suffix, 
+ *        if last (or none at all), assume filter is a prefix.
+ *      * If there is an asterisk in the middle of the filter, it is chopped
+ *        at the asterisk without warning.
+ */
+static int
+<A NAME="listfilter">listfilter</A>(char *filter,char *fname)
+{
+    int     flen;
+    char    *prefix, *suffix, *asterisk, *sp;
+
+    if (!filter)        /* No filter means match everything. */
+        return(1);
+
+    flen = 0;
+    prefix = suffix = (char *)0;
+    asterisk = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(filter,'*');
+
+    /* If no asterisk, then just compare filter to fname... */
+    if (!asterisk) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(filter,fname))
+            return(1);
+    }
+    else if (asterisk == filter) {
+        suffix = asterisk+1;
+        flen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(suffix);
+        sp = fname + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(fname) - flen;
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(suffix,sp))
+            return(1);
+    }
+    else {
+        *asterisk = 0;
+        prefix = filter;
+        flen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(prefix);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(prefix,fname,flen)) {
+            *asterisk = '*';
+            return(1);
+        }
+        *asterisk = '*';
+    }
+    return(0);
+}
+
+/* tfsvlist():  verbose list...
+ *  Display all files currently stored.  Do not put them in alphabetical
+ *  order; display them as they are physically listed in the file system.
+ *  Display complete structure of file header for each file.
+ *  Note1: This version of file listing is only called if "tfs -vv ls"
+ *  or "tfs -vvv ls" is called.  The first level of verbosity is handled
+ *  by tfsqlist to simply display the "dot" files.
+ */
+static int
+<A NAME="tfsvlist">tfsvlist</A>(char *filter[], int verbose, int more)
+{
+    TDEV    *tdp;
+    TFILE   *fp;
+    int     tot, sizetot;
+    char    tbuf[32], **fltrptr;
+
+    tot = 0;
+    sizetot = 0;
+    for(tdp=tfsDeviceTbl;tdp-&gt;start != TFSEOT;tdp++) {
+        fltrptr = filter;
+        while(1) {
+            fp = (TFILE *)tdp-&gt;start;
+            while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#validtfshdr>validtfshdr</A>(fp)) {
+                int start_sector, end_sector;
+
+                if ((<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_DELETED>TFS_DELETED</A>(fp)) && (verbose &lt; 3)) {
+                    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#nextfp>nextfp</A>(fp,tdp);
+                    continue;
+                }
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#listfilter>listfilter</A>(*fltrptr,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp))) {
+                    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#nextfp>nextfp</A>(fp,tdp);
+                    continue;
+                }
+                if ((fp-&gt;flags & TFS_UNREAD) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp)&gt;getUsrLvl())) {
+                    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#nextfp>nextfp</A>(fp,tdp);
+                    continue;
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Name:  '%s'%s\n",
+                    fp-&gt;name,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_DELETED>TFS_DELETED</A>(fp) ? " (deleted)" : "");
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Info:  '%s'\n", fp-&gt;info);
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_FILEEXISTS>TFS_FILEEXISTS</A>(fp))
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsprflags>tfsprflags</A>(fp-&gt;flags, 1);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Addr:  0x%lx (hdr @ 0x%lx, nxtptr = 0x%lx)\n",
+                    (ulong)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp)),(ulong)fp,(ulong)(fp-&gt;next));
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Size:  %ld bytes",fp-&gt;filsize);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#addrtosector>addrtosector</A>((char *)fp,&start_sector,0,0);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#addrtosector>addrtosector</A>((char *)fp+fp-&gt;filsize+TFSHDRSIZ,&end_sector,0,0);
+                if (start_sector == end_sector) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" (in sector %d)\n",start_sector);
+                }
+                else {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" (spanning sectors %d-%d)\n",
+                        start_sector,end_sector);
+                }
+                sizetot += (fp-&gt;filsize + TFSHDRSIZ + DEFRAGHDRSIZ);
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_TIME>TFS_TIME</A>(fp) != TIME_UNDEFINED)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Time:  %s\n",
+                        tfsGetAtime(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_TIME>TFS_TIME</A>(fp),tbuf,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(tbuf)));
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+                tot++;
+                fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#nextfp>nextfp</A>(fp,tdp);
+                if ((more) && ((tot % more) == 0)) {
+                    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>())
+                        return(TFS_OKAY);
+                }
+            }
+            /* If this or the next pointer is null, terminate loop now... */
+            if (!*fltrptr) break;
+            fltrptr++;
+            if (!*fltrptr) break;
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Total: %d accessible file%s (%d bytes).\n",
+        tot,tot == 1 ? "" : "s",sizetot);
+    return (TFS_OKAY);
+}
+
+/* tfsqlist():  quick list...
+ *  Display list of files in alphabetical order.
+ *  Display only the name and flag summary.
+ *
+ *  To support listing of files in a bit of an orderly manner, if this
+ *  function sees that a filename has a slash in it, it will only print the
+ *  characters upto and including the first slash.  This gives the appearance
+ *  of a directory structure, even though there really isn't one.
+ *  For example, if there are three files...
+ *          CONFIG/file1
+ *          CONFIG/file2
+ *          CONFIG/file3
+ *  then if no filter is specified, then that listing will be replaced with
+ *          CONFIG/
+ *  printed only once.  To display all the files prefixed with CONFIG/, the
+ *  user must type "tfs ls CONFIG/\*".
+ *  
+ *  Note: a file with a leading dot ('.') is invisible unless verbose is set.
+ */
+static int
+<A NAME="tfsqlist">tfsqlist</A>(char *filter[], int verbose, int more)
+{
+    TFILE   *fp;
+    char    dirname[TFSNAMESIZE+1], tmpname[TFSNAMESIZE+1];
+    char    *name, fbuf[16], **fltrptr, *slash, *flags;
+    int     idx, sidx, filelisted, err, sizetot;
+
+    if ((err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsreorder>tfsreorder</A>()) &lt; 0)
+        return(err);
+
+    filelisted = 0;
+    sizetot = 0;
+    dirname[0] = 0;
+    fltrptr = filter;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" Name                        Size   Location   Flags  Info\n");
+    while(1) {
+        idx = 0;
+        while((fp = tfsAlist[idx])) {
+            name = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp);
+            if (((name[0] == '.') && (!verbose)) ||
+                (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#listfilter>listfilter</A>(*fltrptr,name)) ||
+                ((fp-&gt;flags & TFS_UNREAD) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>()))) {
+                idx++;
+                continue;
+            }
+
+            /* If name contains a slash, process it differently (but ignore */
+            /* any leading slashes) */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(tmpname,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp));
+            for(sidx=0;sidx&lt;TFSNAMESIZE;sidx++) {
+                if (tmpname[sidx] != '/')
+                    break;
+            }
+            slash = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(&tmpname[sidx],'/');
+            if (slash && !*fltrptr) {
+                char tmp;
+
+                tmp = *(slash+1);
+                *(slash+1) = 0;
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(dirname,tmpname)) {
+                    filelisted++;
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %-34s  (dir)\n",tmpname);
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(dirname,tmpname);
+                    *(slash+1) = tmp;
+                }
+                else {
+                    idx++;
+                    *(slash+1) = tmp;
+                    continue;
+                }
+            }
+            else {
+                filelisted++;
+                sizetot += <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(fp);
+                flags = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsflagsbtoa>tfsflagsbtoa</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_FLAGS>TFS_FLAGS</A>(fp),fbuf);
+                if ((!flags) || (!fbuf[0]))
+                    flags = " ";
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %-23s  %7ld  0x%08lx  %-5s  %s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp),
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(fp),(ulong)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp)),flags,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_INFO>TFS_INFO</A>(fp));
+            }
+            idx++;
+            if ((more) && !(filelisted % more)) {
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>())
+                    return(TFS_OKAY);
+            }
+        }
+        /* If this or the next pointer is null, terminate loop now... */
+        if (!*fltrptr) break;
+        fltrptr++;
+        if (!*fltrptr) break;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nTotal: %d item%s listed (%d bytes).\n",filelisted,
+        filelisted == 1 ? "" : "s",sizetot);
+    return (TFS_OKAY);
+}
+
+/* tfsrm():
+ *  Remove all files that pass the incoming filter.
+ *  This replaces the older tfs rm stuff in Tfs().
+ */
+static int
+<A NAME="tfsrm">tfsrm</A>(char *filter[])
+{
+    TFILE   *fp;
+    char    *name, **fltrptr;
+    int     idx, err, rmtot;
+
+    if ((err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsreorder>tfsreorder</A>()) &lt; 0)
+        return(err);
+
+    fltrptr = filter;
+    while (*fltrptr) {
+        idx = rmtot = 0;
+        while((fp = tfsAlist[idx])) {
+            name = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp);
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#listfilter>listfilter</A>(*fltrptr,name)) {
+                if ((err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsunlink>tfsunlink</A>(name)) != TFS_OKAY) 
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",name,(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+                rmtot++;
+            }
+            idx++;
+        }
+        /* This function will potentially delete many files, but if the */
+        /* filter doesn't match at least one file, indicate that... */
+        if (!rmtot)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: file not found\n",*fltrptr);
+        fltrptr++;
+    }
+
+    return(TFS_OKAY);
+}
+
+/* tfscat():
+ *  Print each character of the file until NULL terminate. Replace
+ *  each instance of CR or LF with CRLF.
+ */
+static void
+<A NAME="tfscat">tfscat</A>(TFILE *fp, int more)
+{
+    int i, lcnt;
+    char    *cp;
+
+    lcnt = 0;
+    cp = (char *) (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+    for(i=0;i&lt;fp-&gt;filsize;i++) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(*cp);
+        if ((*cp == '\r') || (*cp == '\n')) {
+            lcnt++;
+            if (lcnt == more) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>() == 0)
+                    break;
+                lcnt = 0;
+            }
+        }
+        cp++;
+    }
+}
+
+int
+<A NAME="dumpFhdr">dumpFhdr</A>(TFILE *fhp)
+{
+    int     crcok;
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfshdrcrc>tfshdrcrc</A>(fhp) == fhp-&gt;hdrcrc)
+        crcok = 1;
+    else
+        crcok = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("hdrsize: 0x%04x (%s)\n",fhp-&gt;hdrsize,
+        fhp-&gt;hdrsize == TFSHDRSIZ ? "ok" : "bad");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("hdrvrsn: 0x%04x\n",fhp-&gt;hdrvrsn);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("filsize: 0x%08lx\n",fhp-&gt;filsize);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("flags  : 0x%08lx\n",fhp-&gt;flags);
+#if 0
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("filcrc : 0x%08lx (%s)\n",fhp-&gt;filcrc,
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#crc32>crc32</A>((uchar *)(fhp+1),fhp-&gt;filsize) == fhp-&gt;filcrc ? "ok" : "bad");
+#else
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("filcrc : 0x%08lx\n",fhp-&gt;filcrc);
+#endif
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("hdrcrc : 0x%08lx (%s)\n",fhp-&gt;hdrcrc,crcok ? "ok" : "bad");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("modtime: 0x%08lx\n",fhp-&gt;modtime);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("next   : 0x%08lx\n",(ulong)fhp-&gt;next);
+    if (crcok) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("name   : %s\n",fhp-&gt;name);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("info   : %s\n",fhp-&gt;info ? fhp-&gt;info : "");
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("name at: 0x%08lx\n",(ulong)fhp-&gt;name);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("info at: 0x%08lx\n",(ulong)fhp-&gt;info);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("data at: 0x%08lx\n",(ulong)(fhp+1));
+    return(TFS_OKAY);
+}
+
+char *TfsHelp[] = {
+    "Tiny File System Interface",
+    "-[df:i:mv] operation [args]...",
+    "",
+    "Options:",
+    " -d    tfs device",
+    " -f    flags (see below)",
+    " -i    info",
+    " -m    enable more throttle",
+    " -v    enable verbosity",
+    " -x    set exit flag if error",
+    "",
+    "Operations:",
+    " init, stat, clean, check [var], ls [filter], ld[v] {name}",
+    " rm {filter}, cat {name}, run {name}, freemem [var], trace [lvl]",
+    " info {file} {var}, log {on|off} {msg}, size {file} {var}",
+    " ln {src} {lnk}, fhdr {addr}, uname {prefix} {var}",
+    " cp {from_name} {to_name | addr}, add {name} {src_addr} {size}",
+#if DEFRAG_TEST_ENABLED
+    "",
+    "Operations for testing TFS defragmentation:",
+    " clean {E|S|F} {tag#} {sector#}", 
+    "   E=Exit, S=SectorErase F=FlashWrite",
+    " rms {size} [exclude_file1] [exclude_file2] ...", 
+    " dhdr {address}", 
+    " dht", 
+#endif
+    "",
+    "Flags:",
+    " E=exec_binary, e=exec_script, c=compressed, l=symlink",
+    " b=run_at_boot, B=qry_run_at_boot, i=inplace_modifiable",
+    " 0-3=usrlvl_0-3, u=ulvl_unreadable",
+
+    0,
+};
+
+/* Tfs():
+ *  Entry point for the tfs command through the monitor's command line
+ *  interface.  This function provides access to most TFS functionality
+ *  through the CLI.
+ */
+
+int
+<A NAME="Tfs">Tfs</A>(int argc, char *argv[])
+{
+    TDEV    *tdp, *tdptmp;
+    TFILE   *fp;
+    TINFO   tinfo;
+    long    size;
+    int     opt, verbose, i, more, retval, setexitflag, status;
+    char    *src, *name, *info, *flags, *to, *from, *devprefix;
+    char    *arg1, *arg2, *arg3, *arg4;
+
+    tdp = 0;
+    more = 0;
+    retval = CMD_SUCCESS;
+    verbose = 0;
+    status = TFS_OKAY;
+    setexitflag = 0;
+    info = (char *)0;
+    flags = (char *)0;
+    devprefix = (char *)0;
+    while ((opt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc, argv, "d:vmf:i:x")) != -1) {
+        switch (opt) {
+        case 'd':
+            devprefix = optarg;
+            tdp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#gettfsdev_fromprefix>gettfsdev_fromprefix</A>(devprefix,1);
+            if (!tdp)
+                return(CMD_FAILURE);
+            break;
+        case 'f':
+            flags = optarg;
+            break;
+        case 'i':
+            info = optarg;
+            break;
+        case 'm':
+            more++;
+            break;
+        case 'v':
+            verbose++;
+            break;
+        case 'x':
+            setexitflag = 1;
+            break;
+        default:
+            retval = CMD_PARAM_ERROR;
+            goto done;
+        }
+    }
+
+    arg1 = argv[optind];
+    arg2 = argv[optind+1];
+    arg3 = argv[optind+2];
+    arg4 = argv[optind+3];
+
+    if (argc == optind) {
+        retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "trace") == 0) {
+        if (argc == optind + 2)
+            tfsTrace = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(arg2,0,0);
+        else if (argc == optind + 1)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Current trace mode: 0x%lx\n",tfsTrace);
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "init") == 0) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>() &lt; MAXUSRLEVEL) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_USERDENIED,0);
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsinit>_tfsinit</A>(tdp);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsclear>tfsclear</A>(tdp);
+        }
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "log") == 0) {
+        retval = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfslog.c.html#tfsLogCmd>tfsLogCmd</A>(argc,argv,optind);
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "stat") == 0) {
+        char buf[32];
+        int  opencnt;
+        struct  tfsdat *slot;
+
+        /* Display current TFS memory usage: */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemuse>tfsmemuse</A>(tdp,&tinfo,1);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFS Hdr size: %d\n",TFSHDRSIZ);
+
+        /* Display currently opened files: */
+        opencnt = 0;
+        slot = tfsSlots;
+        for (i=0;i&lt;TFS_MAXOPEN;i++,slot++) {
+            if (slot-&gt;offset &gt;= 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%3d: 0x%08lx %s %s\n",i,(ulong)(slot-&gt;base),
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsmodebtoa>tfsmodebtoa</A>(slot-&gt;flagmode,buf),slot-&gt;hdr.name);
+                opencnt++;
+            }
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Total files currently opened: %d\n",opencnt);
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "freemem") == 0) {
+        char *prefix;
+
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemuse>tfsmemuse</A>(tdp,&tinfo,0);
+        if (tdp)
+            prefix = tdp-&gt;prefix;
+        else
+            prefix = "";
+        if (argc == optind + 1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%x (%d) bytes available to TFS %s\n",
+                tinfo.memfordata,tinfo.memfordata,prefix);
+        }
+        else if (argc == optind + 2) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(arg2,"0x%x",tinfo.memfordata);
+        }
+        else 
+            retval = CMD_PARAM_ERROR;
+    }
+#if DEFRAG_TEST_ENABLED
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "dht") == 0) {
+        if (argc == optind + 1) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsclean.c.html#dumpDhdrTbl>dumpDhdrTbl</A>(0,0);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,"dht");
+        }
+        else if (argc == optind + 3) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsclean.c.html#dumpDhdrTbl>dumpDhdrTbl</A>((DEFRAGHDR *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg2,0,0),
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(arg3));
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,"dht");
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "dhdr") == 0) {
+        if (argc == optind + 2) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsclean.c.html#dumpDhdr>dumpDhdr</A>((DEFRAGHDR *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg2,0,0));
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,"dhdr");
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+#endif
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "fhdr") == 0) {
+        if (argc == optind + 2) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#dumpFhdr>dumpFhdr</A>((TFILE *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg2,0,0));
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,"fhdr");
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "info") == 0) {
+        if (argc == optind + 3) {
+            fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(arg2);
+            if ((!fp) ||
+                ((fp-&gt;flags & TFS_UNREAD) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(arg3,0);
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(arg3,fp-&gt;info);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "uname") == 0) {
+        if (argc == optind + 3) {
+            char uname[TFSNAMESIZE];
+            for(i=0;;i++) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(uname,"%s%d",arg2,i);
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(uname)) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(arg3,uname);
+                    break;
+                }
+            }
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "size") == 0) {
+        if (argc == optind + 3) {
+            fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(arg2);
+            if ((!fp) ||
+                ((fp-&gt;flags & TFS_UNREAD) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(arg3,0);
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(arg3,"%ld",fp-&gt;filsize);
+            }
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "ls") == 0) {
+        if (verbose &gt; 1)
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsvlist>tfsvlist</A>(&argv[optind+1],verbose,more &lt;&lt; 1);
+        else
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsqlist>tfsqlist</A>(&argv[optind+1],verbose,more &lt;&lt; 3);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,"ls");
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "ln") == 0) {
+        if (argc == optind+3) {
+            from = arg2;
+            to = arg3;
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfslink>tfslink</A>(from,to);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,from);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "cp") == 0) {
+        char    buf[16], linfo[TFSINFOSIZE];
+
+        if (argc == optind + 3) {
+            from = arg2;
+            to = arg3;
+            fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(from);
+            if (fp) {
+                if (!flags)
+                    flags = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsflagsbtoa>tfsflagsbtoa</A>(fp-&gt;flags,buf);
+                if (!info)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(linfo,fp-&gt;info);
+                else
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(linfo,info);
+                if ((fp-&gt;flags & TFS_UNREAD) &&
+                    (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())) {
+                    status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_USERDENIED,from);
+                }
+                else if (to[0] == '0' && to[1] == 'x') {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(to,0,16),
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp),<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(fp));
+                }
+                else {
+                    char *appram = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>();
+
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(appram,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp),<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(fp));
+                    status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(to,linfo,flags,appram,fp-&gt;filsize);
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,to);
+                }
+            }
+            else
+                status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_NOFILE,from);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "cat") == 0) {
+        if (argc &gt;= optind + 2) {
+            for(i=optind+1;i&lt;argc;i++) {
+                name = argv[i];
+                fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(name);
+                if (fp) {
+                    if ((fp-&gt;flags & TFS_UNREAD) &&
+                        (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())) {
+                        status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_USERDENIED,name);
+                    }
+                    else {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfscat>tfscat</A>(fp,more &lt;&lt; 3);   /* more times 8 */
+                    }
+                }
+                else
+                    status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_NOFILE,name);
+            }
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+#if DEFRAG_TEST_ENABLED
+    /* rms: "remove space".  Used for testing only... Keep removing files
+     * until the number of bytes freed up is greater than the argument
+     * to rms. Skip over all files listed after the first size argument.
+     * Arglist to tfs rms is...
+     *
+     *  tfs rms {SIZE} [EXCLUDEFILE1] [EXCLUDEFILE2] ...
+     *  where SIZE is the amount of space to freeup and EXCLUDEFILEN is
+     *  a filename that is not to be removed.
+     */
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "rms") == 0) {
+        if (argc &gt;= optind + 2) {
+            int insize, totsize;
+
+            totsize = 0;
+            insize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg2,0,0);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsreorder>tfsreorder</A>();
+            for(i=0;tfsAlist[i];i++) {
+                int j;
+
+                for(j=optind+1;j&lt;argc;j++) {
+                    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(tfsAlist[i]),argv[j]))
+                        break;
+                }
+                if (j != argc) {
+                    continue;
+                }
+                if (devprefix &&
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(tfsAlist[i]),devprefix,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(devprefix)))
+                    continue;
+                totsize += (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(tfsAlist[i]) + TFSHDRSIZ);
+                if (verbose)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("rms: removing %s (%ld)\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(tfsAlist[i]),
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(tfsAlist[i]) + TFSHDRSIZ);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsunlink>_tfsunlink</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(tfsAlist[i]));
+                if (totsize &gt; insize)
+                    break;
+                totsize += TFSHDRSIZ;
+            }
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+#endif
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "rm") == 0) {
+        if (argc &gt;= optind + 2) {
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsrm>tfsrm</A>(&argv[optind+1]);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,0);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "fix") == 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsclean.c.html#tfsfixup>tfsfixup</A>(verbose,1);
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "clean") == 0) {
+        int otrace;
+
+#if DEFRAG_TEST_ENABLED
+        DefragTestPoint = DefragTestSector = DefragTestType = 0;
+        if (argc == optind + 4) {
+            if (arg2[0] == 'S')
+                DefragTestType = DEFRAG_TEST_SERASE;
+            else if (arg2[0] == 'F')
+                DefragTestType = DEFRAG_TEST_FWRITE;
+            else if (arg2[0] == 'E')
+                DefragTestType = DEFRAG_TEST_EXIT;
+            else
+                return(CMD_PARAM_ERROR);
+            DefragTestPoint = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(arg3);
+            DefragTestSector = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(arg4);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Testtype=%c, Testpoint=%d, Testsector=%d\n",
+                arg2[0],DefragTestPoint,DefragTestSector);
+        }
+        else 
+#endif
+        if (argc != optind+1)
+            return(CMD_PARAM_ERROR);
+
+        /* If verbosity request is extreme, then turn on TFS trace also...
+         */
+        otrace = tfsTrace;
+        if (verbose &gt;= 5)
+            tfsTrace = 99;
+
+        /* If tdp has been set by the -d option, only defrag the affected
+         * device; else, defrag all devices...
+         */
+        for (tdptmp=tfsDeviceTbl;tdptmp-&gt;start != TFSEOT;tdptmp++) {
+            if (!tdp || (tdp == tdptmp)) {
+                status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsclean>tfsclean</A>(tdptmp,verbose+1);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,tdptmp-&gt;prefix);
+            }
+        }
+        tfsTrace = otrace;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "check") == 0) {
+        if ((argc == optind+1) && (verbose == 0))
+            verbose = 1;
+    
+        /* If tdp has been set by the -d option, only check the affected
+         * device; else, check all devices...
+         */
+        for (tdptmp=tfsDeviceTbl;tdptmp-&gt;start != TFSEOT;tdptmp++) {
+            if (!tdp || (tdp == tdptmp)) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfscheck>tfscheck</A>(tdptmp,verbose) != TFS_OKAY)
+                    status = TFSERR_CORRUPT;
+            }
+        }
+        /* If an additional argument is provided after the "check" command
+         * then assume it is a shell variable name that is to be populated
+         * with the pass/fail status of the check...
+         */
+        if (argc == optind+2)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(arg2,status == TFS_OKAY ? "PASS" : "FAIL");
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(arg1, "ld",2)) {
+        if (argc == optind + 2) {
+            int vfy = 0;
+
+            if (arg1[2] == 'v')
+                vfy = 1;
+            else if (arg1[2] != 0)
+                return(-1);
+            name = argv[optind + 1];
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfscli.c.html#tfsld>tfsld</A>(name,verbose,vfy);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,name);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "run") == 0) {
+        if (argc &gt;= optind + 2) {
+            name = argv[optind + 1];
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsrun>tfsrun</A>(&argv[optind+1],verbose);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,name);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else if (!(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(arg1, "add"))) {
+        if (argc == optind + 4) {
+            name = arg2;
+            src = (char *) <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg3, (char **) 0, 0);
+            size = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(arg4, (char **) 0, 0);
+            status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(name, info, flags, src, size);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(status,name);
+        }
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    else
+        retval = CMD_PARAM_ERROR;
+done:
+#if INCLUDE_TFSSCRIPT
+    if ((setexitflag) && ((retval == -1) || (status != TFS_OKAY)))
+        ScriptExitFlag = EXIT_SCRIPT;
+#endif
+    return(retval);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

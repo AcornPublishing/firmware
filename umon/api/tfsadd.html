@@ -1,0 +1,112 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: tfsadd</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_tfsadd()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_tfsadd()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Add a new file to TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">#include "tfs.h"</font>
+<p><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_tfsadd(char *name,
+char *info, char *flags, uchar *src, int size);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">The application can use this function
+to create a file from some block of memory without having to go through
+a typical open, write, close scenerio.&nbsp; If the file already exists,
+it will first see if the incoming data is identical to that of the file
+already in TFS; if it is, then no flash operation is performed and TFS_OKAY
+is returned.&nbsp; If there are differences, then the old file is first
+removed and the new file is added.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *name</font></li>
+
+<br><font face="Arial,Helvetica">name of the file being created.</font>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *info</font></li>
+
+<br><font face="Arial,Helvetica">content to be placed in the info field
+of the header.</font>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *flags</font></li>
+
+<br><font face="Arial,Helvetica">flags to be assigned to the file.</font>
+<li>
+<font face="Arial,Helvetica">uchar&nbsp;&nbsp;&nbsp; *src;</font></li>
+
+<br><font face="Arial,Helvetica">location of the data to become the file
+content.</font>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; size</font></li>
+
+<br><font face="Arial,Helvetica">size of the data copied to the file.</font></ul>
+<b><blink><font face="Arial,Helvetica"><font color="#CC0000">Warning:</font></font></blink></b>
+<br><font face="Arial,Helvetica"><font color="#000000">Although it is allowed,
+it is dangerous to pass a source address into this function that is within
+TFS flash space.&nbsp; This would seem to be the intuitive thing to do
+to copy one file to another; however, if a defragmentation occurs as a
+result of this addition and the source file is shifted, then the add is
+aborted and the TFSERR_FLAKEYSOURCE error code is returned.&nbsp; Whenever
+copying from one file to another, it is best to copy the source file to
+local ram space then transfer the content of the ram to tfsadd().&nbsp;
+Then, even if a defragmenatation does occur, it will not affect anything
+in the source space.</font></font>
+<br>&nbsp;
+<p><font face="Arial,Helvetica"><a href="../tfs.html#return_values">Return</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFS_OKAY if successful;
+else...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADARG</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_CORRUPT</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FILEEXISTS</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FLASHFULL</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FLASHFAILURE</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_BADCRC</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; TFSERR_FLAKEYSOURCE</font>
+<br>&nbsp;</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/tfs.c.html#tfsadd">tfs.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

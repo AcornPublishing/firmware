@@ -1,0 +1,418 @@
+<HTML>
+<HEADER>
+<TITLE>common/cpu/pio_ppc860.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* pio.c:
+ *  Support the basic ability to configure and set/clear parallel IO pins.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpuio.h"
+#include "ctype.h"
+#include "genlib.h"
+#include "mpc860.h"
+#include "arch_ppc.h"
+
+typedef unsigned char uchar;
+typedef unsigned short ushort;
+typedef unsigned long ulong;
+
+
+#define PIO_IN  1
+#define PIO_OUT 2
+#define PIO_GP  3
+#define PIO_DED 4
+#define ALL_PIO 0x7f
+
+void    pioshow(char);
+
+/* Pio():
+    Display/Configure/Modify MPC860 PIO pins.
+    Syntax
+    pio [options] {A|B|C|D} {bit #} [0|1]
+
+      For port A, bit # range = 0-15
+      For port B, bit # range = 14-31
+      For port C, bit # range = 4-15
+      For port D, bit # range = 3-15
+      Options:
+        -i  configure as in
+        -o  configure as out
+        -g  configure as gpio
+        -d  configure as dedicated
+
+    Note: recall that the PowerPC documentation reverses the order of bits
+    (for some ridiculous reason), so bit 1 in a 32 bit register corresponds
+    to 0x80000000, not 0x00000001; likewise, bit 1 in a 16 bit register is
+    0x8000, not 0x0001.
+*/
+
+extern EPPC *IMMRBase;
+
+#if INCLUDE_PIO
+
+char *PioHelp[] = {
+    "Programmable IO Interface",
+    "-[iogdw] {PortName} [bit #] [0|1]",
+    " -i   input",
+    " -o   output",
+    " -g   gpio",
+    " -d   dedicated",
+    " -w   waitonbit",
+    0,
+};
+
+int
+<A NAME="Pio">Pio</A>(argc,argv)
+int argc;
+char *argv[];
+{
+    char    portName;
+    int opt, bitnum, val, config, waitonbit, boor;
+    volatile ushort *dat16, *dir16, *par16;
+    volatile ulong  *dat32, *dir32, *par32;
+
+    dat16 = dir16 = par16 = (ushort *)0;
+    dat32 = dir32 = par32 = (ulong *)0;
+
+    /* Set IMMRBase pointing to the MPC860's internal register memory map */
+    /* (should have already been done by InitUART(), but just do it again */
+    /* to be safe). */
+    IMMRBase = (EPPC *)(ppcMfimmr() & 0xFFFF0000);
+
+    /* Show all ports: */
+    if (argc == 1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/pio_ppc860.c.html#pioshow>pioshow</A>(ALL_PIO);
+        return(0);
+    }
+
+    /* Show one port: */
+    if (argc == 2) {
+        portName = (char)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#toupper>toupper</A>(argv[optind][0]);
+        switch(portName) {
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/pio_ppc860.c.html#pioshow>pioshow</A>(portName);
+            return(0);
+        default:
+            return(-1);
+        }
+    }
+
+    config = 0;
+    waitonbit = 0;
+    boor = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"iogdw")) != -1) {
+        switch(opt) {
+        case 'o':
+            config = PIO_OUT;
+            break;
+        case 'g':
+            config = PIO_GP;
+            break;
+        case 'd':
+            config = PIO_DED;
+            break;
+        case 'i':
+            config = PIO_IN;
+            break;
+        case 'w':
+            waitonbit = 1;
+            break;
+        default:
+            return(0);
+        }
+    }
+
+    if (argc &lt; (optind+2))
+        return(-1);
+
+    portName = (char)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#toupper>toupper</A>(argv[optind][0]);
+    bitnum = (int)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind+1],(char **)0,0);
+
+    /* Clear bit-out-of-range flag, then check for bit out of range... */
+    switch(portName) {
+        case 'A':
+            if ((bitnum &lt; 0) || (bitnum &gt; 15)) 
+                boor = 1;
+            else {
+                dat16 = &IMMRBase-&gt;pio_padat;           /* data */
+                dir16 = &IMMRBase-&gt;pio_padir;           /* direction */
+                par16 = &IMMRBase-&gt;pio_papar;           /* pin assignment */
+            }
+            break;
+        case 'B':
+            if ((bitnum &lt; 14) || (bitnum &gt; 31)) 
+                boor = 1;
+            else {
+                dat32 = &IMMRBase-&gt;pip_pbdat;
+                dir32 = &IMMRBase-&gt;pip_pbdir;
+                par32 = &IMMRBase-&gt;pip_pbpar;
+            }
+            break;
+        case 'C':
+            if ((bitnum &lt; 4) || (bitnum &gt; 15)) 
+                boor = 1;
+            else {
+                dat16 = &IMMRBase-&gt;pio_pcdat;
+                dir16 = &IMMRBase-&gt;pio_pcdir;
+                par16 = &IMMRBase-&gt;pio_pcpar;
+            }
+            break;
+        case 'D':
+            if ((bitnum &lt; 3) || (bitnum &gt; 15)) 
+                boor = 1;
+            else {
+                dat16 = &IMMRBase-&gt;pio_pddat;
+                dir16 = &IMMRBase-&gt;pio_pddir;
+                par16 = &IMMRBase-&gt;pio_pdpar;
+            }
+            break;
+        default:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Invalid port: %c\n",portName);
+            return(0);
+    }
+
+    if (boor) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Bit %d out of range for port %c\n",bitnum,portName);
+        return(0);
+    }
+
+    if (waitonbit) {
+        if (argc != (optind+3)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("-w requires port, bit and value\n");
+            return(-1);
+        }
+        val = argv[optind+2][0] & 1;
+        if (portName == 'B') {
+            while(1) {
+                if ((val == 1) && (*dat32 & (ulong)(0x80000000&gt;&gt;bitnum)))
+                    break;
+                else if ((val == 0) && !(*dat32 & (ulong)(0x80000000&gt;&gt;bitnum)))
+                    break;
+            }
+        }
+        else {
+            while(1) {
+                if ((val == 1) && (*dat16 & (ushort)(0x8000 &gt;&gt; bitnum)))
+                    break;
+                else if ((val == 0) && !(*dat16 & (ushort)(0x8000 &gt;&gt; bitnum)))
+                    break;
+            }
+        }
+        return(0);
+    }
+    /* If config, then set up direction or control */
+    if (config) {
+        if (argc != (optind+2))
+            return(-1);
+        if (portName == 'B') {
+            switch(config) {
+            case PIO_OUT:
+                *dir32 |= (ulong)(0x80000000 &gt;&gt; bitnum);
+                break;
+            case PIO_IN:
+                *dir32 &= (ulong)~(0x80000000 &gt;&gt; bitnum);
+                break;
+            case PIO_GP:
+                *par32 &= (ulong)~(0x80000000 &gt;&gt; bitnum);
+                break;
+            case PIO_DED:
+                *par32 |= (ulong)(0x80000000 &gt;&gt; bitnum);
+                break;
+            }
+        }
+        else {
+            switch(config) {
+            case PIO_OUT:
+                *dir16 |= (ushort)(0x8000 &gt;&gt; bitnum);
+                break;
+            case PIO_IN:
+                *dir16 &= (ushort)~(0x8000 &gt;&gt; bitnum);
+                break;
+            case PIO_GP:
+                *par16 &= (ushort)~(0x8000 &gt;&gt; bitnum);
+                break;
+            case PIO_DED:
+                *par16 |= (ushort)(0x8000 &gt;&gt; bitnum);
+                break;
+            }
+        }
+        return(0);
+    }
+
+    /* If config is not set, then it must be a read or write request... */
+    /* If third arg is present, then write; else read. */
+    if (argc == optind+3) {
+        val = argv[optind+2][0] & 1;
+        if (portName == 'B') {
+            if (val)
+                *dat32 |= (ulong)(0x80000000 &gt;&gt; bitnum);
+            else
+                *dat32 &= (ulong)~(0x80000000 &gt;&gt; bitnum);
+        }
+        else {
+            if (val)
+                *dat16 |= (ushort)(0x8000 &gt;&gt; bitnum);
+            else
+                *dat16 &= (ushort)~(0x8000 &gt;&gt; bitnum);
+        }
+    }
+    else {          /* Read a pio bit */
+        if (portName == 'B') {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("P%c%d = %d\n",portName,bitnum,
+                (*dat32 & (ulong)(0x80000000 &gt;&gt; bitnum)) ? 1:0);
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("P%c%d = %d\n",portName,bitnum,
+                (*dat16 & (ushort)(0x8000000 &gt;&gt; bitnum)) ? 1:0);
+        }
+    }
+    return(0);
+}
+
+void
+<A NAME="pioshow">pioshow</A>(char port)
+{
+    int i;
+    ulong   mask;
+
+    if (port == 'A' || port == ALL_PIO) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PORTA bits 0-15...\n");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PAPAR: 0x%04x, PADIR: 0x%04x, PADAT: 0x%04x\n",
+            IMMRBase-&gt;pio_papar, IMMRBase-&gt;pio_padir, IMMRBase-&gt;pio_padat);
+        for (mask=0x8000,i=0;i&lt;16;i++,mask &gt;&gt;= 1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  PA%02d: %s %s %d\n",i,
+                (IMMRBase-&gt;pio_papar & mask) ? "dedicated" : "gpio",
+                (IMMRBase-&gt;pio_padir & mask) ? "output" : "input",
+                (IMMRBase-&gt;pio_padat & mask) ? 1 : 0);
+        }
+    }
+
+    if (port == 'B' || port == ALL_PIO) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nPORTB bits 14-31...\n");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PBPAR: 0x%08x, PBDIR: 0x%08x, PBDAT: 0x%08x\n",
+            IMMRBase-&gt;pip_pbpar, IMMRBase-&gt;pip_pbdir, IMMRBase-&gt;pip_pbdat);
+        for (mask=0x80000000&gt;&gt;14,i=14;i&lt;32;i++,mask &gt;&gt;= 1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  PB%02d: %s %s %d\n",i,
+                (IMMRBase-&gt;pip_pbpar & mask) ? "dedicated" : "gpio",
+                (IMMRBase-&gt;pip_pbdir & mask) ? "output" : "input",
+                (IMMRBase-&gt;pip_pbdat & mask) ? 1 : 0);
+        }
+    }
+
+    if (port == 'C' || port == ALL_PIO) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PORTC bits 4-15...\n");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PCPAR: 0x%04x, PCDIR: 0x%04x, PCDAT: 0x%04x\n",
+            IMMRBase-&gt;pio_pcpar, IMMRBase-&gt;pio_pcdir, IMMRBase-&gt;pio_pcdat);
+        for (mask=0x8000&gt;&gt;4,i=4;i&lt;16;i++,mask &gt;&gt;= 1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  PC%02d: %s %s %d\n",i,
+                (IMMRBase-&gt;pio_pcpar & mask) ? "dedicated" : "gpio",
+                (IMMRBase-&gt;pio_pcdir & mask) ? "output" : "input",
+                (IMMRBase-&gt;pio_pcdat & mask) ? 1 : 0);
+        }
+    }
+
+    if (port == 'D' || port == ALL_PIO) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PORTD bits 3-15...\n");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("PDPAR: 0x%04x, PDDIR: 0x%04x, PDDAT: 0x%04x\n",
+            IMMRBase-&gt;pio_pdpar, IMMRBase-&gt;pio_pddir, IMMRBase-&gt;pio_pddat);
+        for (mask=0x8000&gt;&gt;3,i=3;i&lt;16;i++,mask &gt;&gt;= 1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  PD%02d: %s %s %d\n",i,
+                (IMMRBase-&gt;pio_pdpar & mask) ? "dedicated" : "gpio",
+                (IMMRBase-&gt;pio_pddir & mask) ? "output" : "input",
+                (IMMRBase-&gt;pio_pddat & mask) ? 1 : 0);
+        }
+    }
+}
+#endif
+
+int
+<A NAME="pioget">pioget</A>(char port,int bitnum)
+{
+    ulong   mask;
+
+    mask = 0x8000 &gt;&gt; bitnum;
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#tolower>tolower</A>(port)) {
+        case 'a':
+            return((IMMRBase-&gt;pio_padat & (ushort)mask) ? 1:0);
+        case 'b':
+            mask = 0x80000000 &gt;&gt; bitnum;
+            return((IMMRBase-&gt;pip_pbdat & (ulong)mask) ? 1:0);
+        case 'c':
+            return((IMMRBase-&gt;pio_pcdat & (ushort)mask) ? 1:0);
+        case 'd':
+            return((IMMRBase-&gt;pio_pddat & (ushort)mask) ? 1:0);
+    }
+    return(-1);
+}
+
+void
+<A NAME="pioclr">pioclr</A>(char port,int bitnum)
+{
+    ulong   mask;
+
+    mask = 0x8000 &gt;&gt; bitnum;
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#tolower>tolower</A>(port)) {
+        case 'a':
+            IMMRBase-&gt;pio_padat &= (ushort)~mask;
+            break;
+        case 'b':
+            mask = 0x80000000 &gt;&gt; bitnum;
+            IMMRBase-&gt;pip_pbdat &= (ulong)~mask;
+            break;
+        case 'c':
+            IMMRBase-&gt;pio_pcdat &= (ushort)~mask;
+            break;
+        case 'd':
+            IMMRBase-&gt;pio_pddat &= (ushort)~mask;
+            break;
+    }
+}
+
+void
+<A NAME="pioset">pioset</A>(char port,int bitnum)
+{
+    ulong   mask;
+
+    mask = 0x8000 &gt;&gt; bitnum;
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#tolower>tolower</A>(port)) {
+        case 'a':
+            IMMRBase-&gt;pio_padat |= (ushort)mask;
+            break;
+        case 'b':
+            mask = 0x80000000 &gt;&gt; bitnum;
+            IMMRBase-&gt;pip_pbdat |= (ulong)mask;
+            break;
+        case 'c':
+            IMMRBase-&gt;pio_pcdat |= (ushort)mask;
+            break;
+        case 'd':
+            IMMRBase-&gt;pio_pddat |= (ushort)mask;
+            break;
+    }
+}
+</HTML>
+</PRE>
+</BODY>

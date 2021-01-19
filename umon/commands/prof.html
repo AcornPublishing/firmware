@@ -1,0 +1,156 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: PROF</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>PROF</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">prof</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Run-time profiler facility.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">prof -[a:h:m:s:] {operation} [args]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the user to configure the
+monitor's profiling facility for application-specific requirements.&nbsp;
+Refer to the <a href="../appnotes/profiling.html">profiling appnote</a>
+implementation details.&nbsp; The profiler is a combination of monitor
+configuration and run-time data gathering.&nbsp; The prof command is used
+to configure the profiling prior to run-time data gathering and to dump
+the statistics gathered after the runtime profiling has completed.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a {##}</font></li>
+
+<br><font face="Arial,Helvetica">address to use for statistics logging
+(default builds off of APPRAMBASE)</font>
+<li>
+<font face="Arial,Helvetica">-h {##}</font></li>
+
+<br><font face="Arial,Helvetica">minimum hit-count used when statistics
+are displayed;</font>
+<li>
+<font face="Arial,Helvetica">-m {##}</font></li>
+
+<br><font face="Arial,Helvetica">line count for output throttling (--more--)
+of displayed statistics;</font>
+<li>
+<font face="Arial,Helvetica">s {filename}</font></li>
+
+<br><font face="Arial,Helvetica">file to be used for symbolic information
+(default is "symtbl")..</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPERATIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">on</font></li>
+
+<br><font face="Arial,Helvetica">Enable runtime profiling.</font>
+<li>
+<font face="Arial,Helvetica">off</font></li>
+
+<br><font face="Arial,Helvetica">Disable runtime profiling.</font>
+<li>
+<font face="Arial,Helvetica">show</font></li>
+
+<br><font face="Arial,Helvetica">Dump the statistics of a previously run
+profiling session.</font>
+<li>
+<font face="Arial,Helvetica">init</font></li>
+
+<br><font face="Arial,Helvetica">Initialize all internal structures and
+tables.</font>
+<li>
+<font face="Arial,Helvetica">call {type} {pc} {tid}</font></li>
+
+<br><font face="Arial,Helvetica">Call the profiler function specifying
+the type ('t', 'p' or 'f') the PC value and the TID value.&nbsp; The PC
+and/or TID value may be set to zero depending on the type of profiling
+request being made.&nbsp; 't' = TID, 'f' = FUNCTION, 'p' = PC</font>
+<li>
+<font face="Arial,Helvetica">restart</font></li>
+
+<br><font face="Arial,Helvetica">Initialize all statistics gathered so
+that a configured profiling run can be restarted.</font>
+<li>
+<font face="Arial,Helvetica">tidcfg {tidtot}</font></li>
+
+<br><font face="Arial,Helvetica">Initialize the TID profiler specifying
+the number of unique TIDs to be handled.</font>
+<li>
+<font face="Arial,Helvetica">funccfg</font></li>
+
+<br><font face="Arial,Helvetica">Initialize the FUNCTION profiler from
+the symbol table file.</font>
+<li>
+<font face="Arial,Helvetica">pccfg {wid} {add} {size}</font></li>
+
+<br><font face="Arial,Helvetica">Initialize the PC profiler with instruction
+width, base address of application's .text section and the size of this
+.text section.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">icmp time 135.3.29.35</font></li>
+
+<br><font face="Arial,Helvetica">Issue an ICMP time request to server on
+135.3.29.35.</font>
+<li>
+<font face="Arial,Helvetica">icmp echo 135.3.29.39</font></li>
+
+<br><font face="Arial,Helvetica">Similar to&nbsp; ping 135.3.29.39.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">The <i>d,f,r &amp; v</i> options are for the
+time operation and <i>c</i>&nbsp; is for echo.</font></li>
+</blockquote>
+
+</body>
+</html>

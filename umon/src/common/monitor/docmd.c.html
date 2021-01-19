@@ -1,0 +1,711 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/docmd.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* docmd:
+ *  This code supports the command line interface (CLI) portion of the
+ *  monitor.  It is a table-driven CLI that uses the table in cmdtbl.c.
+ *  A limited amount of "shell-like" capabilities are supported...
+ *      shell variables, symbol-table lookup, command history,
+ *      command line editiing, command output redirection, etc...
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "cli.h"
+
+/* appCmdlist:
+ *  This is a pointer to a list of commands that can be added to the 
+ *  monitor's list by the application using addcommand().
+ */
+struct  monCommand *appCmdlist;
+
+void    paramerr(struct monCommand *);
+void    showusage(struct monCommand *);
+int     showhelp(struct monCommand *,int,int);
+void    shownextarg(struct monCommand *,char *,int,char **);
+int     expandshellvars(char *);
+int     tokenize(char *,char **);
+extern  struct monCommand cmdlist[];
+extern  char cmdUlvl[];
+
+/*  docommand():
+ *  Assume the incoming string is a null terminated character string
+ *  that is made up of whitespace delimited tokens that will be parsed
+ *  into command line arguments.  The first argument is the command name
+ *  and all following arguments (if any) are specific to that command.
+ *  Three levels of verbosity are supported:
+ *  verbose == 0        no verbosity;
+ *  verbose == 1        print the list of arguments after tokenization
+ *  verbose == 2        print the incoming string prior to processing AND
+ *                      print the list of arguments after tokenization; 
+ *                      the print of the unprocessed string is prefixed by
+ *                      a "+ " string.
+ *  The verbosity level is 0 by default, to change the level, the script
+ *  should be run with "tfs -v run script" for verbose = 1 or
+ *  "tfs -v -v run script" for verbose = 2.
+ */
+int
+<A NAME="docommand">docommand</A>(char *cmdline,int verbose)
+{
+    int ret, argc, i;
+    struct  monCommand  *cmdptr;
+    char    *ps, *argv[ARGCNT], cmdcpy[CMDLINESIZE];
+
+    if (verbose == 2)       /* Print command line prior to processing */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("+ %s\n",cmdline);
+    
+    /* Just in case an upper-level interpreter has the same command as
+     * this monitor, if the first character of the incoming command
+     * string is an underscore, just throw it away.  This allows the
+     * user to get to the monitor command that is duplicated in an
+     * upper level interpreter by preceding it with an underscore.
+     */
+    if (cmdline[0] == '_')
+        cmdline++;
+
+    /* Copy the incoming command line to a local buffer so that we can 
+     * be sure that the line is writeable; plus we do not alter the 
+     * incoming buffer.
+     */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(cmdcpy,cmdline);
+
+    /* Scan through the string, if '#' is found, terminate line if
+     * it is not preceded by a backslash.  If it is preceded by a
+     * backslash, then remove the backslash from the line and leave
+     * the rest of the line as is.
+     */
+    ps = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(cmdcpy,'#');
+    if (ps) {
+        if (*(ps-1) != '\\')
+            *ps = 0;
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(ps-1,ps);
+    }
+
+    /* If there are any instances if a dollar or percent sign within the 
+     * command line, then expand any shell variables (or symbols) that may
+     * be present.
+     */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(cmdcpy,"$%")) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#expandshellvars>expandshellvars</A>(cmdcpy) &lt; 0)
+            return(CMD_LINE_ERROR);
+    }
+
+    /* Do a redirection check after shell variable expansion.
+     * This must be done after the shell variable expansion so that we
+     * can do things like..
+     *
+     *   echo hi $APPRAMBASE,100
+     */&gt;
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/redirect.c.html#RedirectionCheck>RedirectionCheck</A>(cmdcpy) == -1)
+        return(CMD_LINE_ERROR);
+
+    /* Build argc/argv structure based on incoming command line. */
+    argc = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#tokenize>tokenize</A>(cmdcpy,argv);
+    if (argc == 0)
+        return(CMD_LINE_ERROR);
+    if (argc &lt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Command line error\n");
+        return(CMD_LINE_ERROR);
+    }
+
+    /* If verbosity is enabled, print the processed command line. */
+    if (verbose) {  
+        for(i=0;i&lt;argc;i++)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s ",argv[i]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+    }
+
+    /* Initialize static data used by getopt(). */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getoptinit>getoptinit</A>();
+
+    /* Step through the command table looking for a match between
+     * the first token of the command line and a command name.
+     */
+    cmdptr = cmdlist;
+    while(cmdptr-&gt;name) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[0],cmdptr-&gt;name) == 0)
+            break;
+        cmdptr++;
+    }
+    if (cmdptr-&gt;name) {
+        if (cmdUlvl[cmdptr-cmdlist] &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>()) {
+            return(CMD_ULVL_DENIED);
+        }
+        if ((argc &gt; 1) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[argc-1],"?") == 0)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#shownextarg>shownextarg</A>(cmdptr,cmdline,argc,argv);
+            return(CMD_PREFILL);
+        }
+        ret = cmdptr-&gt;func(argc,argv);
+
+        /* If command returns parameter error, then print the second
+         * string in that commands help text as the usage text.  If
+         * the second string is a null pointer, then print a generic
+         * "no arguments" string as the usage message.
+         */
+        if (ret == CMD_PARAM_ERROR)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#paramerr>paramerr</A>(cmdptr);
+        
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.h.html#RedirectionCmdDone>RedirectionCmdDone</A>();
+        return(ret);
+    }
+
+    /* If we get here, then the first token does not match on any of
+     * the command names in the standard command table.  Next we try
+     * the optional application-provided command table.
+     */
+    if (appCmdlist) {
+        cmdptr = appCmdlist;
+
+        while(cmdptr-&gt;name) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[0],cmdptr-&gt;name) == 0)
+                break;
+            cmdptr++;
+        }
+        if (cmdptr-&gt;name) {
+            ret = cmdptr-&gt;func(argc,argv);
+            if (ret == CMD_PARAM_ERROR)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#paramerr>paramerr</A>(cmdptr);
+
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.h.html#RedirectionCmdDone>RedirectionCmdDone</A>();
+            return(ret);
+        }
+    }
+
+
+    /* If we get here, then the first token does not match on any of
+     * the command names in ether of the command tables.  As a last
+     * resort, we look to see if the first token matches an executable
+     * file name in TFS.
+     */
+    ret = CMD_NOT_FOUND;
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(argv[0])) {
+        int err;
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsrun>tfsrun</A>(argv,verbose);
+        if (err == TFS_OKAY) {
+            ret = CMD_SUCCESS;
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",argv[0],(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+        }
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Command not found: %s\n",argv[0]);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.h.html#RedirectionCmdDone>RedirectionCmdDone</A>();
+    return(ret);
+}
+
+/* shownextarg():
+ */
+void
+<A NAME="shownextarg">shownextarg</A>(struct monCommand *cmdptr, char *cmdline, int argc, char **argv)
+{
+    char *eol;
+
+    /* Remove the question mark: */
+    eol = cmdline + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(cmdline);
+    while(eol &gt; cmdline) {
+        if (*eol == '?') {
+            *eol = 0;
+            break;
+        }
+        else
+            *eol = 0;
+        eol--;
+    }
+    if (cmdptr-&gt;clix) {
+        if (cmdptr-&gt;clix-&gt;nextarg(cmdline,argc,argv) == -1)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showusage>showusage</A>(cmdptr);
+    }
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showusage>showusage</A>(cmdptr);
+}
+
+void
+<A NAME="showusage">showusage</A>(struct monCommand *cmdptr)
+{
+    char    *usage;
+
+    usage = cmdptr-&gt;helptxt[1];
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Usage: %s %s\n",
+        cmdptr-&gt;name,*usage ? usage : "(no args/opts)");
+}
+
+void
+<A NAME="paramerr">paramerr</A>(struct monCommand *cmdptr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Command line error...\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showusage>showusage</A>(cmdptr);
+}
+
+int
+<A NAME="addcommand">addcommand</A>(struct monCommand *cmd)
+{
+    if (appCmdlist)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Overwriting appCmdlist pointer.\n");
+    appCmdlist = cmd;
+    return(0);
+}
+
+static char *
+<A NAME="shellsym_chk">shellsym_chk</A>(char type, char *string,int *size,char *buf,int bufsize)
+{
+    char    *p1, *p2, varname[CMDLINESIZE], *val;
+
+    p1 = string;
+    p2 = varname;
+    while(1) {
+        if (((*p1 &gt;= '0') && (*p1 &lt;= '9')) ||
+            ((*p1 &gt;= 'a') && (*p1 &lt;= 'z')) ||
+            ((*p1 &gt;= 'A') && (*p1 &lt;= 'Z')) ||
+            (*p1 == '_')) {
+            *p2++ = *p1++;
+        }
+        else
+            break;
+    }
+    *p2 = '\0';
+
+    if (type == '%')
+        val = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/symtbl.c.html#getsym>getsym</A>(varname,buf,bufsize);
+    else
+        val = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>(varname);
+    if (val) {
+        *size = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(varname);
+        return(val);
+    }
+    else
+        return((char *)0);
+}
+
+/* braceimbalance():
+ *  Return non-zero (the index into the src string at the point of the 
+ *  imbalance) if the incoming string does not have a balanced set
+ *  of braces; else return 0.
+ */
+static int
+<A NAME="braceimbalance">braceimbalance</A>(char *src, int *idx, int *ndp)
+{
+    int     bnest;
+    char    *base;
+
+    bnest = 0;
+    base = src;
+    while((*src) && (bnest &gt;= 0)) {
+        if (((*src == '$') || (*src == '%')) && (*(src+1) == '{')) {
+            bnest++;
+            src++;
+        }
+        else if (*src == '}')
+            bnest--;
+        else if (*src == '{') {
+            *ndp += 1;  /* Indicate that there is a brace with no '$' prefix */
+        }
+        else if (*src == '\\') {
+            if ((*(src+1) == '$') || (*(src+1) == '%') ||
+                (*(src+1) == '\\') ||
+                (*(src+1) == '{') || (*(src+1) == '}')) {
+                src++;
+            }
+        }
+        src++;
+    }
+
+    /* If there is a '{}' mismatch, bnest will be non-zero... */
+    *idx = src - base - 1;
+    return(bnest);
+}
+
+/* processprefixes():
+ *  Process the '$' for shell variables and '%' for symbols.
+ *  Look for the last '$' (or '%') in the incoming string and attempt to
+ *  make a shell variable (or symbol) substitution.  Return 0 if no '$'
+ *  (or '%') is found.  Note that '$' and '%' are processed interchangeably
+ *  to support symbols and shell variables in the same way.
+ */
+static int
+<A NAME="processprefixes">processprefixes</A>(char *src)
+{
+    int     namesize, srclen;
+    char    *base, *varname, *value;
+    char    buf[CMDLINESIZE], buf1[CMDLINESIZE];
+
+
+    base = src;
+    srclen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(src);
+
+    while(*src) {
+        if (((*src == '$') || (*src == '%')) && (*(src-1) != '\\')) {
+            varname = src+1;
+            value = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#shellsym_chk>shellsym_chk</A>(*src,varname,&namesize,buf1,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(buf1));
+            if (value) {
+                if (((srclen - namesize) + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(value)) &gt;= CMDLINESIZE) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Cmd line expansion overflow\n");
+                    return(-1);
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(buf,varname+namesize);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(varname-1,"%s%s",value,buf);
+                return(1);
+            }
+        }
+        src++;
+    }
+    return(0);
+}
+
+/* processbraces():
+ *  Look into the incoming string for the deepest set of braces and
+ *  substitute that with the value stored in the corresponding shell
+ *  variable.  Return 1 if a set of braces was processed; else 0 indicating
+ *  that all braces have been processed.  Return -1 if there is some kind
+ *  of processing error (buffer overflow).
+ */
+int
+<A NAME="processbraces">processbraces</A>(char *src)
+{
+    int     namesize, srclen, result;
+    char    *base, *cp1, *cp2, *varname, *value, type;
+    char    buf[CMDLINESIZE], buf1[CMDLINESIZE], buf2[CMDLINESIZE];
+
+    type = 0;
+    base = src;
+    varname = src;
+    srclen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(src);
+
+    while(*src) {
+        if (((*src == '$') || (*src == '%')) && (*(src+1) == '{')) {
+            type = *src;
+            varname = src+2;
+            src++;
+        }
+        else if (*src == '}') {
+            cp1 = varname;
+            cp2 = buf1;
+            while(cp1 &lt; src)
+                *cp2++ = *cp1++;
+            *cp2 = 0;
+            while((result = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#processprefixes>processprefixes</A>(buf1)) == 1);
+            if (result == -1)
+                return(-1);
+
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(buf,src);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(varname,"%s%s",buf1,buf);
+            value = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#shellsym_chk>shellsym_chk</A>(type,varname,&namesize,buf2,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(buf2));
+            /* If the shellvar or symbol exists, replace it; else remove it. */
+            if (value) {
+                if (((srclen-(namesize+3))+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(value)+1) &gt; CMDLINESIZE) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Cmd line expansion overflow\n");
+                    return(-1);
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(buf1,varname+namesize+1);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(varname-2,"%s%s",value,buf1);
+            }
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(varname-2,src+1);
+            }
+            return(1);
+        }
+        else if (*src == '\\') {
+            if ((*(src+1) == '$') || (*(src+1) == '%') ||
+                (*(src+1) == '\\') ||
+                (*(src+1) == '{') || (*(src+1) == '}')) {
+                src++;
+            }
+        }
+        src++;
+    }
+    return(0);
+}
+
+
+/* expandshellvars():
+ *  Passed a string that is to be expanded with all shell variables converted.
+ *  This function supports variables of type $VARNAME and ${VARNAME}.
+ *  It also allows variables to be embedded within variables.  For example...
+ *  ${VAR${NAME}} will be a 2-pass expansion in which ${NAME} is evaluated
+ *  and then ${VARXXX} (where XXX is whatever was in variable NAME) is
+ *  processed.
+ */
+int
+<A NAME="expandshellvars">expandshellvars</A>(char *newstring)
+{
+    char    *cp;
+    int     result, cno, ndp;
+
+    /* Verify that there is a balanced set of braces in the incoming
+     * string...
+     */
+    ndp = 0;
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#braceimbalance>braceimbalance</A>(newstring,&cno,&ndp)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Brace imbalance @ %d%s.\n",
+            cno,ndp ? " ({ missing $ or %)" : "");
+        return(-1);
+    }
+        
+    /* Process the variable names within braces... */
+    while((result = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#processbraces>processbraces</A>(newstring)) == 1);
+    if (result == -1)
+        return(-1);
+
+    /* Process dollar signs (left-most first)...    */
+    while((result = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#processprefixes>processprefixes</A>(newstring)) == 1);
+    if (result == -1)
+        return(-1);
+
+    /* Cleanup any remaining "\{", "\}" or "\$" strings... */
+    cp = newstring+1; 
+    while(*cp) {
+        if (*cp == '{' || *cp == '}' || *cp == '$' || *cp == '%') {
+            if (*(cp-1) == '\\') {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(cp-1,cp);
+                cp -= 2;
+            }
+        }
+        cp++;
+    }
+
+    return(0);
+}
+
+/* tokenize():
+ *  Take the incoming string and create an argv[] array from that.  The
+ *  incoming string is assumed to be writeable.  The argv[] array is simple
+ *  a set of pointers into that string, where the whitespace delimited
+ *  character sets are each NULL terminated.
+ */
+int
+<A NAME="tokenize">tokenize</A>(char *string,char *argv[])
+{
+    int argc, done;
+
+    /* Null out the incoming argv array. */
+    for(argc=0;argc&lt;ARGCNT;argc++)
+        argv[argc] = (char *)0;
+
+    argc = 0;
+    while(1) {
+        while ((*string == ' ') || (*string == '\t'))
+            string++;
+        if (*string == 0)
+            break;
+        argv[argc] = string;
+        while ((*string != ' ') && (*string != '\t')) {
+            if ((*string == '\\') && (*(string+1) == '"')) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(string,string+1);
+            }
+            else if (*string == '"') {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(string,string+1);
+                while(*string != '"') {
+                    if ((*string == '\\') && (*(string+1) == '"'))
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(string,string+1);
+                    if (*string == 0)
+                        return(-1);
+                    string++;
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(string,string+1);
+                continue;
+            }
+            if (*string == 0)
+                break;
+            string++;
+        }
+        if (*string == 0)
+            done = 1;
+        else {
+            done = 0;
+            *string++ = 0;
+        }
+        argc++;
+        if (done)
+            break;
+        if (argc &gt;= ARGCNT) {
+            argc = -1;
+            break;
+        }
+    }
+    return(argc);
+}
+
+/* Help():
+ * This command displays each commands help text.
+ * The help text is assumed to be formatted as an array of strings
+ * where...
+ *  the first string is the command description;
+ *  the second string is command usage;
+ *  and all remaining strings up to the NULL are just printable text.
+ */
+
+char *HelpHelp[] = {
+        "Display command set",
+        "-[d] [commandname]",
+        "Options:",
+        " -d   list commands and descriptions",
+        0,
+};
+
+int
+<A NAME="Help">Help</A>(int argc,char *argv[])
+{
+    struct  monCommand *cptr, *acptr;
+    char    *p;
+    int     j, i, foundit, opt, descriptions;
+
+    descriptions = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"d")) != -1) {
+        switch(opt) {
+        case 'd':
+            descriptions = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    cptr = cmdlist;
+    if (argc == optind) {
+        foundit = 1;
+        if (descriptions) {
+            while(cptr-&gt;name) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(cmdlist,cptr-cmdlist,1);
+                cptr++;
+            }
+            if (appCmdlist) {
+                acptr = appCmdlist;
+                for(i=0;acptr-&gt;name;acptr++,i++)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(appCmdlist,i,1);
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+        }
+        else {
+            i = 0;
+            while(1) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(cmdlist,cptr-cmdlist,0)) {
+                    if ((++i%6) == 0)
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+                }
+                cptr++; 
+                if (cptr-&gt;name == 0L)
+                    break;
+            }
+            if (appCmdlist) {
+                acptr = appCmdlist;
+                for(j=0;acptr-&gt;name;acptr++,j++) {
+                    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(appCmdlist,j,0)) { 
+                        if ((++i%6) == 0)
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+                    }
+                }
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+        }
+    }
+    else {
+        foundit = 0;
+        p = argv[1];
+        while(cptr-&gt;name) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cptr-&gt;name,argv[1]) == 0) {
+                foundit = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(cmdlist,cptr-cmdlist,2);
+                break;
+            }
+            cptr++;
+        }
+        if (!cptr-&gt;name) {
+            if (appCmdlist) {
+                acptr = appCmdlist;
+                for(i=0;acptr-&gt;name;acptr++,i++) {
+                    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(acptr-&gt;name,argv[1]) == 0) {
+                        foundit = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showhelp>showhelp</A>(appCmdlist,i,2);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if (!foundit) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\"%s\" not found\n",argv[1]);
+        return(CMD_FAILURE);
+    }
+    return(CMD_SUCCESS);
+}
+
+/* showhelp():
+ *  Called by Help() when it is time to print out some verbosity level of
+ *  a command's help text.
+ *  if...
+ *      verbose == 2, then print all the help text;
+ *      verbose == 1, then print the command name and abstract;
+ *      verbose == 0, then print only the command name;
+ */
+int
+<A NAME="showhelp">showhelp</A>(struct monCommand *list,int index,int verbose)
+{
+    char **hp;
+    int  lcnt;
+    struct monCommand *cptr;
+
+    cptr = &list[index];
+
+    /* If the incoming command list is that of the monitor, then check
+     * for user level...
+     */
+    if ((list == cmdlist) && (cmdUlvl[index] &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>()))
+        return(0);
+
+    if (verbose == 2) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n", cptr-&gt;helptxt[0]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/docmd.c.html#showusage>showusage</A>(cptr);
+
+        lcnt = 0;
+        hp = &cptr-&gt;helptxt[2];
+        while(*hp) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",*hp++);
+            if (++lcnt == 18) {
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>())
+                    break;
+                lcnt = 0;
+            }
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nRequired user level: ");
+        if (list == cmdlist)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d\n\n",cmdUlvl[index]);
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("NA\n\n");
+    }
+    else if (verbose == 1) {
+        if (list == cmdlist)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %-12s %d %s\n", cptr-&gt;name, cmdUlvl[index],
+                cptr-&gt;helptxt[0]);
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %-12s %s\n", cptr-&gt;name,cptr-&gt;helptxt[0]);
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-12s",cptr-&gt;name);
+    }
+    return(1);
+}
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,571 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/etherdev.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* etherdev.c:
+    This file, along with common/ethernet.c supports the ethernet interface.
+    It is the lowest layer of code supporting the monitor's IP, ICMP & UDP
+    services.  This file is specific to one particular ethernet device
+    and provides the hooks needed by common/ethernet.c to initialize,
+    and transmit/receive packets in a polled environment.
+
+    The common vs device-specific code is generally noted by a naming 
+    convention where ...Ethernet... is common and ...Etherdev... is device-
+    specific.
+
+    General notice:
+    This code is part of a boot-monitor package developed as a generic base
+    platform for embedded system designs.  As such, it is likely to be
+    distributed to various projects beyond the control of the original
+    author.  Please notify the author of any enhancements made or bugs found
+    so that all may benefit from the changes.  In addition, notification back
+    to the author will allow the new user to pick up changes that may have
+    been made by other users after this version of the code was distributed.
+
+    Author: Ed Sutter
+    email:  esutter@lucent.com      (home: lesutter@worldnet.att.net)
+    phone:  908-582-2351            (home: 908-889-5161)
+*/
+#include "config.h"
+#if INCLUDE_ETHERNET
+#include "cpuio.h"
+#include "ether.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "bcsr.h"
+#include "arch_ppc.h"
+#include "mpc860.h"
+#include "masks860.h"
+
+extern  char *processARP();
+extern  EPPC *IMMRBase;
+
+#define RTS1_PB19   1
+#define RTS1_PC15   0
+
+int EtherRLCnt, EtherDEFCnt, EtherLCCnt, EtherDRVRETRYCnt;
+int eninit();
+
+static uchar xbuf[XBUFCNT][1600];   /* Transmit & receive buffers pointed */
+static uchar rbuf[RBUFCNT][1600];   /* to by the buffer descriptors. */
+
+struct  snoopinfo snoopInfo;
+struct  enet_bd *tbptr, *rbptr, *prevtbptr;
+
+/* ShowEtherdevStats():
+    Called by the command "ether stat" on the monitor's command line.
+    This function and a common ShowEthernetStats() are used to dump
+    generic as well as device-specific ethernet driver statistics.
+*/
+void
+<A NAME="ShowEtherdevStats">ShowEtherdevStats</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Driver retry count:      %d\n",EtherDRVRETRYCnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Retry_count_exceeded:    %d times\n",EtherRLCnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Late-collision count:    %d\n",EtherLCCnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Defer-indication count:  %d\n",EtherDEFCnt);
+    if (snoopInfo.on) {
+        char smac[32];
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherToString>EtherToString</A>(snoopInfo.mac,smac);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Snoop MAC:               %s\n",smac);
+    }
+}
+
+/* EtherdevStartup():
+    Called by EthernetStartup().  Initialize all device-specific 
+    counters, reset and initialized the ethernet device.
+*/
+int
+<A NAME="EtherdevStartup">EtherdevStartup</A>(int verbose)
+{
+    EtherRLCnt = 0;
+    EtherLCCnt = 0;
+    EtherDEFCnt = 0;
+    EtherDRVRETRYCnt = 0;
+    snoopInfo.on = 0;
+
+    /* Put ethernet controller in reset: */
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enreset>enreset</A>();
+
+    /* Initialize controller: */
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#eninit>eninit</A>();
+
+    return(0);
+}
+
+/* DisableEtherdev():
+    Called by DisableEthernet() to do the device-specific portion of 
+    the turn-down.
+*/
+void
+<A NAME="DisableEtherdev">DisableEtherdev</A>()
+{
+    ulong   bcsr;
+
+    bcsr = *(ulong *)BCSR1_BASE;
+    bcsr |= ETHERDISABLE;               /* Disable ethernet */
+    *(ulong *)BCSR1_BASE = bcsr;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enreset>enreset</A>();
+#if RTS1_PB19
+    IMMRBase-&gt;pip_pbpar &= ~(0x1000);    /* set port B - RTS1 = *TENA */&gt;
+#elif RTS1_PC15
+    IMMRBase-&gt;pio_pcpar &= ~(0x0001);    /* set port C - RTS1 = *TENA */&gt;
+#else
+#error
+#endif
+    IMMRBase-&gt;cpmi_cimr &= ~CIMR_SCC1;
+    EtherIsActive = 0;
+    IPMonCmdActive = 0;
+}
+
+void
+<A NAME="enreset">enreset</A>()
+{
+    int timeout;
+
+    /* Issue CPM Command to init RX/TX params for SCC1: */
+    /* (wait for completion) */
+    IMMRBase-&gt;cp_cr = 0x0001;
+    timeout = 500000;
+    while(IMMRBase-&gt;cp_cr & 0x0001) {
+        timeout--;
+        if (timeout &lt;= 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("enreset() timeout\n");
+            break;
+        }
+    }
+
+}
+
+/* eninit():
+    These steps are basically taken from the MPC860 User's Manual (rev1)
+    section 28.22 "SCC Ethernet Programming Example".
+*/
+int
+<A NAME="eninit">eninit</A>()
+{
+    ushort  mac;
+    uchar   *cp;
+    ulong   bcsr;
+    int     i, timeout;
+    struct  enet_bd *tbd, *rbd;
+
+    /* Set IMMR pointing to the MPC860's internal register memory map. */
+    IMMRBase = (EPPC *)(ppcMfimmr() & 0xFFFF0000);
+
+    /* Configure ports for ethernet... */
+    IMMRBase-&gt;si_sicr  &= 0xFFFFFF00;   /* Clear SCC1 info */
+    IMMRBase-&gt;pio_papar |=  0x0303;     /* RXD1,TXD1, CLK1, CLK2 */
+    IMMRBase-&gt;pio_padir &= ~0x0303;     /* RXD1,TXD1, CLK1, CLK2*/
+
+    bcsr = *(ulong *)BCSR4_BASE;
+    bcsr &= ~ETHLOOP;                   /* Disable loopback */
+    bcsr |= (TFPLDL | TPSQEL);          /* Disable squelch & full duplex */
+    *(ulong *)BCSR4_BASE = bcsr;
+
+    bcsr = *(ulong *)BCSR1_BASE;
+    bcsr &= ~ETHERDISABLE;              /* Enable ethernet */
+    *(ulong *)BCSR1_BASE = bcsr;
+
+    IMMRBase-&gt;si_sicr  |= 0x0000002c;   /* NMSI, recv = CLK2, xmit = CLK1 */
+
+#if RTS1_PB19
+    IMMRBase-&gt;pip_pbpar |=  0x1000;     /* RTS1 */
+    IMMRBase-&gt;pip_pbdir |=  0x1000;     /* RTS1 */
+    IMMRBase-&gt;pip_pbdat &= ~0x1000;     /* Data=0 for when RTS1 is disabled */
+#else
+    IMMRBase-&gt;pio_pcpar |=  0x0001;     /* RTS1 */
+    IMMRBase-&gt;pio_pcdir &=  ~0x0001;    /* RTS1 */
+    IMMRBase-&gt;pio_pcdat &= ~0x0001;     /* Data=0 for when RTS1 is disabled */
+#endif
+
+    IMMRBase-&gt;pio_pcpar &= ~0x0030;         /* CD1, CTS1 */
+    IMMRBase-&gt;pio_pcdir &= ~0x0030;         /* CD1, CTS1 */
+    IMMRBase-&gt;pio_pcso  |=  0x0030;         /* CD1, CTS1 */
+
+    /* Configure General SCC Mode Register for ethernet: */
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_gsmr_h = 0;
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_gsmr_l = 0x1088000c;
+
+    /* Initialize Buffer Descriptors (located in DPRAM): */
+    /* Refer to mpc860.h for the layout of DPRAM as used by MicroMonitor. */
+    tbd = tbptr = IMMRBase-&gt;qcp_or_ud.umd.e_bdtbl;
+    rbd = rbptr = &IMMRBase-&gt;qcp_or_ud.umd.e_bdtbl[XBUFCNT];
+
+    /* Set parameter ram to point to buffer descriptors in DPRAM: */
+    /* Note that this will generate a compiler warning because we are */
+    /* casting a pointer to a short. This can be ignored because these */
+    /* two entries are offsets relative to the base of the IMMR, not the */
+    /* actual address. */
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.rbase = (ushort)rbd;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.tbase = (ushort)tbd;
+
+    for (i=0;i&lt;XBUFCNT;i++,tbd++) {
+        tbd-&gt;status = 0;
+        tbd-&gt;length = 0;
+        tbd-&gt;baddr = xbuf[i];
+        if (i == (XBUFCNT-1))
+            tbd-&gt;status |= BD_WRAP; /* Set WRAP bit on final BD */
+    }
+    for(i=0;i&lt;RBUFCNT;i++,rbd++) {
+        rbd-&gt;status = BD_READY;
+        rbd-&gt;length = 0;
+        rbd-&gt;baddr = rbuf[i];
+        if (i == (RBUFCNT-1))
+            rbd-&gt;status |= BD_WRAP; /* Set WRAP bit on final BD */
+    }
+
+    /* Issue CPM Command to init RX/TX params for SCC1: */
+    /* (wait for completion) */
+    IMMRBase-&gt;cp_cr = 0x0001;
+    timeout = 500000;
+    while(IMMRBase-&gt;cp_cr & 0x0001) {
+        timeout--;
+        if (timeout &lt;= 0)
+            break;
+    }
+
+    /* Set RFCR,TFCR -- Rx,Tx Function Code */
+    /* Normal Operation and Motorola byte ordering */
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.rfcr = 0x10;  
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.tfcr = 0x10;  
+
+    /* MRBLR = MAX buffer length (first value larger than 1518 evenly */
+    /* divisible by 4). */
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.mrblr = 1520;    
+
+    /* Initialize based on example in mpc860 manual. */
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.c_pres = 0xffffffff;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.c_mask = 0xdebb20e3;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.crcec = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.alec = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.disfc = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.pads = 0x8888;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.ret_lim = 15;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.mflr = 1518;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.minflr = 64;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.maxd1 = 1520;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.maxd2 = 1520;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.gaddr1 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.gaddr2 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.gaddr3 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.gaddr4 = 0;
+
+    /* Load the PADDR registers with this board's ethernet address. */
+    cp = (uchar *)&mac;
+    cp[0] = BinEnetAddr[5];
+    cp[1] = BinEnetAddr[4];
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.paddr_h = mac;
+    cp[0] = BinEnetAddr[3];
+    cp[1] = BinEnetAddr[2];
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.paddr_m = mac;
+    cp[0] = BinEnetAddr[1];
+    cp[1] = BinEnetAddr[0];
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.paddr_l = mac;
+
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.p_per = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.iaddr1 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.iaddr2 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.iaddr3 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.iaddr4 = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.taddr_h = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.taddr_m = 0;
+    IMMRBase-&gt;PRAM[PAGE1].enet_scc.taddr_l = 0;
+
+    /* Clear any events: */
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_scce = 0xffff;
+
+    /* Enable RXF events: */
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_sccm = ENET_SCCM_RXF;
+
+    IMMRBase-&gt;cpmi_cimr |= CIPR_SCC1;
+
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_dsr = 0xd555;
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr = 0x080a;
+
+    /* 34. Enable RTS1.  Note that RTS1 can be brought out to one of two
+     * different pio pins (PC15 or PB19).
+     */
+#if RTS1_PB19
+    IMMRBase-&gt;pip_pbpar |= 0x1000;          /* Enable RTS1 on PB19 */
+    IMMRBase-&gt;pip_pbdir |= 0x1000;
+#else
+    IMMRBase-&gt;pio_pcpar |= 0x0001;          /* Enable RTS1 on PC15 */
+    IMMRBase-&gt;pio_pcdir &= ~0x0001;
+#endif
+
+    /* 35. Enable transmit/receive: */
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_gsmr_l = 0x1088003c;
+    return(0);
+}
+
+/* enselftest():
+    1. Enable ethernet interface.
+    2. Put the PHY in loopback.
+    3. Send a packet, and see if that packet is received.
+    4. Disable the ethernet interface.
+    Return 1 if passed, else -1.
+*/
+int
+<A NAME="enselftest">enselftest</A>(int verbose)
+{
+#define TESTSIZE    50
+    int     i, timeout, passed;
+    uchar   *bp;
+    ulong   bcsr4;
+    vushort event;
+    struct ether_header *te;
+    
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enreset>enreset</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#eninit>eninit</A>();
+
+    passed = 1;
+    bcsr4 = *(ulong *)BCSR4_BASE;
+    bcsr4 |= ETHLOOP;                       /* Enable loopback */
+    bcsr4 &= ~TFPLDL;                       /* Enable full duplex */
+    *(ulong *)BCSR4_BASE = bcsr4;
+
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr |= (ENET_PSMR_LPB|ENET_PSMR_FDE);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enableBroadcastReception>enableBroadcastReception</A>();
+
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_shost),BroadcastAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_dhost),BroadcastAddr,6);
+    te-&gt;ether_type = ETHERTYPE_IP;
+    bp = (uchar *)(te+1);
+    for(i=0;i&lt;TESTSIZE;i++)
+        *bp++ = (uchar )i;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ether_header)+TESTSIZE);
+
+    for(timeout=1000000;timeout&gt;0;timeout--) {
+        event = IMMRBase-&gt;scc_regs[SCC1_REG].scc_scce;
+        IMMRBase-&gt;scc_regs[SCC1_REG].scc_scce = event;
+        if (!(event & ENET_SCCE_RXF))       /* Received frame interrupt */
+            continue;
+        if(!(rbptr-&gt;status & BD_READY)) {
+            bp = rbptr-&gt;baddr;
+            bp+=<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ether_header);
+            for(i=0;i&lt;TESTSIZE;i++,bp++) {
+                if (*bp != i) {
+                    if (verbose)
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Data valid failure %02x != %02x\n",*bp,i);
+                    passed = -1;
+                    break;
+                }
+            }
+
+            /* Make the buffer ready. */
+            rbptr-&gt;status |= BD_READY;
+            break;
+        }
+    }
+    if (timeout == 0) {
+        passed = -1;
+        if (verbose)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Timed out waiting for data.\n");
+    }
+
+    bcsr4 = *(ulong *)BCSR4_BASE;
+    bcsr4 &= ~ETHLOOP;                      /* Disable loopback */
+    bcsr4 |= TFPLDL;                        /* Disable full duplex */
+    *(ulong *)BCSR4_BASE = bcsr4;
+
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr &= ~(ENET_PSMR_LPB|ENET_PSMR_FDE);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#disableBroadcastReception>disableBroadcastReception</A>();
+    if ((verbose) && (passed &gt; 0))
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Passed\n");
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#DisableEthernet>DisableEthernet</A>();
+    return(passed);
+}
+
+/* geteinbuf():
+    Get ethernet input buffer...
+    Do whatever is necessary to pull the packet out of the ethernet device
+    and pass that packet (along with the size of the packet) to the
+    processPACKET() function.
+*/
+static int
+<A NAME="geteinbuf">geteinbuf</A>()
+{
+    int cnt;
+    struct  enet_bd *rp;
+
+    cnt = 0;
+
+    /* Stay in this loop while there is an active receive buffer. */
+    /* If receive buffer is empty, just return. */
+    while(!(rbptr-&gt;status & BD_READY)) {
+
+        EtherRFRAMECnt++;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#processPACKET>processPACKET</A>((struct ether_header *)rbptr-&gt;baddr,rbptr-&gt;length);
+
+        /* Make the buffer ready. */
+        rbptr-&gt;status |= BD_READY;
+
+        /* If WRAP, then back to top; else, increment to next BD. */
+        if (rbptr-&gt;status & BD_WRAP)
+            rbptr = &IMMRBase-&gt;qcp_or_ud.umd.e_bdtbl[XBUFCNT];
+        else
+            rbptr++;
+        cnt++;
+    }
+#if 1
+    /* Make sure no other receive buffers are ready... */
+    rp = rbptr;
+    while(1) {
+        if (rp-&gt;status & BD_WRAP)
+            rp = &IMMRBase-&gt;qcp_or_ud.umd.e_bdtbl[XBUFCNT];
+        else
+            rp++;
+        if (rp == rbptr)
+            break;
+        if (!(rp-&gt;status & BD_READY))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("rbptr buffer ready out of order!\n");
+    }
+#endif
+    return(cnt);
+}
+
+/* polletherdev():
+    Called by pollethernet() to do the device-specific portion of the
+    ethernet polling.  This code is the first step in processing incoming
+    ethernet packets.  If a packet is available, the functino geteinbuf()
+    (get ethernet input buffer) is called to pass the packet to the higher
+    level processPACKET() function.
+    IMPORTANT NOTE:
+    This function MUST be re-entrant.  There is a possibility that the
+    processPACKET() function will ultimately call polletherdev() again.
+    This means that once the packet has been detected in the device, it 
+    is important that this code do whatever is necessary to assure that
+    the same packet will not be seen as available to the nested caller.
+    In other words...
+    clear the packet from the device prior to calling processPACKET().
+*/
+int
+<A NAME="polletherdev">polletherdev</A>()
+{
+    vushort event;
+    int     pcnt;
+
+    pcnt = 0;
+    event = IMMRBase-&gt;scc_regs[SCC1_REG].scc_scce;
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_scce = event;
+    if (event & ENET_SCCE_RXF) {    /* Received frame interrupt */
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#geteinbuf>geteinbuf</A>();
+        pcnt++;
+    }
+    return(pcnt);
+}
+
+/* getXmitBuffer():
+    Called by various points in the IP/UDP/ICMP code for a buffer that
+    will ultimately be the next output packet.
+*/
+uchar *
+<A NAME="getXmitBuffer">getXmitBuffer</A>()
+{
+    /* Wait for the next buffer descriptor to become available... */
+    while(tbptr-&gt;status & BD_READY);
+    return(tbptr-&gt;baddr);
+}
+
+/* sendBuffer():
+   Set the flag within the current transmit buffer descriptor indicating
+   that it is ready to be transmitted.  Then increment the BD pointer to 
+   the next buffer descriptor.
+*/
+int
+<A NAME="sendBuffer">sendBuffer</A>(int length)
+{
+    if (EtherVerbose &  SHOW_OUTGOING)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#printPkt>printPkt</A>((struct ether_header *)tbptr-&gt;baddr,length,ETHER_OUTGOING);
+
+    /* Keep stats: */
+    if (EtherXFRAMECnt) {
+        if (prevtbptr-&gt;status & BD_DEF)
+            EtherDEFCnt++;
+        if (prevtbptr-&gt;status & BD_LC)
+            EtherLCCnt++;
+        if (prevtbptr-&gt;status & BD_RL)
+            EtherRLCnt++;
+    }
+
+    EtherXFRAMECnt++;
+
+    /* Make the current transmit buffer ready and populate the length. */
+    tbptr-&gt;length = (ushort)length;
+#if 1
+    tbptr-&gt;status |= (BD_PAD | BD_READY | BD_LAST | BD_TC);
+#else
+    tbptr-&gt;status |= (BD_READY | BD_LAST | BD_TC);
+#endif
+
+    /* Keep track of this BD so that the status can be looked at when the */
+    /* next transmission is done. */
+    prevtbptr = tbptr;
+
+    /* If WRAP, then back to top; else, just increment to next BD. */
+    if (tbptr-&gt;status & BD_WRAP)
+        tbptr = IMMRBase-&gt;qcp_or_ud.umd.e_bdtbl;
+    else
+        tbptr++;
+    return(0);
+}
+
+/* Disable/Enable either broadcast or promiscuous mode... */
+
+void
+<A NAME="disableBroadcastReception">disableBroadcastReception</A>()
+{
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr |= ENET_PSMR_BRO;
+}
+
+void
+<A NAME="enableBroadcastReception">enableBroadcastReception</A>()
+{
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr &= ~ENET_PSMR_BRO;
+}
+
+void
+<A NAME="enablePromiscuousReception">enablePromiscuousReception</A>()
+{
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr |= ENET_PSMR_PRO;
+}
+
+void
+<A NAME="disablePromiscuousReception">disablePromiscuousReception</A>()
+{
+    IMMRBase-&gt;scc_regs[SCC1_REG].scc_psmr &= ~ENET_PSMR_PRO;
+}
+
+void
+<A NAME="enresetmmu">enresetmmu</A>()
+{
+}
+
+/* extGetEtherAdd() & extGetIpAdd():
+    These two functions return a char * to a string that represents an
+    IP or MAC address.  If they return NULL, then it is assumed by the
+    calling function that there is no target specific hardware that
+    contains the IP and/or MAC address.
+*/
+char *
+<A NAME="extGetEtherAdd">extGetEtherAdd</A>()
+{
+    return((char *)0);
+}
+char *
+<A NAME="extGetIpAdd">extGetIpAdd</A>()
+{
+    return((char *)0);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

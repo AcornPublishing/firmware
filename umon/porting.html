@@ -1,0 +1,230 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Porting the Monitor to a New Target</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Porting to a New Target</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">One of the design goals of this
+monitor package was to make it simple to port to new processors and target
+hardware.&nbsp; There are a few things in the monitor (timing in particular)
+which suffer a bit just to keep the porting effort to a minimum. The two
+most significant points are...</font>
+<ul>
+<li>
+<b><font face="Arial,Helvetica">The monitor does not use any interrupts
+from the CPU</font></b></li>
+
+<br><font face="Arial,Helvetica">From the porting point of view this is
+a real luxury.&nbsp; It makes it much easier to get a port to a new processor
+up and running.&nbsp; You don't have to worry about how a processor's interrupt
+handler mechanism is set up and you don't have to worry about making sure
+you save all the registers appropirately.&nbsp; Additionally, the serial
+port and ethernet drivers are much less complex because everything is polled.&nbsp;
+Not having interrupts means that it is a bit more difficult (and somewhat
+inaccurate) to deal with elapsed time.&nbsp; If you have no clock reference,
+then you don't really know how much time has passed; however, to get around
+this a bit, there is a calibration that is made by the "sleep" command
+that allows you to tweek this timing a bit.&nbsp; Still, it is admittedly
+inaccurate, but worth it.&nbsp; Keep in mind that the drivers in the monitor
+are not intended to be reused by the application anyway.&nbsp; If the overlaying
+application needs a real driver, then that application needs to provide
+it.</font>
+<li>
+<b><font face="Arial,Helvetica">The monitor code assumes that initialized
+data is not writeable</font></b></li>
+
+<br><font face="Arial,Helvetica">For bootup, the code is running out of
+flash which is non-volatile.&nbsp; The monitor does not copy any .data
+space to ram, so it too is accessed in runtime from flash.&nbsp; This means
+that the monitor's initialized data is not writeable.&nbsp; Yep, this is
+something to be aware of; but, once again, it makes the port much easier
+because now there is no need to figure out how the compiler toolset allows
+the data section to be remapped to ram space and there is no need to copy
+the data section into ram space.&nbsp; On the other hand, the monitor DOES
+assume that on startup the .bss section is initialized to zero.&nbsp; This
+is ok because it is easy to clear a block of memory regardless of the toolset.</font></ul>
+<b><font face="Arial,Helvetica">Porting details...</font></b>
+<br><font face="Arial,Helvetica">There are 4 sections of code within the
+monitor that need to be modified when porting to a new target.&nbsp; Based
+on the ports already available, some of these sections may be re-usable
+from other ports that have already been made, so it is wise to check with
+the <a href="mailto:esutter@lucent.com">author</a> prior to starting this
+work.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Code to handle CPU reset, basic exception
+handling and getting up to 'C' level (see <a href="../src/targets/target_dirname/monitor/reset.s.html">reset.s</a>
+and <a href="../src/common/monitor/start.c.html">start.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a polled serial port driver (see
+<a href="../src/targets/target_dirname/monitor/cpuio.c.html">cpuio.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a&nbsp; flash device driver (see
+<a href="../src/common/flash/flash_dirname/flashdev.c.html">flashdev.c</a>
+and <a href="../src/common/flash/flash_dirname/flashpic.c.html">flashpic.c</a>).</font></li>
+
+<li>
+<font face="Arial,Helvetica">Code for a polled ethernet driver (see <a href="../src/targets/target_dirname/monitor/etherdev.c.html">etherdev.c</a>).</font></li>
+</ul>
+<font face="Arial,Helvetica">There are currently two top-level directories
+that contain the code... the <a href="../src/common">common</a> directory
+and the <a href="../src/targets">target-specific</a> directory.&nbsp; The&nbsp;
+code under the common directory should be left untouched.&nbsp; Those files
+have been designed to interface to the target-specific code found under
+the targets/<i>targetname</i>/monitor (where <i>targetname</i> is the name
+of some target platform) directory and the common/flash/<i>flashname</i>
+(where <i>flashname</i> is some flash device name) directory.&nbsp;&nbsp;
+The only exception to this rule is if you are writing a new flash driver;
+then, a new common/flash/<i>new_flashname</i> directory would be created
+and the new drivers would be written similar to one of the existing flash
+device drivers.</font>
+<p><font face="Arial,Helvetica">When starting a port, retrieve the latest
+tar file from the author and copy it to some workspace.&nbsp; Change the
+name of the target-specific directory.&nbsp; Change the name to something
+that contains an acronym for your target followed by a string representing
+the CPU (ie.. abcsh2 is the ABC board with the Hitachi SH2 processor).&nbsp;
+Also, under the common directory, if you will be writing a new flash device
+driver, change the name of the directory containing the flash code to the
+name of the device you are going to be using.&nbsp; For the sake of this
+discussion, let's assume the target-specific directory name is ABC960 and
+the common/flash directory is 29XX32.</font>
+<p><font face="Arial,Helvetica">At this point we are ready to start modifying
+code.&nbsp; The first thing to do is to reduce the complexity of the monitor
+by turning off the majority of the features established by the ABC960/monitor/config.h
+file.&nbsp; In this file there is a block of INCLUDE_<i>FEATURE</i> macros
+(where <i>FEATURE</i> is some feature-specific string).&nbsp; Following
+is what can be used as the minimal configuration...</font>
+<br>&nbsp;
+<blockquote><tt>#define INCLUDE_MEMCMDS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1</tt>
+<br><tt>#define INCLUDE_PIO&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EDIT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DEBUG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DISASSEMBLER&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_UNPACK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_UNZIP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_ETHERNET&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFTP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_DHCPBOOT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_XMODEM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1</tt>
+<br><tt>#define INCLUDE_LINEEDIT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_FLASH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_CRYPT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSAPI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSCLEAN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_TFSSYMTBL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_TFSSCRIPT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0</tt>
+<br><tt>#define INCLUDE_TFSCLI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_GDB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_STRACE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_CAST&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_EXCTEST&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt>
+<br><tt>#define INCLUDE_IDEV&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+0</tt></blockquote>
+<font face="Arial,Helvetica">This configuration provides a very basic monitor...
+a serial port driver with xmodem for download and memory commands for interfacing
+to target memory.&nbsp; Refer to the file <a href="../src/common/monitor/inc_check.h.html">inc_check.h</a>
+for the most up-to-date list of these definitions and their meaning. The
+files that need the work now are reset.s and cpuio.c.&nbsp; If this is
+the first attempt at this processor, then spend some time looking for some
+example code from the CPU manufacturer's website.&nbsp; This is usually
+not too hard to find.&nbsp; For the very first build attempt, don't even
+worry about the exception handlers.&nbsp; Once this is working, then add
+the exception handling stuff found in ABC960/monitor/except.c and ABC960/monitor/vectors.s.</font>
+<p><font face="Arial,Helvetica">At this point, you have a basic monitor
+working.&nbsp; Next, enable INCLUDE_FLASH and start working on the files
+under common/29XX32.&nbsp; Use the current code as a model. You can use
+XMODEM to download small programs and run them by executing the "<a href="../commands/call.html">cal</a>l"
+comand.&nbsp; Once the flash driver is operational, the <a href="../commands/xmodem.html">Xmodem
+-B</a> command can be used to download new monitor binaries without the
+need for an external programmer.&nbsp;&nbsp; After that, enable INCLUDE_TFS
+and the file system stuff will be active.&nbsp; Note that there are a few
+additional configuration macros in config.h that must be established for
+TFS, plus look at ABC960/monitor/tfsdev.h to configure each of the flash
+devices within TFS.&nbsp; The final step is to enable INCLUDE_ETHERNET
+and work on the code in etherdev.c.&nbsp;&nbsp; At this point, since you
+have a working monitor with TFS, you can download small applications that
+include your ethernet code to conveniently test it out.&nbsp; That will
+give you the ethernet interface.&nbsp; Once this works, all of the other
+macros can be enabled as needed and the port is completed.</font>
+<p><b><font face="Arial,Helvetica">A few hints...</font></b>
+<ul>
+<li>
+<font face="Arial,Helvetica">It is important to <b>take little steps</b>
+when doing a port.&nbsp; The config.h INCLUDE_XXX macros allow you to do
+this.&nbsp; Don't try to build the whole platform in one shot.&nbsp; One
+step at a time will get you there a lot faster!!!</font></li>
+
+<li>
+<font face="Arial,Helvetica">Don't even enable cache if your CPU has it.&nbsp;
+Just leave it off until you have the port complete and you build up some
+confidence in what you have.</font></li>
+
+<li>
+<font face="Arial,Helvetica">In all of the driver polling loops insert
+some type of timeout.&nbsp; If the timeout occurs, depending on where it
+occurs, you can do a few different things: if the timeout occurs in a UART-related
+poll, then blink an LED, or do SOMETHING to let the outside world know
+where the code is.&nbsp; If the timeout occurs somewhere after the uart
+interface is known to be up and running, then call some simple error message
+that will print out the serial port.</font></li>
+
+<li>
+<font face="Arial,Helvetica">In the start() function, make sure that ramstart
+&amp; ramend variables are properly pointing to the beginning and end of
+the monitor-owned .bss space.&nbsp; Also, when first bringing up a new
+port, force this bss initialization to be done by defining the FORCE_BSS_INIT
+macro in config.h.</font></li>
+</ul>
+</blockquote>
+
+</body>
+</html>

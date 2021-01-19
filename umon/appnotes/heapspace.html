@@ -1,0 +1,114 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Using HEAPSPACE &amp; HEAPSIZE</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Extending the Monitor's Heap</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The monitor
+has its own memory manager (<a href="../src/common/monitor/malloc.c.html">malloc.c</a>
+&amp; <a href="../src/common/monitor/sbrk.c.html">sbrk.c)</a>.&nbsp; By
+default, the monitor is typically configured to have 8K of memory dedicated
+to the monitor's malloc.&nbsp; There are cases where this may be insufficient
+and the monitor configuration can be modified so that a larger amount of
+memory is statically allocated for this purpose.&nbsp; An alternative to
+this is to extend the space using the -X option of the <a href="../commands/heap.html">heap</a>
+command.&nbsp; This allows the monitor's default amount of memory to remain
+relatively small, but does not prohibit the ability to increase the size
+it if necessary.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Usually, a project
+will put some operating system on top of the monitor and use that OS's
+malloc; however, the monitor code itself still maintains its own small
+heap independent of the OS.&nbsp; The monitor's heap is used mostly for
+shell variable storage and a few operations in TFS, which generally don't
+need much memory.&nbsp; Larger allocations can be made if the application
+does use the monitor's malloc and also if the ZLIB code is active for decompression.&nbsp;
+Following are two examples of situations where <i>heap -X</i> would be
+used to compensate for the small amount of memory configured for use by
+the monitor's malloc, but still not require that the monitor have a large
+heap compiled in.&nbsp; Note that an alternative to the "heap -X" command
+at the monitor's command line is to use the API call <a href="../api/heapextend.html">mon_heapextend()</a>.</font></blockquote>
+
+<h1>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+2>An
+Application that uses the monitor's malloc:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Usually, an
+application has its own malloc and when it takes over the target, the monitor's
+malloc is only used by the monitor.&nbsp; This doesn't have to be the case.&nbsp;
+A small application that does not need an OS may still need some way to
+allocate memory temporarily, so <a href="../api/malloc.html">mon_malloc()</a>
+can be used for this.&nbsp; This being the case, then it is likely that
+the 8K of space compiled in as the monitor's heap will not be sufficient.&nbsp;
+This is where <b><i>heap -X {start,size}</i></b> comes in...&nbsp; In the
+monrc file (or anywhere prior to the application starting to allocate memory
+beyond the basic 8K), set up these two parameters.&nbsp; The value of <i>start</i>
+should be loaded with a starting address from which malloc will get additional
+memory and size is the size of that block of memory.&nbsp; Once this is
+done, the monitor's malloc will be able to allocated memory from that block
+of space if it cannot fulfill a request using its initial 8K of space.</font></blockquote>
+
+<h1>
+<a href="#top"><img SRC="../images/top.gif" NOSAVE height=20 width=20></a><a NAME="zlib_extend"></a><font face="Arial,Helvetica"><font size=+2>Using
+ZLIB to decompress files in TFS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The use of
+zlib to decompress is likely to need more than the basic 8K of memory that
+the monitor's heap is configured with.&nbsp; Like the above example, the
+heapsize can be increased to allow zlib to do its thing.&nbsp; This is
+good, but once zlib has completed the decompression of the application,
+it is very likely that heap extension will no longer be needed by the monitor.&nbsp;
+To compensate for this, the extension can be "de-allocated" from the monitor
+as long as there is no memory currently allocated in the space that spans
+the extension.&nbsp; For example, the heap can be extended, the executable
+decompressed into DRAM, then the heap can be "un-extended" and control
+can then be turned over to the application.&nbsp; The only obvious requirement
+is that the space into which the application is being loaded can not overlap
+with the extended heap space.&nbsp; Following is a pictorial view of the
+extended heap space and a script to extend the heap, load a compressed
+executable, "unextend" the heap and run the executable...</font></blockquote>
+
+<center><img SRC="../images/heapexpand.gif" NOSAVE height=512 width=640></center>
+
+<blockquote>
+<blockquote>
+<blockquote><tt># Extend the heap as necessary:</tt>
+<br><tt>heap -X 0x1100000,0x80000</tt>
+<p><tt># Load the application, allowing zlib to use the extended</tt>
+<br><tt># heap.&nbsp; (this will load ENTRYPOINT with the entry point of</tt>
+<br><tt># the application 'File_2'):</tt>
+<br><tt>tfs ld File_2</tt>
+<p><tt># Eliminate the heap extension:</tt>
+<br><tt>heap -x</tt>
+<p><tt># Transfer control to the entry point of</tt>
+<br><tt># the application previously loaded:</tt>
+<br><tt>call $ENTRYPOINT</tt></blockquote>
+</blockquote>
+</blockquote>
+
+<br>&nbsp;
+<br>&nbsp;
+</body>
+</html>

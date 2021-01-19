@@ -1,0 +1,107 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: ARP</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ARP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">arp</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Arp cache maintenance..</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">arp -[fp] [IP]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">ARP (address resolution protocol)
+is used to allow a network element to query the network for the ethernet
+address assigned to a known IP address.&nbsp; This command is a user interface
+hooked into the monitors basic ability to query the network for ethernet
+addresses and maintain a cache of the most recently used addresses.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-f</font></li>
+
+<br><font face="Arial,Helvetica">flush the current arp cache;</font>
+<li>
+<font face="Arial,Helvetica">-p</font></li>
+
+<br><font face="Arial,Helvetica">do not use the gateway if the IP is on
+a different subnet;</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">arp 135.3.94.136</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Returns the ethernet
+address for the network device that is assigned IP address 135.3.94.136.</font>
+<li>
+<font face="Arial,Helvetica">arp -f</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Flushes all entries
+in the arp cache.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">&nbsp;If the IP address specified is not on
+the same subnet as the PPA making the query, then the actual ethernet address
+that is loaded into the arp cache is that of the gateway.</font></li>
+
+<li>
+<font face="Arial,Helvetica">This command requires some network knowledge.&nbsp;
+In particular, it assumes that the shell variable NETMASK is loaded with
+the correct sub-net mask setting for the network the PPA is residing on.&nbsp;
+If it is determined that the IP request is for a device not on the local
+sub-net, then GIPADD must be loaded with the IP address of the gateway
+and the arp request is destined for the gateway.&nbsp; If NETMASK is not
+set, then the IP address is assumed to not exist on the same subnet.&nbsp;
+If GIPADD is not set, then the ARP request is sent to the IP address specified
+(may be picked up by the gateway, if it supports proxy arp).&nbsp; Note
+that the GIPADD is only needed if '-p' is not specified.</font></li>
+</blockquote>
+
+</body>
+</html>

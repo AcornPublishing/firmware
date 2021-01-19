@@ -1,0 +1,881 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/memcmds.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* memcmds.c:
+ *  This code allows the monitor to display, modify, search, copy and fill
+ *  memory in a variety of different ways.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "cli.h"
+#if INCLUDE_MEMCMDS
+
+/* Pm():
+ *  Put to memory.
+ *
+ *  Arguments...
+ *  arg1:       address.
+ *  arg2-argN:  data to put beginning at specified address (max of 8).
+ *
+ *  Options...
+ *  -2  access as a short.
+ *  -4  access as a long.
+ *  -f  fifo access (address does not increment).
+ *  -s  data is ascii string.
+ *  -S  data is ascii string and should be concatenated with the
+ *      string that starts at the specified address.
+ */
+
+char *PmHelp[] = {
+    "Put to Memory",
+    "-[24efsS] {addr} {val|string} [val] ...",
+    " -2   short access",
+    " -4   long access",
+    " -e   endian swap",
+    " -f   fifo mode",
+    " -s   strcpy",
+    " -S   strcat",
+    0,
+};
+
+int
+<A NAME="Pm">Pm</A>(int argc,char *argv[])
+{
+    ulong   val4, add;
+    ushort  val2;
+    uchar   val1;
+    int opt, width, ascii, fifo, i, j, concatenate, endian_swap;
+
+    width = 1;
+    ascii = fifo = 0;
+    concatenate = 0;
+    endian_swap = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"24efsS")) != -1) {
+        switch(opt) {
+        case 's':
+            ascii = 1;
+            break;
+        case 'S':
+            ascii = 1;
+            concatenate = 1;
+            break;
+        case 'e':
+            endian_swap = 1;
+            break;
+        case 'f':
+            fifo = 1;
+            break;
+        case '2':
+            width = 2;
+            break;
+        case '4':
+            width = 4;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc &lt; (optind+2))
+        return(CMD_PARAM_ERROR);
+
+    add = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);
+
+    if (ascii) {
+        if (concatenate) {          /* If concatenate, skip to */
+            while(*(uchar *)add)    /* end of string, then start. */
+                add++;
+        }
+        for(i=optind+1;i&lt;argc;i++) {
+            j = 0;
+            while(argv[i][j]) {
+                *(uchar *)add = argv[i][j++];
+                if (!fifo)
+                    add++;
+            }
+        }
+        *(uchar *)add = 0;
+        return(CMD_SUCCESS);
+    }
+    for(i=optind+1;i&lt;argc;i++) {
+        switch(width) {
+        case 1:
+            val1 = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[i],(char **)0,0);
+            *(uchar *)add = val1;
+            if (!fifo) add++;
+            break;
+        case 2:
+            val2 = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[i],(char **)0,0);
+            *(ushort *)add = endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap2>swap2</A>(val2) : val2;
+            if (!fifo) add += 2;
+            break;
+        case 4:
+            val4 = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[i],(char **)0,0);
+            *(ulong *)add = endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap4>swap4</A>(val4) : val4;
+            if (!fifo) add += 4;
+            break;
+        }
+    }
+    return(CMD_SUCCESS);
+}
+
+/* Dm():
+ *  Display memory.  
+ *
+ *  Arguments...
+ *  arg1: address to start display
+ *  arg2: if present, specifies the number of units to be displayed.
+ *
+ *  Options...
+ *  -2  a unit is a short.
+ *  -4  a unit is a long.
+ *  -b  print chars out as is (binary).
+ *  -d  display in decimal.
+ *  -e  endian-swap for short/long display.
+ *  -f  fifo-type access (address does not increment).
+ *  -m  prompt user for more.
+ *  -s  print chars out as is (binary) and terminates at a null.
+ *  -v {varname} assign last value displayed to shell var varname.  
+ *  
+ *  Defaults...
+ *  Display in hex, and unit type is byte.  
+ */
+
+char *DmHelp[] = {
+    "Display Memory",
+    "-[24bdefs] {addr} [byte-cnt]",
+    " -2   short access",
+    " -4   long access",
+    " -b   binary",
+    " -d   decimal",
+    " -e   endian swap",
+    " -f   fifo mode",
+    " -m   use 'more'",
+    " -s   string",
+    " -v {var} quietly load 'var' with element at addr",
+    0,
+};
+
+#define BD_NULL         0
+#define BD_RAWBINARY    1
+#define BD_ASCIISTRING  2
+
+int
+<A NAME="Dm">Dm</A>(int argc,char *argv[])
+{
+    int     i, count, count_rqst, width, opt, more, size, fifo;
+    int     hex_display, bin_display, endian_swap;
+    char    *varname, *prfmt, *vprfmt;
+    uchar   *cp, cbuf[16];
+    ushort  *sp;
+    ulong   *lp, add;
+
+    width = 1;
+    more = fifo = 0;
+    bin_display = BD_NULL;
+    hex_display = 1;
+    endian_swap = 0;
+    varname = (char *)0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"24bdefmsv:")) != -1) {
+        switch(opt) {
+        case '2':
+            width = 2;
+            break;
+        case '4':
+            width = 4;
+            break;
+        case 'b':
+            bin_display = BD_RAWBINARY;
+            break;
+        case 'd':
+            hex_display = 0;
+            break;
+        case 'e':
+            endian_swap = 1;
+            break;
+        case 'f':
+            fifo = 1;
+            break;
+        case 'm':
+            more = 1;
+            break;
+        case 'v':
+            varname = optarg;
+            break;
+        case 's':
+            bin_display = BD_ASCIISTRING;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc &lt; (optind+1))
+        return(CMD_PARAM_ERROR);
+
+    add = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);
+    if (hex_display)
+        vprfmt = "0x%x";
+    else
+        vprfmt = "%d";
+
+    if (argc-(optind-1) == 3) {
+        count_rqst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],(char **)0,0);
+        count_rqst *= width;
+    }
+    else
+        count_rqst = 128;
+
+    if (bin_display != BD_NULL) {
+        cp = (uchar *)add;
+        if (bin_display == BD_ASCIISTRING) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(cp);
+            if (varname) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(varname,vprfmt,cp+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(cp)+1);
+            }
+        }
+        else {
+            for(i=0;i&lt;count_rqst;i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(*cp++);
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+        return(CMD_SUCCESS);
+    }
+
+    do {
+        count = count_rqst;
+
+        if (width == 1) {
+            cp = (uchar *)add;
+            if (hex_display)
+                prfmt = "%02X ";
+            else
+                prfmt = "%3d ";
+    
+            if (varname) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(varname,vprfmt,*cp);
+            }
+            else {
+                while(count &gt; 0) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%08lx: ",(ulong)cp);
+                    if (count &gt; 16)
+                        size = 16;
+                    else    
+                        size = count;
+    
+                    for(i=0;i&lt;16;i++) {
+                        if (i &gt;= size)
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("   ");
+                        else  {
+                            cbuf[i] = *cp;
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(prfmt,cbuf[i]);
+                        }
+                        if (i == 7)
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("  ");
+                        if (!fifo)
+                            cp++;
+                    }
+                    if ((hex_display) && (!fifo)) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("  ");
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#prascii>prascii</A>(cbuf,size);
+                    }
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+                    count -= size;
+                    if (!fifo) {
+                        add += size;
+                        cp = (uchar *)add;
+                    }
+                }
+            }
+        }
+        else if (width == 2) {
+            sp = (ushort *)add;
+            if (hex_display)
+                prfmt = "%04X ";
+            else
+                prfmt = "%5d ";
+    
+            if (varname) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(varname,vprfmt,endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap2>swap2</A>(*sp) : *sp);
+            }
+            else {
+                while(count&gt;0) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%08lx: ",(ulong)sp);
+                    if (count &gt; 16)
+                        size = 16;
+                    else    
+                        size = count;
+        
+                    for(i=0;i&lt;size;i+=2) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(prfmt,endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap2>swap2</A>(*sp) : *sp);
+                        if (!fifo)
+                            sp++;
+                    }
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+                    count -= size;
+                    if (!fifo) {
+                        add += size;
+                        sp = (ushort *)add;
+                    }
+                }
+            }
+        }
+        else if (width == 4) {
+            lp = (ulong *)add;
+            if (hex_display) 
+                prfmt = "%08X  ";
+            else
+                prfmt = "%12d  ";
+            
+            if (varname) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(varname,vprfmt,endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap4>swap4</A>(*lp) : *lp);
+            }
+            else {
+                while(count&gt;0) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%08lx: ",(ulong)lp);
+                    if (count &gt; 16)
+                        size = 16;
+                    else    
+                        size = count;
+                    for(i=0;i&lt;size;i+=4) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(prfmt,endian_swap ? <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#swap4>swap4</A>(*lp) : *lp);
+                        if (!fifo)
+                            lp++;
+                    }
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+                    count -= size;
+                    if (!fifo) {
+                        add += size;
+                        lp = (ulong *)add;
+                    }
+                }
+            }
+        }
+    } while (more && <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>());
+    return(CMD_SUCCESS);
+}
+
+/* Fm():
+ *  Fill memory with user-specified data.
+ *  Syntax:
+ *      fm [options] {start} {count | finish} {value}
+ */
+
+char *FmHelp[] = {
+    "Fill Memory",
+    "-[c24] {start} {finish|byte-cnt} {value}",
+    " -c   arg2 is count (in bytes)",
+    " -2   short access",
+    " -4   long access",
+    0,
+};
+
+int
+<A NAME="Fm">Fm</A>(int argc,char *argv[])
+{
+    ulong   start, finish;
+    uchar   *cptr, cdata;
+    ushort  *wptr, wdata;
+    ulong   *lptr, ldata, error_at;
+    int width, opt, arg2iscount, err;
+
+    width = 1;
+    error_at = 0;
+    arg2iscount = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"24c")) != -1) {
+        switch(opt) {
+        case '2':
+            width = 2;
+            break;
+        case '4':
+            width = 4;
+            break;
+        case 'c':
+            arg2iscount = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    start = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);
+    finish = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],(char **)0,0);
+
+    if (arg2iscount)
+        finish = start + finish;
+
+    err = 0;
+    switch (width) {
+    case 1:
+        cdata = (uchar) <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+2],0,0);
+        for(cptr=(uchar *)start;cptr&lt;(uchar *)finish;cptr++) {
+            *cptr = cdata;
+            if (*cptr != cdata) {
+                err = 1;
+                error_at = (ulong)cptr;
+                break;
+            }
+        }
+        break;
+    case 2:
+        wdata = (ushort) <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+2],0,0);
+        for(wptr=(ushort *)start;wptr&lt;(ushort *)finish;wptr++) {
+            *wptr = wdata;
+            if (*wptr != wdata) {
+                err = 1;
+                error_at = (ulong)wptr;
+                break;
+            }
+        }
+        break;
+    case 4:
+        ldata = (ulong) <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+2],0,0);
+        for(lptr=(ulong *)start;lptr&lt;(ulong *)finish;lptr++) {
+            *lptr = ldata;
+            if (*lptr != ldata) {
+                err = 1;
+                error_at = (ulong)lptr;
+                break;
+            }
+        }
+        break;
+    }
+    if (err) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Error at 0x%lx\n",error_at);
+        return(CMD_FAILURE);
+    }
+    return(CMD_SUCCESS);
+}
+
+/* Sm():
+ *  Search memory.
+ */
+
+char *SmHelp[] = {
+    "Search Memory",
+    "-[24cnqsx] {start} {finish|byte-cnt} {srchfor}",
+    " -2   short access",
+    " -4   long access",
+    " -c   arg2 is count (in bytes)",
+    " -n   srchfor_not (NA for -s or -x)",
+    " -q   quit after first search hit",
+    " -s   string srch",
+    " -x   hexblock srch",
+        0,
+};
+
+#define SM_NORMAL       1       /* Search for 1 value */
+#define SM_STRING       2       /* Search for ascii string */
+#define SM_HEXBLOCK     3       /* Search for block of hex data */
+
+int
+<A NAME="Sm">Sm</A>(int argc,char *argv[])
+{
+    ulong   start, finish;
+    int     width, opt, i, j, mode, arg2iscount, not, quit;
+    char    *srchfor, tmp;
+    uchar   *cptr, cdata, data[32];
+    ushort  *wptr, wdata;
+    ulong   *lptr, ldata;
+
+    not = 0;
+    quit = 0;
+    width = 1;
+    arg2iscount = 0;
+    mode = SM_NORMAL;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"24cnqsx")) != -1) {
+        switch(opt) {
+        case '2':
+            width = 2;
+            break;
+        case '4':
+            width = 4;
+            break;
+        case 'c':
+            arg2iscount = 1;
+            break;
+        case 'n':
+            not = 1;                /* opposite logic SM_NORMAL only. */
+            break;
+        case 'q':
+            quit = 1;               /* quit after first [no]match */
+            break;
+        case 's':
+            mode = SM_STRING;       /* ascii string */
+            break;
+        case 'x':
+            mode = SM_HEXBLOCK;     /* hex data */
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc != optind+3)
+        return(CMD_PARAM_ERROR);
+
+    start = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);
+    finish = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],(char **)0,0);
+    if (arg2iscount)
+        finish = start + finish;
+    srchfor = argv[optind+2];
+
+    if (mode == SM_HEXBLOCK) {
+        char    *ex;
+
+        if (not)
+            return(CMD_PARAM_ERROR);
+        ex = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(srchfor,"xX");
+        if (ex)
+            srchfor=ex+1;
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(srchfor) % 2)
+            return(CMD_PARAM_ERROR);
+        for(i=0,j=0;i&lt;(sizeof data);i++,j+=2) {
+            if (srchfor[j] == 0)
+                break;
+            tmp = srchfor[j+2];
+            srchfor[j+2] = 0;
+            data[i] = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(&srchfor[j],0,16);
+            srchfor[j+2] = tmp;
+        }
+        for(cptr=(uchar *)start;cptr&lt;(uchar *)finish;cptr++) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(cptr,data,i) == 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Match @ 0x%lx\n",(ulong)cptr);
+                if (quit)
+                    break;
+            }
+        }
+        return(CMD_SUCCESS);
+    }
+    else if (mode == SM_STRING) {
+        int len;
+
+        if (not)
+            return(CMD_PARAM_ERROR);
+        len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(srchfor);
+        for(cptr=(uchar *)start;cptr&lt;(uchar *)finish;cptr++) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(cptr,srchfor,len) == 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Match @ 0x%lx\n",(ulong)cptr);
+                if (quit)
+                    break;
+            }
+        }
+    }
+    else if (width == 1) {
+        cdata = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(srchfor,(char **)0,0);
+        for(cptr=(uchar *)start;cptr&lt;(uchar *)finish;cptr++) {
+            if (not) {
+                if (*cptr != cdata) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Nomatch @ 0x%lx (0x%x)\n",(ulong)cptr,*cptr);
+                    if (quit)
+                        break;
+                }
+            }
+            else if (*cptr == cdata) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Match @ 0x%lx\n",(ulong)cptr);
+                if (quit)
+                    break;
+            }
+        }
+    }
+    else if (width == 2) {
+        wdata = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(srchfor,(char **)0,0);
+        for(wptr=(ushort *)start;wptr&lt;(ushort *)finish;wptr++) {
+            if (not) {
+                if (*wptr != wdata) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Nomatch @ 0x%lx (0x%x)\n",(ulong)wptr,*wptr);
+                    if (quit)
+                        break;
+                }
+            }
+            else if (*wptr == wdata) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Match @ 0x%lx\n",(ulong)wptr);
+                if (quit)
+                    break;
+            }
+        }
+    }
+    else {
+        ldata = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(srchfor,(char **)0,0);
+        for(lptr=(ulong *)start;lptr&lt;(ulong *)finish;lptr++) {
+            if (not) {
+                if (*lptr != ldata) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Nomatch @ 0x%lx (0x%lx)\n",(ulong)lptr,*lptr);
+                    if (quit)
+                        break;
+                }
+            }
+            else if (*lptr == ldata) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Match @ 0x%lx\n",(ulong)lptr);
+                if (quit)
+                    break;
+            }
+        }
+    }
+    return(CMD_SUCCESS);
+}
+
+/* Cm():
+ *  Copy memory.
+ *
+ *  Arguments...
+ *  arg1:       source address
+ *  arg2:       destination address
+ *  arg3:       byte count
+ *
+ *  Options...
+ *  -2  access as a short.
+ *  -4  access as a long.
+ *  -f  fifo access (address does not increment).
+ *  -v  verify (only) that the range specified, is copied.
+ */
+
+char *CmHelp[] = {
+    "Copy Memory",
+    "-[24fv] {src} {dst} {byte-cnt}",
+    " -2   short access",
+    " -4   long access",
+    " -f   fifo mode",
+    " -v   verify only",
+    0,
+};
+
+int
+<A NAME="Cm">Cm</A>(int argc,char *argv[])
+{
+    ulong   src, dest, end, bytecount;
+    int opt, width, fifo, verify, verify_failed;
+
+    width = 1;
+    fifo = verify = 0;
+    verify_failed = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"24fv")) != -1) {
+        switch(opt) {
+        case '2':
+            width = 2;
+            break;
+        case '4':
+            width = 4;
+            break;
+        case 'f':
+            fifo = 1;
+            break;
+        case 'v':
+            verify = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc != optind+3) {
+        return(CMD_PARAM_ERROR);
+    }
+    if ((verify) && (fifo)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Can't verify in fifo mode\n");
+        return(CMD_FAILURE);
+    }
+
+    src = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);
+    dest = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],(char **)0,0);
+    bytecount = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+2],(char **)0,0);
+
+    end = src+bytecount;
+    if (width == 1) {
+        while(src &lt; end) {
+            if (verify) {
+                if (*(uchar *)dest != *(uchar *)src) {
+                    verify_failed = 1;
+                    break;
+                }
+            }
+            else 
+                *(uchar *)dest = *(uchar *)src;
+            if (!fifo)
+                dest++;
+            src++;
+        }
+    }
+    else if (width == 2) {
+        while(src &lt; end) {
+            if (verify) {
+                if (*(ushort *)dest != *(ushort *)src) {
+                    verify_failed = 1;
+                    break;
+                }
+            }
+            else
+                *(ushort *)dest = *(ushort *)src;
+            if (!fifo)
+                dest += 2;
+            src += 2;
+        }
+    }
+    else {  /* width == 4 */
+        while(src &lt; end) {
+            if (verify) {
+                if (*(ulong *)dest != *(ulong *)src) {
+                    verify_failed = 1;
+                    break;
+                }
+            }
+            else
+                *(ulong *)dest = *(ulong *)src;
+            if (!fifo)
+                dest += 4;
+            src += 4;
+        }
+    }
+    if ((verify) && (verify_failed)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Verify failed: *0x%lx != *0x%lx\n",src,dest);
+        return(CMD_FAILURE);
+    }
+    return(CMD_SUCCESS);
+}
+
+/* Mt():
+ *  Memory test
+ *  Walking ones and address-in-address tests for data and address bus
+ *  testing respectively.  This test, within the context of a monitor
+ *  command, has limited value.  It must assume that the memory space
+ *  from which this code is executing is sane (obviously, or the code
+ *  would not be executing) and the ram used for stack and bss must
+ *  already be somewhat useable.
+ */
+char *MtHelp[] = {
+    "Memory test",
+    "-[w] {addr} {length}",
+    " -w   wait-for-user between addr write and readback",
+    "Walking ones followed by address-in-address",
+    "Note: hit any key to abort test with errors",
+    0,
+};
+
+int
+<A NAME="Mt">Mt</A>(int argc,char *argv[])
+{
+    int errcnt, len, testaborted, opt;
+    ulong   arg1, arg2, *start, wait_for_user;
+    register ulong *end, walker, readback;
+    register volatile ulong *addr;
+
+    wait_for_user = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"w")) != -1) {
+        switch(opt) {
+        case 'w':
+            wait_for_user = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc != optind+2)
+        return(CMD_PARAM_ERROR);
+
+    arg1 = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],(char **)0,0);      /* start */
+    arg2 = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],(char **)0,0);    /* length */
+
+    arg1 &= ~0x3;   /* Word align */
+    arg2 &= ~0x3;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Testing 0x%lx .. 0x%lx\n",arg1,arg1+arg2);
+
+    start = (ulong *)arg1;
+    len = (int)arg2;
+    testaborted = errcnt = 0;
+
+    /***********************************************************/
+    /****** Walking Ones test for data-bus verification: *******/
+    /***********************************************************/
+
+    /* Write 32 locations, each with a different bit set, then */
+    /* read back those 32 locations and make sure the bit is set. */
+    walker = 1;
+    end = start + 32;
+    for (addr=(ulong *)start;addr&lt;end;addr++) {
+        *addr = walker;
+        walker &lt;&lt;= 1;
+    }
+
+    walker = 1;
+    for (addr=start;addr&lt;end;addr++) {
+        readback = *addr;
+        if (readback != walker) {
+            errcnt++;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("WalkingOnesErr @ 0x%08lx read 0x%08lx expected 0x%08lx\n",
+                (ulong)addr,readback,walker);
+            if (<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>()) {
+                testaborted = 1;
+                break;
+            }
+        }
+        walker &lt;&lt;= 1;
+    }
+
+    /********************************************************************/
+    /****** Address-in-address test for address-bus verification: *******/
+    /********************************************************************/
+
+    /* If the walking-ones test detected an error in the data bus, then */
+    /* don't bother running the address bus test. */
+
+    if (!errcnt && !testaborted) {
+
+        /* Store the address in each address, then read it back. */
+        end = (ulong *)((int)start + len);
+        for (addr=start;addr&lt;end;addr++)
+            *addr = (ulong)addr;
+
+        /* If -w is specified, then wait for user to say continue. */
+        if (wait_for_user)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#hitakey>hitakey</A>();
+    
+        /* check that each address contains its address */
+        for (addr=start;addr&lt;end;addr++) {
+            readback = *addr;
+            if (readback != (ulong)addr) {
+                errcnt++;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("AddInAddErr @ 0x%08lx read 0x%08lx\n",
+                    (ulong)addr,readback);
+                if (<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>()) {
+                    testaborted = 1;
+                    break;
+                }
+            }
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Found %d errors\n", errcnt);
+    if (errcnt)
+        return(CMD_FAILURE);
+    else
+        return(CMD_SUCCESS);
+}
+
+
+#endif
+</HTML>
+</PRE>
+</BODY>

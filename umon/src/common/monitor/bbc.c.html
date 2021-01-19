@@ -1,0 +1,256 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/bbc.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* bbc.c:
+ * Support some basic ability to to basic-block-coverage.
+ * This is VERY basic; nevertheless, useful.  It simply organizes
+ * the ability to determine if a block of code was executed or not
+ * based on the filename and line number in the file.
+ *
+ * Here's the idea...
+ * Two ways to use this:
+ * 1. You have 1 file that you want to test for basic block coverage.
+ *    In this case, the bbc() function below is called with the file
+ *    argument NULLed out.  Assuming bbc was previously configured for
+ *    the number of lines in the file (using "bbc ltot" command), then
+ *    each time bbc() is called, a line-specific flag is set to indicate
+ *    that the line was hit.
+ * 2. Similar to 1, but now several files are involved.  You initialize
+ *    bbc through "bbc ftot" "bbc file" commands.  Then the application
+ *    calls bbc() with both file and line number specified.
+ *
+ * In either case, the "bbc dump" command will show the results.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "cli.h"
+#include "bbc.h"
+
+#if INCLUDE_BBC
+struct bbcinfo {
+    char filename[64];
+    int linetot;
+    char *linehit;
+};
+
+static int      bbcFtot, bbcLtot;
+static char     *bbcLineHit;
+static struct   bbcinfo *bbcData;
+
+/* bbc():
+ * This function is called by the code that has the BBC()
+ * macro inserted for basic block coverage.
+ */
+void
+<A NAME="bbc">bbc</A>(char *file, int line)
+{
+    int i;
+    struct  bbcinfo *bbcp;
+
+    if (file) {
+        if (bbcData) {
+            bbcp = bbcData;
+            for(i=0;i&lt;bbcFtot;i++,bbcp++) {
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(file,bbcp-&gt;filename)) {
+                    bbcp-&gt;linehit[line] = 1;
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        if (bbcLineHit)
+            bbcLineHit[line] = 1;
+    }
+}
+
+void
+<A NAME="bbcDump">bbcDump</A>(char *filename)
+{
+    int line, i;
+    struct  bbcinfo *bbcp;
+
+    if (filename) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("BBC info for %s...\n",filename);
+        bbcp = bbcData;
+        for(i=0;i&lt;bbcFtot;i++,bbcp++) {
+            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(filename,bbcp-&gt;filename)) {
+                for(line=0;line&lt;bbcp-&gt;linetot;line++) {
+                    if (bbcp-&gt;linehit[line])
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%5d:1 ",line);
+                }
+            }
+        }
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("BBC ltot = %d...\n",bbcLtot);
+        for(line=0;line&lt;bbcLtot;line++) {
+            if (bbcLineHit[line])
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%5d:1 ",line);
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+}
+
+char *BbcHelp[] = {
+    "Basic Block Coverage",
+    "-[m:] {cmd} [cmd-specific args]",
+    " -m {addr}  use 'addr' instead of malloc",
+    "",
+    " cmds:",
+    "  init",
+    "  dump [fname]",
+    "  ltot {linecount}",
+    "  ftot {filecount}",
+    "  file {fname} {linecount}",
+    0,
+};
+
+int
+<A NAME="BbcCmd">BbcCmd</A>(int argc,char *argv[])
+{
+    char    *fname, *cmd, *memory;
+    struct  bbcinfo *bbcp;
+    int     opt, lcnt, i, j, line;
+
+    memory = (char *)0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"m:")) != -1) {
+        switch(opt) {
+        case 'm':
+            memory = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,0,0);
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (argc &gt;= optind+1) {
+
+        cmd = argv[optind];
+
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"init")) {
+            bbcp = bbcData;
+
+            if (bbcLineHit)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(bbcLineHit);
+            for(i=0;i&lt;bbcFtot;i++) {
+                if (bbcp-&gt;filename[0] != 0) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(bbcp-&gt;linehit);
+                    bbcp-&gt;linehit = 0;
+                }
+            }
+            if (bbcData)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>((char *)bbcData);
+            bbcFtot = 0;
+            bbcLtot = 0;
+            bbcData = 0;
+            bbcLineHit = 0;
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"clear")) {
+            for(i=0;i&lt;bbcLtot;i++)
+                bbcLineHit[i] = 0;
+            bbcp = bbcData;
+            for(i=0;i&lt;bbcFtot;i++,bbcp++) {
+                for(j=0;j&lt;bbcp-&gt;linetot;j++)
+                    bbcp-&gt;linehit[j] = 0;
+            }
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"dump")) {
+            if (argc == optind+1) 
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/bbc.c.html#bbcDump>bbcDump</A>(0);
+            else if (argc == optind+2)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/bbc.c.html#bbcDump>bbcDump</A>(argv[optind+1]);
+            else
+                return(CMD_PARAM_ERROR);
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"ftot")) {
+            if (argc != optind+2)
+                return(CMD_PARAM_ERROR);
+            bbcFtot = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(argv[optind+1]);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ftot = %d\n",bbcFtot);
+            if (!memory)
+                memory = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(bbcFtot*<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct bbcinfo));
+            bbcData = (struct bbcinfo *)memory;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)bbcData,0,bbcFtot*<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct bbcinfo));
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"ltot")) {
+            if (argc != optind+2)
+                return(CMD_PARAM_ERROR);
+            bbcLtot = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(argv[optind+1]);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ltot = %d\n",bbcLtot);
+            if (!memory)
+                memory = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(bbcLtot);
+            bbcLineHit = memory;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(bbcLineHit,0,bbcLtot);
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"file")) {
+            if (argc != optind+3)
+                return(CMD_PARAM_ERROR);
+
+            if (bbcFtot == 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Must set ftot first\n");
+                return(CMD_FAILURE);
+            }
+            fname = argv[optind+1];
+            lcnt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(argv[optind+2]);
+            bbcp = bbcData;
+            for(i=0;i&lt;bbcFtot;i++) {
+                if (bbcp-&gt;filename[0] == 0) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("File %d = %s, lcnt = %d\n",i,fname,lcnt);
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(bbcp-&gt;filename,fname);
+                    bbcp-&gt;linetot = lcnt;
+                    if (!memory)
+                        memory = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(lcnt);
+                    bbcp-&gt;linehit = memory;
+                    break;
+                }
+            }
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmd,"call")) {
+            if (argc != optind+3)
+                return(CMD_PARAM_ERROR);
+            fname = argv[optind+1];
+            line = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(argv[optind+2]);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("bbc(%s,%d)\n",fname,line);
+            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(fname,"0")) 
+                fname = 0;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/bbc.c.html#bbc>bbc</A>(fname,line);
+        }
+        else
+            return(CMD_PARAM_ERROR);
+    }
+    else
+        return(CMD_PARAM_ERROR);
+
+    return(CMD_SUCCESS);
+}
+#else
+void
+<A NAME="bbc">bbc</A>(char *file, int line)
+{
+    return;
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

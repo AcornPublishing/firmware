@@ -1,0 +1,368 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/dns.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* dns.c:
+ *  Support a basic DNS query.
+ *  NOT READY YET!!!
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_DNSQUERY
+#include "endian.h"
+#include "genlib.h"
+#include "ether.h"
+#include "stddefs.h"
+#include "cli.h"
+
+char *DnsHelp[] = {
+    "DNS query",
+    "-[c:d:f:v:] {operation} [args]",
+    "Options...",
+    " -c {#}    echo count",
+    " -d {#}    delta (hours) relative to GMT",
+    " -f {x|d}  hex or decimal output (default is ascii)",
+    " -r        check server resolution",
+    " -v {var}  load result in shellvar 'var'",
+    "Operations...",
+    " time {IP}",
+    " echo {IP}",
+    "Notes...",
+    " If '.ns' is appended to time, then time is non-standard.",
+    " The 'dfrv' options are used by icmp time, option 'c' is used by echo.",
+    0,
+};
+
+int
+<A NAME="Dns">Dns</A>(int argc,char *argv[])
+{
+    int     timestamp, hour, min, sec, opt, gmt_delta, timeout, count;
+    char    *varname, format, *nonstandard, *operation, *ipadd;
+    uchar   binip[8], binenet[8], buf[32];
+    ushort  seqno;
+
+    gmt_delta = 0;
+    count = 1;
+    varname = (char *)0;
+    format = 'a';
+    nonstandard = "";
+    CheckSrvrResolution = 0;
+
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"c:d:f:rv:")) != -1) {
+        switch(opt) {
+        case 'c':   /* count used by ping */
+            count = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,(char **)0,0);
+            break;
+        case 'd':   /* difference between this time zone and Greenwich */
+            gmt_delta = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,(char **)0,0);
+            break;
+        case 'f':
+            format = *optarg;
+            break;
+        case 'r':
+            CheckSrvrResolution = 1;
+            break;
+        case 'v':
+            varname = optarg;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc == optind)
+        return(-1);
+
+    operation = argv[optind];
+    ipadd = argv[optind+1];
+    
+    /* If time or echo, do the common up-front stuff here... */
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(operation,"time") || !<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(operation,"echo")) {
+        if (argc != optind + 2)
+            return(CMD_PARAM_ERROR);
+
+        /* Convert IP address to binary: */
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(ipadd,binip) &lt; 0)
+            return(CMD_SUCCESS);
+    }
+
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(operation, "time")) {
+
+        /* Get the ethernet address for the IP: */
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpEther>ArpEther</A>(binip,binenet,0)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ARP failed for %s\n",ipadd);
+            return(CMD_FAILURE);
+        }
+
+        ICMPTimeStamp = INVALID_TIMESTAMP;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/icmp.c.html#SendICMPRequest>SendICMPRequest</A>(ICMP_TIMEREQUEST,binip,binenet,0,0);
+
+        /* Timeout waiting for timestamp after waiting about 2 seconds. */
+        timeout = LoopsPerSecond * 2;
+        while(timeout &gt; 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+            timeout--;
+            if (ICMPTimeStamp != INVALID_TIMESTAMP)
+                break;
+        }
+        if (timeout == 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("No response\n");
+            return(CMD_FAILURE);
+        }
+
+        if (ICMPTimeStamp & NONSTANDARD_TIMESTAMP) {
+            ICMPTimeStamp &= ~NONSTANDARD_TIMESTAMP;
+            nonstandard = ".ns";
+        }
+
+        if (format == 'a') {
+            timestamp = ICMPTimeStamp + (gmt_delta*MSECS_PER_HOUR);
+            hour = timestamp/MSECS_PER_HOUR;
+            timestamp -= hour*MSECS_PER_HOUR;
+            min = timestamp/MSECS_PER_MINUTE;
+            timestamp -= min*MSECS_PER_MINUTE;
+            sec = timestamp/MSECS_PER_SECOND;
+            timestamp -= sec*MSECS_PER_SECOND;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%02d:%02d:%02d.%03d%s",hour,min,sec,timestamp,
+                nonstandard);
+        }
+        else if (format == 'x')
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"0x%lx%s",ICMPTimeStamp,nonstandard);
+        else if (format == 'd')
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%ld%s",ICMPTimeStamp,nonstandard);
+        else
+            return(CMD_PARAM_ERROR);
+        if (varname)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(varname,buf);
+        else if (!CheckSrvrResolution)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",buf);
+        CheckSrvrResolution = 0;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(operation, "echo")) {
+        seqno = 0;
+        while (count-- &gt; 0) {
+
+            /* Is this a self-ping? */
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(binip,BinIpAddr,4) == 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Yes, I am alive!\n");
+                break;
+            }
+            /* Get the ethernet address for the IP: */
+            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpEther>ArpEther</A>(binip,binenet,0)) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ARP failed for %s\n",ipadd);
+                continue;
+            }
+
+            ICMPEchoReplyId = 0;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/icmp.c.html#SendICMPRequest>SendICMPRequest</A>(ICMP_ECHOREQUEST,binip,binenet,0,seqno);
+
+            /* Timeout waiting for reply after waiting about 2 secs. */
+            timeout = LoopsPerSecond * 2;
+            while(timeout &gt; 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+                timeout--;
+                if (ICMPEchoReplyId == ICMP_ECHO_ID)
+                    break;
+            }
+            if (timeout == 0)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("no answer from %s\n",ipadd);
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s is alive",ipadd);
+                if (count) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" icmp_seq=%d",ICMPSeqNoRcvd);
+                    timeout = LoopsPerSecond;
+                    while(timeout-- &gt; 0)
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+                    seqno++;
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+            }
+        }
+    }
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Unrecognized ICMP op: %s\n",operation);
+    return(CMD_SUCCESS);
+}
+
+int
+<A NAME="processDNS">processDNS</A>(struct ether_header *ehdr,ushort size)
+{
+    struct  ip *ipp;
+    struct  icmp_hdr *icmpp;
+    int len, i;
+
+    ipp = (struct ip *)(ehdr + 1);
+
+    /* Compute size of ICMP message (IP len - size of IP header): */
+    len = ipp-&gt;ip_len - ((ipp-&gt;ip_vhl & 0x0f) * 4);
+
+    icmpp = (struct icmp_hdr *)((char *)ipp+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ether.h.html#IP_HLEN>IP_HLEN</A>(ipp));
+    if (icmpp-&gt;type == ICMP_ECHOREQUEST) {      /* 3rdEd Comer pg 127 */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/icmp.c.html#SendEchoResp>SendEchoResp</A>(ehdr);
+        return(0);
+    }
+    else if (icmpp-&gt;type == ICMP_ECHOREPLY) {
+        struct icmp_echo_hdr *icmpecho;
+
+        icmpecho = (struct icmp_echo_hdr *)icmpp;
+        ICMPEchoReplyId = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(icmpecho-&gt;id);
+        ICMPSeqNoRcvd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(icmpecho-&gt;seq);
+    }
+    else if (icmpp-&gt;type == ICMP_DESTUNREACHABLE) { /* 3rdEd Comer pg 129 */
+        if (EtherVerbose & SHOW_INCOMING) {
+            i = icmpp-&gt;code;
+            if ((i &gt; 5) || (i &lt; 0))
+                i = 6;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  ICMP: %s (code=%d)\n",
+                IcmpDestUnreachableCode[i],icmpp-&gt;code);
+        }
+        return(0);
+    }
+    else if (icmpp-&gt;type == ICMP_TIMEREPLY) {
+        struct icmp_time_hdr *icmptime;
+        ulong orig, recv, xmit;
+
+        icmptime = (struct icmp_time_hdr *)icmpp;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&orig,(char *)&icmptime-&gt;orig,4);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&recv,(char *)&icmptime-&gt;recv,4);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&xmit,(char *)&icmptime-&gt;xmit,4);
+
+        ICMPSeqNoRcvd = icmptime-&gt;seq;
+        if (EtherVerbose & SHOW_INCOMING) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    ICMP_TIMEREPLY: orig=0x%lx,recv=0x%lx,xmit=0x%lx\n",
+                orig,recv,xmit);
+        }
+        if (CheckSrvrResolution) {
+            static int ICMPTimeStampTbl[20];
+    
+            if (icmptime-&gt;seq &lt; 20) {
+                ICMPTimeStampTbl[icmptime-&gt;seq] = xmit;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/icmp.c.html#SendICMPRequest>SendICMPRequest</A>(ICMP_TIMEREQUEST,(uchar *)&ipp-&gt;ip_src,
+                    (uchar *)&ehdr-&gt;ether_shost,0,icmptime-&gt;seq+1);
+            } else {
+                
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TS00: %d\n",ICMPTimeStampTbl[0]);
+                for(i=1;i&lt;20;i++) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TS%02d: %d (dlta=%d)\n",i,
+                        ICMPTimeStampTbl[i],
+                        ICMPTimeStampTbl[i]-ICMPTimeStampTbl[i-1]);
+                }
+                ICMPTimeStamp = xmit;
+            }
+        }
+        else {
+            ICMPTimeStamp = xmit;
+        }
+    }
+    else {
+        if (EtherVerbose & SHOW_INCOMING) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    ICMPTYPE=%d\n",icmpp-&gt;type);
+        }
+        return(-1);
+    }
+    return(0);
+}
+
+/* SendDNSQuery():
+ */
+int
+<A NAME="SendDNSQuery">SendDNSQuery</A>(ulong addr,char *tftpsrvr,char *mode, char *hostfile,char *tfsfile,
+    char *tfsflags,char *tfsinfo)
+{
+    int     done;
+    char    buf[32];
+    uchar   binip[8], binenet[8], *enetaddr;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("TFTPGET",0);
+
+    /* Convert IP address to binary: */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(tftpsrvr,binip) &lt; 0)
+        return(0);
+
+
+    /* Get the ethernet address for the IP: */
+    /* Give ARP the same verbosity (if any) set up for TFTP: */
+    if (EtherVerbose & SHOW_TFTP)
+        EtherVerbose |= SHOW_ARP;
+    enetaddr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpEther>ArpEther</A>(binip,binenet,0);
+    EtherVerbose &= ~SHOW_ARP;
+    if (!enetaddr) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ARP failed for %s\n",tftpsrvr);
+        return(0);
+    }
+
+    /* Initialize the retransmission delay calculator: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_TFTP);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Retrieving %s from %s...",hostfile,tftpsrvr);
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+
+    /* Send the TFTP RRQ to initiate the transfer. */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPRRQ>SendTFTPRRQ</A>(binip,binenet,hostfile,mode,(uchar *)addr) &lt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("RRQ failed\n");
+        return(0);
+    }
+
+    /* Wait for TftpState to indicate that the transaction has completed... */
+    done = 0;
+    while(!done) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+        switch(TftpState) {
+            case TFTPIDLE:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %d bytes",TftpCount);
+                done = 1;
+                break;
+            case TFTPERROR:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" host error: %s\n",TftpErrString);
+                done = 2;
+                break;
+            case TFTPTIMEOUT:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" timing out (%d bytes rcvd)\n",TftpCount);
+                done = 2;
+                break;
+            default:
+                break;
+        }
+    }
+    if (done == 2)
+        return(0);
+
+    if (tfsfile) {
+        int err, filesize;
+
+        filesize = TftpCount - TftpChopCount;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nAdding %s (size=%d) to TFS...",tfsfile,filesize);
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(tfsfile,tfsinfo,tfsflags,(uchar *)addr,filesize);
+        if (err != TFS_OKAY)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",tfsfile,(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%d",TftpCount);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("TFTPGET",buf);
+    return(TftpCount);
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

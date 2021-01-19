@@ -1,0 +1,392 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/cmdtbl.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* cmdtbl.c:
+ *  This is the command table used by the monitor.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "cli.h"
+#include "genlib.h"
+#include "xcmddcl.h"
+
+#define ULVLCMD  "ulvl"
+
+#if INCLUDE_CAST
+extern  int Cast();
+extern  char *CastHelp[];
+#endif
+#if INCLUDE_EXCTEST
+extern  int Etest();
+extern  char *EtestHelp[];
+#endif
+#if INCLUDE_BBC
+extern  int BbcCmd();
+extern  char *BbcHelp[];
+#endif
+#if INCLUDE_UNZIP
+extern  int Unzip();
+extern  char *UnzipHelp[];
+#endif
+#if INCLUDE_MEMTRACE
+extern  int MtraceCmd();
+extern  char *MtraceHelp[];
+#endif
+#if INCLUDE_GDB
+extern  int Gdb();
+extern  char *GdbHelp[];
+#endif
+
+extern  int Heap(), Reg();
+extern  char *HeapHelp[], *RegHelp[];
+
+#if INCLUDE_MEMCMDS
+extern  int Dm(), Pm(), Cm(), Sm(), Fm(), Mt();
+extern  char *DmHelp[], *PmHelp[], *CmHelp[];
+extern  char *SmHelp[], *FmHelp[], *MtHelp[];
+#endif
+#if INCLUDE_IDEV
+extern  int Idev();
+extern  char *IdevHelp[];
+#endif
+#if INCLUDE_PROFILER
+extern  int Prof();
+extern  char *ProfHelp[];
+#endif
+#if INCLUDE_STRACE
+extern  int Strace();
+extern  char *StraceHelp[];
+#endif
+#if INCLUDE_EE
+extern  int Let();
+extern  char *LetHelp[];
+#endif
+#if INCLUDE_PIO
+extern  int Pio();
+extern  char *PioHelp[];
+#endif
+#if INCLUDE_LINEEDIT
+extern  int History();
+extern  char *HistoryHelp[];
+#endif
+#if INCLUDE_EDIT
+extern  int Edit();
+extern  char *EditHelp[];
+#endif
+#if INCLUDE_DEBUG | INCLUDE_TFS | INCLUDE_ARGV
+extern  int Argv();
+extern  char *ArgvHelp[];
+#endif
+#if INCLUDE_DEBUG
+extern  int At(), Go(), Ss();
+extern  char *AtHelp[], *GoHelp[], *SsHelp[];
+#endif
+#if INCLUDE_DISASSEMBLER
+extern  int Dis();
+extern  char *DisHelp[];
+#endif
+
+#if INCLUDE_UNPACK
+extern  int Unpack();
+extern  char *UnpackHelp[];
+#endif
+
+#if INCLUDE_TFSSCRIPT
+extern  int If(), Exit(), Goto(), Gosub(), Return(), Item();
+extern  char *IfHelp[], *GotoHelp[], *GosubHelp[], *ItemHelp[];
+extern  char *ReturnHelp[], *ExitHelp[];
+#endif
+
+#if INCLUDE_TFSCLI
+extern  int Tfs();
+extern  char *TfsHelp[];
+#endif
+
+extern  int Set(), Read();
+extern  char *SetHelp[], *ReadHelp[];
+
+#if INCLUDE_XMODEM
+extern  int Xmodem();
+extern  char *XmodemHelp[];
+#endif
+
+#if INCLUDE_TFTP
+extern  int Tftp();
+extern  char *TftpHelp[];
+#endif
+
+#if INCLUDE_DHCPBOOT
+extern  int Dhcp();
+extern  char *DhcpHelp[];
+#endif
+
+#if INCLUDE_ETHERNET
+extern  int Arp(), Dhcp(), Ether(), Tftp(), Icmp();
+extern  char *ArpHelp[], *EtherHelp[], *IcmpHelp[];
+#endif
+
+#if INCLUDE_FLASH
+extern  int FlashCmd();
+extern  char *FlashHelp[];
+#endif
+
+extern  int Help(), Reset(), Mstat(), Ulvl();
+extern  int Version(), Sleep(), Call(), Echo();
+
+extern  char *HelpHelp[], *ResetHelp[], *MstatHelp[], *UlvlHelp[];
+extern  char *VersionHelp[], *SleepHelp[], *CallHelp[], *EchoHelp[];
+
+struct monCommand cmdlist[] = {
+#if (INCLUDE_DEBUG | INCLUDE_TFS | INCLUDE_ARGV)
+    { "argv",       Argv,       ArgvHelp,       0},
+#endif
+#if INCLUDE_ETHERNET
+    { "arp",        Arp,        ArpHelp,        0 },
+#endif
+#if INCLUDE_DEBUG
+    { "at",         At,         AtHelp,         0 },
+#endif
+#if INCLUDE_BBC
+    { "bbc",        BbcCmd,     BbcHelp,        0 },
+#endif
+    { "call",       Call,       CallHelp,       0 },
+#if INCLUDE_CAST
+    { "cast",       Cast,       CastHelp,       0 },
+#endif
+#if INCLUDE_MEMCMDS
+    { "cm",         Cm,         CmHelp,         0 },
+#endif
+#if INCLUDE_DHCPBOOT
+    { "dhcp",       Dhcp,       DhcpHelp,       0 },
+#endif
+#if INCLUDE_DISASSEMBLER
+    { "dis",        Dis,        DisHelp,        0 },
+#endif
+#if INCLUDE_MEMCMDS
+    { "dm",         Dm,         DmHelp,         0 },
+#endif
+
+    { "echo",       Echo,       EchoHelp,       0 },
+
+#if INCLUDE_EDIT
+    { "edit",       Edit,       EditHelp,       0 },
+#endif
+#if INCLUDE_EXCTEST
+    { "etest",      Etest,      EtestHelp,      0 },
+#endif
+#if INCLUDE_ETHERNET
+    { "ether",      Ether,      EtherHelp,      0 },
+#endif
+#if INCLUDE_TFSSCRIPT
+    { "exit",       Exit,       ExitHelp,       0 },
+#endif
+#if INCLUDE_FLASH
+    { "flash",      FlashCmd,   FlashHelp,      0 },
+#endif
+#if INCLUDE_MEMCMDS
+    { "fm",         Fm,         FmHelp,         0 },
+#endif
+
+#if INCLUDE_GDB
+    { "gdb",        Gdb,        GdbHelp,        0 },
+#endif
+#if INCLUDE_DEBUG
+    { "go",         Go,         GoHelp,         0 },
+#endif
+
+#if INCLUDE_TFSSCRIPT
+    { "gosub",      Gosub,      GosubHelp,      0 },
+    { "goto",       Goto,       GotoHelp,       0 },
+#endif
+
+    { "heap",       Heap,       HeapHelp,       0 },
+    { "help",       Help,       HelpHelp,       0 },
+    { "?",          Help,       HelpHelp,       0 },
+
+#if INCLUDE_LINEEDIT
+    { "history",    History,    HistoryHelp,    0 },
+#endif
+
+#if INCLUDE_ETHERNET
+    { "icmp",       Icmp,       IcmpHelp,       0 },
+#endif
+
+#if INCLUDE_IDEV
+    { "idev",       Idev,       IdevHelp,       0 },
+#endif
+
+#if INCLUDE_TFSSCRIPT
+    { "if",         If,         IfHelp,         0 },
+#endif
+
+#if INCLUDE_TFSSCRIPT
+    { "item",       Item,       ItemHelp,       0 },
+#endif
+
+
+#if INCLUDE_EE
+    { "let",        Let,        LetHelp,        0 },
+#endif
+
+    { "mstat",      Mstat,      MstatHelp,      0 },
+
+#if INCLUDE_MEMCMDS
+    { "mt",         Mt,         MtHelp,         0 },
+#endif
+
+#if INCLUDE_MEMTRACE
+    { "mtrace",     MtraceCmd,  MtraceHelp,     0 },
+#endif
+
+#if INCLUDE_PIO
+    { "pio",        Pio,        PioHelp,        0 },
+#endif
+
+#if INCLUDE_MEMCMDS
+    { "pm",         Pm,         PmHelp,         0 },
+#endif
+
+#if INCLUDE_PROFILER
+    { "prof",       Prof,       ProfHelp,       0 },
+#endif
+
+#if INCLUDE_TFSSCRIPT
+    { "read",       Read,       ReadHelp,       0 },
+#endif
+
+    { "reg",        Reg,        RegHelp,        0 },
+    { "reset",      Reset,      ResetHelp,      0 },
+
+#if INCLUDE_TFSSCRIPT
+    { "return",     Return,     ReturnHelp,     0 },
+#endif
+
+    { "set",        Set,        SetHelp,        0 },
+    { "sleep",      Sleep,      SleepHelp,      0 },
+
+#if INCLUDE_MEMCMDS
+    { "sm",         Sm,         SmHelp,         0 },
+#endif
+
+#if INCLUDE_DEBUG
+    { "ss",         Ss,         SsHelp,         0 },
+#endif
+
+#if INCLUDE_STRACE
+    { "strace",     Strace,     StraceHelp,     0 },
+#endif
+
+    { ULVLCMD,      Ulvl,       UlvlHelp,       0 },
+
+#if INCLUDE_TFTP
+    { "tftp",       Tftp,       TftpHelp,       0 },
+#endif
+
+#if INCLUDE_TFSCLI
+    { "tfs",        Tfs,        TfsHelp,        0 },
+#endif
+
+#if INCLUDE_UNPACK
+    { "unpack",     Unpack,     UnpackHelp,     0 },
+#endif
+
+#if INCLUDE_UNZIP
+    { "unzip",      Unzip,      UnzipHelp,      0 },
+#endif
+
+#if INCLUDE_XMODEM
+    { "xmodem",     Xmodem,     XmodemHelp,     0 },
+#endif
+
+    { "version",    Version,    VersionHelp,    0 },
+
+#include "xcmdtbl.h"                /* For non-generic commands that are */
+                                    /* specific to a particular target.  */
+    { 0,0,0,0 },
+};
+
+/* cmdUlvl[]:
+ *  This table stores one char per command that contains that command's
+ *  user level.  The default user level of all commands is 0, but can
+ *  be re-defined by the ulvl -c command.
+ */
+char cmdUlvl[(sizeof(cmdlist)/sizeof(struct monCommand))];
+
+/* setCmdUlvl():
+ *  The incoming string is a command name followed by a comma and a user
+ *  level (ranging from 0 thru 4).
+ *  Return 0 if pass, 1 if new level was user-level rejected, -1 if error.
+ */
+int
+<A NAME="setCmdUlvl">setCmdUlvl</A>(char *cmdandlevel, int verbose)
+{
+    struct monCommand *cptr;
+    int newlevel, idx;
+    char *comma;
+
+    /* First verify that the comma is in the string... */
+    comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(cmdandlevel,',');
+    if (!comma)
+        goto showerr;
+
+    /* Retrieve and verify the new level to be assigned... */
+    newlevel = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(comma+1);
+    if ((newlevel &lt; MINUSRLEVEL) || (newlevel &gt; MAXUSRLEVEL))
+        goto showerr;
+
+    *comma = 0;
+
+    /* Don't allow adjustment of the ulvl command itself.  It must be
+     * able to run as user level 0 all the time...
+     */
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmdandlevel,ULVLCMD)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Can't adjust '%s' user level.\n",ULVLCMD);
+        return(-1);
+    }
+
+    /* Find the command in the table that is to be adjusted... */
+    for(idx=0,cptr=cmdlist;cptr-&gt;name;cptr++,idx++) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cmdandlevel,cptr-&gt;name)) {
+            /* If the command's user level is to be lowered, then the
+             * current monitor userlevel must be at least as high as the
+             * command's current user level...
+             */
+            if ((newlevel &lt; cmdUlvl[idx]) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>() &lt; cmdUlvl[idx])) {
+                if (verbose)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("User-level access denied: %s\n",cmdandlevel);
+                return(1);
+            }
+            cmdUlvl[idx] = newlevel;
+            return(0);
+        }
+    }
+showerr:
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Input error: %s\n",cmdandlevel);
+    return(-1);
+}
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,175 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tfslog.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tfslog.c:
+ *
+ *  Optional facility for TFS that supports the ability to log all
+ *  tfs actions that affect flash, to a log file.
+ *
+ *  This function is called by tfsadd(), tfsunlink() and tfsipmod() to
+ *  write to a log file indicating that something in tfs has been changed.
+ *  Note that the function can be called at any user level, but it must be
+ *  able to modify the TFS_CHANGELOG_FILE that has "u3" flags.  The 
+ *  user level must be temporarily forced to MAXUSRLEVEL for this.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "cli.h"
+
+#if TFS_CHANGELOG_SIZE
+static int  tfsLogging;
+#endif
+
+void
+<A NAME="tfslog">tfslog</A>(int action, char *string)
+{
+#if TFS_CHANGELOG_SIZE
+    static char *tfslogaction[] = { "ADD", "DEL", "IPM", " ON", "OFF" };
+    
+    extern  void *<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#setTmpMaxUsrLvl>setTmpMaxUsrLvl</A>();
+    static  char buf[TFS_CHANGELOG_SIZE];
+    TFILE   *tfp;
+    int     (*fptr)();
+    char    *eol, *eob, *logaction, tbuf[32];
+    int     newfsize, fsize, lsize, tfd, err, len, tbuflen;
+
+    switch(action) {
+        case TFSLOG_ADD:        /* Return here if logging is off,   */
+        case TFSLOG_DEL:        /* or this tfslog() call is on the  */
+        case TFSLOG_IPM:        /* TFS_CHANGELOG_FILE itself.       */
+            if (!tfsLogging || !<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(string,TFS_CHANGELOG_FILE))
+                return;
+            break;
+        case TFSLOG_ON:
+            if (tfsLogging == 1)
+                return;
+            tfsLogging = 1;
+            break;
+        case TFSLOG_OFF:
+            if (tfsLogging == 0)
+                return;
+            tfsLogging = 0;
+            break;
+    }
+
+    /* Force the getUsrLvl() function to return MAX: */
+    fptr = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#setTmpMaxUsrLvl>setTmpMaxUsrLvl</A>();
+
+    logaction = tfslogaction[action];
+    tfp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(TFS_CHANGELOG_FILE);
+    tfsGetAtime(0,tbuf,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(tbuf));
+    tbuflen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(tbuf); 
+
+    if (tfp) {
+        tfd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsopen>tfsopen</A>(TFS_CHANGELOG_FILE,TFS_RDONLY,0);
+        fsize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsread>tfsread</A>(tfd,buf,TFS_CHANGELOG_SIZE);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+
+        newfsize = (fsize+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(logaction)+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(string)+3);
+        if (tbuflen)
+            newfsize += tbuflen + 3;
+
+        eob = buf + fsize;
+
+        /* If newfsize is greater than the maximum size the file is
+         * allowed to grow, then keep removing the first line
+         * (oldest entry) until new size is within the limit...
+         */
+        if (newfsize &gt; TFS_CHANGELOG_SIZE) {
+            lsize = 0;
+            eol = buf;
+            while ((newfsize-lsize) &gt; TFS_CHANGELOG_SIZE) {
+                while((*eol != '\r') && (*eol != '\n')) eol++;
+                while((*eol == '\r') || (*eol == '\n')) eol++;
+                lsize = eol-buf;
+            }
+            fsize -= lsize;
+            newfsize -= lsize;
+            eob -= lsize;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(buf,eol,fsize);
+        }
+        if (tbuflen)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(eob,"%s: %s @ %s\n",logaction,string,tbuf);
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(eob,"%s: %s\n",logaction,string);
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsunlink>_tfsunlink</A>(TFS_CHANGELOG_FILE);
+        if (err &lt; 0)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",TFS_CHANGELOG_FILE,
+                (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(TFS_CHANGELOG_FILE,0,"u3",buf,newfsize);
+        if (err &lt; 0)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",TFS_CHANGELOG_FILE,
+                (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+    }
+    else {
+        if (tbuflen)
+            len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%s: %s @ %s\n",logaction,string,tbuf);
+        else
+            len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%s: %s\n",logaction,string);
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(TFS_CHANGELOG_FILE,0,"u3",buf,len);
+        if (err &lt; 0)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",TFS_CHANGELOG_FILE,
+                (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+    }
+
+    /* Restore the original getUsrLvl() functionality: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#clrTmpMaxUsrLvl>clrTmpMaxUsrLvl</A>(fptr);
+#endif
+}
+
+int
+<A NAME="tfsLogCmd">tfsLogCmd</A>(int argc,char *argv[], int optind)
+{
+#if TFS_CHANGELOG_SIZE
+    int status;
+    int retval = 0;
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>() &lt; MAXUSRLEVEL) {
+        status = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#showTfsError>showTfsError</A>(TFSERR_USERDENIED,0);
+    }
+    else {
+        if (argc == optind + 3) {
+            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind+1],"on"))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfslog.c.html#tfslog>tfslog</A>(TFSLOG_ON,argv[optind+2]);
+            else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind+1],"off"))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfslog.c.html#tfslog>tfslog</A>(TFSLOG_OFF,argv[optind+2]);
+            else
+                retval = CMD_PARAM_ERROR;
+        }
+        else if (argc == optind + 1)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFS logging %sabled\n",tfsLogging ? "en" : "dis");
+        else
+            retval = CMD_PARAM_ERROR;
+    }
+    return(retval);
+#else
+    return(CMD_FAILURE);
+#endif
+}
+</HTML>
+</PRE>
+</BODY>

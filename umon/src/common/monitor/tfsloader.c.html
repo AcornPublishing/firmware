@@ -1,0 +1,289 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tfsloader.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tfsloader.c:
+ *  This file contains the code that is specific to each of the file types
+ *  supported by TFS as the binary executable type.
+ *  Currently, COFF, ELF and A.OUT are supported.  This requires that
+ *  TFS_EBIN_COFF, TFS_EBIN_ELF or TFS_EBIN_AOUT, respectively, be set in
+ *  the monitor's config.h file.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "coff.h"
+#include "elf.h"
+#include "aout.h"
+#if INCLUDE_TFS
+
+#if TFS_EBIN_AOUT
+
+/* tfsloadaout():
+ *  The file pointed to by fp has been determined to be an A.OUT
+ *  formatted file.  This function loads the sections of that file into
+ *  the designated locations and returns the address of the entry point.
+ *  Caches are flushed after loading text section.
+ */
+int
+<A NAME="tfsloadebin">tfsloadebin</A>(TFILE *fp,int verbose,long *entrypoint,int verifyonly)
+{
+    uchar   *tfrom, *dfrom;
+    struct  exec *ehdr;
+
+    if (tfsTrace)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsloadaout(%s)\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp));
+
+    /* Establish file header pointer... */
+    ehdr = (struct exec *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+
+    /* Return error if relocatable... */
+    if ((ehdr-&gt;a_trsize) || (ehdr-&gt;a_drsize))
+        return(TFSERR_BADHDR);
+
+    /* Establish locations from which text and data are to be */
+    /* copied from ... */
+    tfrom = (uchar *)(ehdr+1);
+    dfrom = tfrom+ehdr-&gt;a_text;
+
+    /* Copy/verify text and data sections to RAM: */
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-10s: ","text");
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>((char *)(ehdr-&gt;a_entry),(char *)tfrom,
+        ehdr-&gt;a_text,verbose,verifyonly) != 0)
+        return(TFSERR_MEMFAIL);
+
+    /* Flush caches after writing to space that will be executed from... */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#flushDcache>flushDcache</A>((char *)ehdr-&gt;a_entry,ehdr-&gt;a_text);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#invalidateIcache>invalidateIcache</A>((char *)ehdr-&gt;a_entry,ehdr-&gt;a_text);
+
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-10s: ","data");
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>((char *)(ehdr-&gt;a_entry+ehdr-&gt;a_text),(char *)dfrom,
+        ehdr-&gt;a_data,verbose,verifyonly) != 0)
+        return(TFSERR_MEMFAIL);
+
+    /* Clear out bss space: */
+    if (verbose)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-10s: ","bss");
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemset>tfsmemset</A>((char *)(ehdr-&gt;a_entry+ehdr-&gt;a_text+ehdr-&gt;a_data),
+        0,ehdr-&gt;a_bss,verbose,verifyonly) != 0)
+        return(TFSERR_MEMFAIL);
+
+
+    if (verbose & !verifyonly)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("entrypoint: 0x%lx\n",ehdr-&gt;a_entry);
+
+    /* Store entry point: */
+    if (entrypoint)
+        *entrypoint = (long)(ehdr-&gt;a_entry);
+
+    return(TFS_OKAY);
+}
+
+#elif TFS_EBIN_COFF
+
+/* tfsloadcoff():
+ *  The file pointed to by fp has been determined to be a COFF file.
+ *  This function loads the sections of that file into the designated 
+ *  locations.
+ *  Caches are flushed after loading each loadable section.
+ */
+int
+<A NAME="tfsloadebin">tfsloadebin</A>(TFILE *fp,int verbose,long *entrypoint,int verifyonly)
+{
+    int     i, err;
+    FILHDR  *fhdr;
+    AOUTHDR *ahdr;
+    SCNHDR  *shdr;
+
+    if (tfsTrace)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsloadcoff(%s)\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp));
+
+    /* Establish file header pointers... */
+    fhdr = (FILHDR *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+    if ((fhdr-&gt;f_opthdr == 0) || ((fhdr-&gt;f_flags & F_EXEC) == 0))
+        return(TFSERR_BADHDR);
+    
+    err = 0;
+    ahdr = (AOUTHDR *)(fhdr+1);
+    shdr = (SCNHDR *)((uchar *)ahdr + fhdr-&gt;f_opthdr);
+
+    /* For each section header, relocate or clear if necessary... */
+    for (i=0;!err && i&lt;fhdr-&gt;f_nscns;i++) {
+        if (shdr-&gt;s_size == 0) {
+            shdr++;
+            continue;
+        }
+        if (verbose)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-10s: ",shdr-&gt;s_name);
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/coff.h.html#ISLOADABLE>ISLOADABLE</A>(shdr-&gt;s_flags)) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_ISCPRS>TFS_ISCPRS</A>(fp)) {
+                int     outsize;
+
+                outsize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#decompress>decompress</A>((char *)shdr-&gt;s_scnptr+(int)fhdr,
+                    shdr-&gt;s_size,(char *)shdr-&gt;s_paddr);
+                if (outsize == -1) {
+                    err++;
+                    shdr++;
+                    continue;
+                }
+                if (verbose)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("dcmp %7d bytes from 0x%08lx to 0x%08lx\n",outsize,
+                        shdr-&gt;s_scnptr+(ulong)fhdr,shdr-&gt;s_paddr);
+            }
+            else {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>((char *)(shdr-&gt;s_paddr),
+                    (char *)(shdr-&gt;s_scnptr+(int)fhdr),
+                    shdr-&gt;s_size,verbose,verifyonly) != 0)
+                    err++;
+            }
+            /* Flush caches for each loadable section... */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#flushDcache>flushDcache</A>((char *)shdr-&gt;s_paddr,shdr-&gt;s_size);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#invalidateIcache>invalidateIcache</A>((char *)shdr-&gt;s_paddr,shdr-&gt;s_size);
+        }
+        else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/coff.h.html#ISBSS>ISBSS</A>(shdr-&gt;s_flags)) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemset>tfsmemset</A>((char *)(shdr-&gt;s_paddr),0,shdr-&gt;s_size,
+                verbose,verifyonly) != 0)
+                err++;
+        }
+        else if (verbose)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("???\n");
+        shdr++;
+    }
+
+    if (verbose & !verifyonly)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("entrypoint: 0x%lx\n",ahdr-&gt;entry);
+
+    if (err)
+        return(TFSERR_MEMFAIL);
+
+    /* Store entry point: */
+    if (entrypoint)
+        *entrypoint = (long)(ahdr-&gt;entry);
+
+    return(TFS_OKAY);
+}
+
+#elif TFS_EBIN_ELF
+
+/* tfsloadelf():
+ *  The file pointed to by fp has been determined to be an ELF file.
+ *  This function loads the sections of that file into the designated 
+ *  locations.
+ *  Caches are flushed after loading each loadable section.
+ */
+int
+<A NAME="tfsloadebin">tfsloadebin</A>(TFILE *fp,int verbose,long *entrypoint,int verifyonly)
+{
+    Elf32_Word  size, notproctot;
+    int         i, err;
+    char        *shname_strings;
+    ELFFHDR     *ehdr;
+    ELFSHDR     *shdr;
+
+    if (tfsTrace)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsloadelf(%s)\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_NAME>TFS_NAME</A>(fp));
+
+    /* Establish file header pointers... */
+    ehdr = (ELFFHDR *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+    shdr = (ELFSHDR *)((int)ehdr + ehdr-&gt;e_shoff);
+    err = 0;
+
+    /* Verify basic file sanity... */
+    if ((ehdr-&gt;e_ident[0] != 0x7f) || (ehdr-&gt;e_ident[1] != 'E') ||
+        (ehdr-&gt;e_ident[2] != 'L') || (ehdr-&gt;e_ident[3] != 'F'))
+        return(TFSERR_BADHDR);
+
+    /* Store the section name string table base: */
+    shname_strings = (char *)ehdr + shdr[ehdr-&gt;e_shstrndx].sh_offset;
+
+    notproctot = 0;
+
+    /* For each section header, relocate or clear if necessary... */
+    for (i=0;!err && i&lt;ehdr-&gt;e_shnum;i++,shdr++) {
+        if ((size = shdr-&gt;sh_size) == 0)
+            continue;
+
+        if ((verbose) && (ehdr-&gt;e_shstrndx != SHN_UNDEF))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%-10s: ", shname_strings + shdr-&gt;sh_name);
+
+        if (!(shdr-&gt;sh_flags & SHF_ALLOC)) {
+            notproctot += size;
+            if (verbose)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("     %7ld bytes not processed (tot=%ld)\n",
+                    size,notproctot);
+            continue;
+        }
+
+        if (shdr-&gt;sh_type == SHT_NOBITS) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemset>tfsmemset</A>((char *)(shdr-&gt;sh_addr),0,size,
+                verbose,verifyonly) != 0)
+                err++;
+        }
+        else {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_ISCPRS>TFS_ISCPRS</A>(fp)) {
+                int     outsize;
+
+                outsize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/unpack.c.html#decompress>decompress</A>((char *)(ehdr)+shdr-&gt;sh_offset,size,
+                    (char *)shdr-&gt;sh_addr);
+                if (outsize == -1) {
+                    err++;
+                    continue;
+                }
+                if (verbose)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("dcmp %7d bytes from 0x%08lx to 0x%08lx\n",outsize,
+                        (ulong)(ehdr)+shdr-&gt;sh_offset,shdr-&gt;sh_addr);
+            }
+            else {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>((char *)(shdr-&gt;sh_addr),
+                    (char *)((int)ehdr+shdr-&gt;sh_offset),
+                    size,verbose,verifyonly) != 0)
+                    err++;
+            }
+            /* Flush caches for each loadable section... */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#flushDcache>flushDcache</A>((char *)shdr-&gt;sh_addr,size);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#invalidateIcache>invalidateIcache</A>((char *)shdr-&gt;sh_addr,size);
+        }
+    }
+
+    if (err)
+        return(TFSERR_MEMFAIL);
+
+    if (verbose & !verifyonly)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("entrypoint: 0x%lx\n",ehdr-&gt;e_entry);
+
+    /* Store entry point: */
+    if (entrypoint)
+        *entrypoint = (long)(ehdr-&gt;e_entry);
+
+    return(TFS_OKAY);
+}
+
+#endif  /* TFS_EBIN_XXXX */
+#endif  /* INCLUDE_TFS */
+</HTML>
+</PRE>
+</BODY>

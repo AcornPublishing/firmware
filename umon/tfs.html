@@ -1,0 +1,719 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: TFS</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font face="Arial,Helvetica"><font size=+0>&nbsp;</font></font>&nbsp;
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>TFS: Tiny File System</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica">The following discussion focuses on TFS,
+a small embedded file system designed for efficient use of standard target
+resident, large sector flash memory subsystems.</font>
+<p><font face="Arial,Helvetica"><a href="#yaffs">Yet another Flash File
+System... Why?</a></font>
+<br><font face="Arial,Helvetica"><a href="#implementation">Implementation
+Details</a></font>
+<br><font face="Arial,Helvetica"><a href="#attributes">File Attributes</a></font>
+<br><font face="Arial,Helvetica"><a href="#autoboot">Autobootable Files</a></font>
+<br><font face="Arial,Helvetica"><a href="#user_levels">File User Levels</a></font>
+<br><font face="Arial,Helvetica"><a href="#ipmod">What is an in-place-modifiable
+file?</a></font>
+<br><font face="Arial,Helvetica"><a href="#decompression">File Decompression</a></font>
+<br><font face="Arial,Helvetica"><a href="#TOD">Time-of-Day</a></font>
+<br><font face="Arial,Helvetica"><a href="#change_log">Change-Log Facility</a></font>
+<br><font face="Arial,Helvetica"><a href="#multiple-devices">Multiple Storage
+Devices</a></font>
+<br><font face="Arial,Helvetica"><a href="#tfs_overhead">Space Overhead
+Required by TFS</a></font>
+<br><font face="Arial,Helvetica"><a href="#flash_life">Flash Life-Expectancy</a></font>
+<br><font face="Arial,Helvetica"><a href="#return_values">TFS API Return
+Values</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<hr WIDTH="100%">
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="yaffs"></a></font>Yet
+another Flash File System... Why?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+There are flash file systems (FFS) available as extensions to most of the
+RTOSes out there.&nbsp; Each has its own set of capabilities and each one
+has to be hooked into the RTOS in some non-trivial way.&nbsp; Plus, an
+FFS typically costs an additional fee to use.&nbsp; Then, if you use a
+different OS, or possibly none at all, you have to determine whether or
+not the FFS you are using is compatible with the new environment; and,
+even if it is, you have to re-do the "hook-up" of the FFS to the RTOS.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The model for TFS (and the servers that use TFS) is to keep things simple,
+but still provide the embedded system with a wide range of facilties.&nbsp;
+TFS is a linear file system that gives a typical embedded system project
+all of the "file-system-like" capabilities it will ever need (most of which
+would not come with an off-the-shelf FFS)...&nbsp; A complete programming
+API that looks very similar to the standard open/close/read/write/etc...
+system calls that you would use on a Unix platform.&nbsp; Also a command
+line interface that allows a user to list, display, add, delete, load and
+edit files.&nbsp; Its loader supports executables as COFF, ELF, AOUT or
+ascii scripts.&nbsp; File decompression, user levels, a file change-log
+and automatic file system cleanup (defragmentation) are also supported
+with TFS.&nbsp; Its implementation is independent of the OS used (doesn't
+even need one) and it is easily hooked into the application.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Also, typical&nbsp; application-level servers that interface to a file
+system are already written and available.&nbsp; HTTP, FTP and TFTP servers
+can easily be incorporated into any RTOS/TCP-IP package that conforms to
+the standard sockets API.&nbsp; Note that these servers are not full-blown
+servers (no, the HTTP server is not Apache compatible!); but they do support
+the majority of the typical needs of an embedded system.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="implementation"></a></font>Implementation
+Details</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+There are two defined sections of the system flash memory: flash space
+used by the monitor code itself and the flash space used by the file system.
+TFS presents itself as an API to the application code, allowing it to create,
+modify and read files.&nbsp; To the user interface, it is seen as a set
+of commands that manage those files (list, remove, display etc..). The
+flash that is used by TFS begins on a sector boundary and, depending on
+the defragmentation method configured at monitor build time, one of the
+largest of those sectors may or may not be dedicated to interruptible defragmentation.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+TFS organizes the files within the flash in a one-way linked list.&nbsp;
+The initial portion of the file is a file header, which contains information
+about the file, pointer to the next file and 32-bit crcs of the header
+and data portion of the file.&nbsp; Maintaining unique crc checks for header
+and data allows TFS to more accurately detect corruption.&nbsp; File size
+is limited only by the amount of flash allocated to TFS, there is no restriction
+with regard to sector boundaries.</font>
+<center>
+<p><img SRC="images/tfs.gif" NOSAVE height=512 width=640></center>
+
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+When the system is first built, TFS must be initialized.&nbsp; This means
+that the flash space allocated to TFS must be erased.&nbsp; From that point
+on, as a file is created it is appended to the end of the linked list of
+files.&nbsp; If a file is deleted from the list, it is simply marked as
+deleted.&nbsp; At some point, after several files have been deleted, it
+will be necessary to clean up the TFS flash space by running a defragmentation
+(<a href="commands/tfs.html">tfs clean</a>).&nbsp; There are currently
+two different mechanisms for TFS defragmentation that can be used (established
+at monitor compile time).&nbsp; The simpler of the two does not require
+a spare sector to be dedicated to defragmentation, but it assumes that
+when it is run it can use as much RAM space as there is FLASH space dedicated
+to TFS.&nbsp; Also, this simpler method is not protected from a reset or
+power hit during defragmentation.&nbsp; This means that if the defragmentation
+is interrupted, it is likely that the file system will be corrupted.&nbsp;
+The second mechanism requires that a sector be allocated to the defragmentation
+process, but it does not need RAM.&nbsp; It also uses a small block of
+flash at the end of the TFS flash space for maintaining non-volatile state
+that can be retrieved in the event of an interrupted defragmentation (power
+hit or reset).</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Note that the spare sector cannot reside within the space used by TFS.&nbsp;
+It must be at the end because TFS assumes that any one file is stored in
+one contiguous block of flash.&nbsp; This, by the way, is a very nice feature
+for extremely real-time dependent systems... A data file can be stored
+in flash, accessed by name to retrieve the starting point of the data,
+and from that point on, simple (and efficient) memory accesses can be made
+to read data from the file.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="attributes"></a></font>File
+Attributes</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+TFS supports file attributes.&nbsp; The attribute simply describes the
+file to TFS, so that when TFS does some automatic stuff, it knows how to
+do it.&nbsp; An attribute in the file header is simply a bit setting.&nbsp;
+At the command line, each attribute is assigned a letter which is used
+to display or create (in a non-verbose mode) the files in TFS.&nbsp; Following
+is a list of all the file attributes, including a brief description of
+each...</font>
+<br>&nbsp;
+<br>&nbsp;
+<center><table BORDER WIDTH="80%" NOSAVE >
+<tr ALIGN=CENTER VALIGN=CENTER NOSAVE>
+<td NOSAVE><b><font face="Arial,Helvetica">Attribute</font></b></td>
+
+<td NOSAVE><b><font face="Arial,Helvetica">Abbreviation</font></b></td>
+
+<td><b><font face="Arial,Helvetica">Description</font></b></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td NOSAVE><font face="Arial,Helvetica">executable script</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">e</font></td>
+
+<td><font face="Arial,Helvetica">executable file of CLI commands</font></td>
+</tr>
+
+<tr>
+<td>
+<center><font face="Arial,Helvetica">executable binary</font></center>
+</td>
+
+<td>
+<center><font face="Arial,Helvetica">E</font></center>
+</td>
+
+<td>
+<center><font face="Arial,Helvetica">executable/loadable COFF, ELF or AOUT
+binary image*</font></center>
+</td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td NOSAVE><font face="Arial,Helvetica">auto-boot</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">b</font></td>
+
+<td><font face="Arial,Helvetica">file is to be automatically run at boot
+time</font></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td NOSAVE><font face="Arial,Helvetica">auto-boot with query</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">B</font></td>
+
+<td><font face="Arial,Helvetica">file is to be automatically run at boot
+time, after querying user</font></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td><font face="Arial,Helvetica">compressed</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">c</font></td>
+
+<td><font face="Arial,Helvetica">file is <a href="#decompression">compressed</a></font></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td><font face="Arial,Helvetica">in-place-modifiable</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">i</font></td>
+
+<td><font face="Arial,Helvetica">file is <a href="#ipmod">in-place-modifiable</a></font></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td><font face="Arial,Helvetica">unreadable</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">u</font></td>
+
+<td><font face="Arial,Helvetica">file is not readable when monitor is below
+required user level</font></td>
+</tr>
+
+<tr ALIGN=CENTER NOSAVE>
+<td><font face="Arial,Helvetica">user-level</font></td>
+
+<td ALIGN=CENTER NOSAVE><font face="Arial,Helvetica">0-3</font></td>
+
+<td><font face="Arial,Helvetica">4 different <a href="#user_levels">user
+levels</a></font></td>
+</tr>
+</table></center>
+
+<p>*<font face="Arial,Helvetica"> Currently COFF, ELF and AOUT are the
+supported loadable file formats.&nbsp; Others will be added as necessary.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="autoboot"></a><font face="Arial,Helvetica">Autobootable
+Files</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp; At some
+point in the startup of the monitor, it looks to TFS for auto-bootable
+files.&nbsp; There are actually three different types of autobootable files:
+two types established by the attributes assigned to the file and one special
+case (the monrc file).&nbsp; For the monrc file to automatically run, it
+must exist and be marked as executable.&nbsp; It will be run prior to any
+other autobootable file in TFS.&nbsp; Actually, it is run prior to the
+monitor having completed its own initialization (this is done so that the
+execution of monrc can be used to configure the monitor as it starts up).&nbsp;
+The remaining autobootable files are run after the monitor has completed
+initialization.&nbsp; They will be run in alphabetical order, so the order
+in which they are placed in TFS doesn't matter.&nbsp; The order in which
+they are listed via "tfs ls" is the order in which they will be executed...</font>
+<blockquote>
+<blockquote><tt>&nbsp;Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Size&nbsp;&nbsp;&nbsp; Location&nbsp;&nbsp; Flags Info</tt>
+<br><tt>&nbsp;bkgd.jpg&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+5976&nbsp;&nbsp; 0x80047a6c</tt>
+<br><tt>&nbsp;cardtilt.gif&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+6099&nbsp;&nbsp; 0x80040c1c</tt>
+<br><tt>&nbsp;boot_diag&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+109358&nbsp;&nbsp; 0x8004921c&nbsp;&nbsp; BeE</tt>
+<br><tt>&nbsp;construction.gif&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+20222&nbsp;&nbsp; 0x8004243c</tt>
+<br><tt>&nbsp;form.html&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+466&nbsp;&nbsp; 0x8004004c</tt>
+<br><tt>&nbsp;ias_app&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+792080&nbsp;&nbsp; 0x80155a7c&nbsp;&nbsp; BeE</tt>
+<br><tt>&nbsp;index.html&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+442&nbsp;&nbsp; 0x8004026c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+webpage</tt>
+<br><tt>&nbsp;info1.html&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1053&nbsp;&nbsp; 0x8004047c&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+webpage</tt>
+<br><tt>&nbsp;info2.html&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+734&nbsp;&nbsp; 0x800408ec&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+webpage</tt>
+<br><tt>&nbsp;lucentlogo.gif&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+1680&nbsp;&nbsp; 0x8004738c</tt>
+<br><tt>&nbsp;monrc&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+823&nbsp;&nbsp; 0x80154d2c&nbsp;&nbsp; e</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; For the above list (output
+of "tfs ls"), the order of autoboot execution would be: 1. monrc;&nbsp;
+2. boot_diag;&nbsp; 3. ias_app.&nbsp; All other files listed are simply
+data files used by the application.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The two autobootable
+attributes supported are "B" and "b", both of which will run at startup;
+but the "B" type will query the user at the console port, providing an
+opportunity to abort the autoboot of that file.&nbsp; Both scripts and
+binary executables can be configured with autoboot flags enabled; but there
+are&nbsp; limitations.&nbsp; Consider the list of autobootable files to
+be a script that contains those executables, each of which will be run
+in the order shown by "tfs ls", then refer to the section on <a href="scripts.html#nesting">script
+nesting</a> for further discussion.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="ipmod"></a><font face="Arial,Helvetica">What
+is an "in-place-modifiable" file?</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp; Typically, when a
+file is modified, the original file is marked as deleted, and the new version
+of the file is appended to the end of the list of files currently stored
+in TFS.&nbsp; This can involve a relatively large amount of overhead if
+the modification to be made is trivial.&nbsp; As an alternative,&nbsp;
+a file can be created as an "in-place-modifiable" file which means that
+the API provides a means by which a file can be modified without the typical
+deletion/re-creation step mentioned above.&nbsp; This is done by creating
+the file as in-place-modifiable and specifying the file to be of some size.&nbsp;
+The space is then allocated in TFS for this file, but the flash is all
+left in a writable state.&nbsp; This usually means that the bytes in the
+flash are all 0xff (usually, bits in flash can be cleared on a byte-by-byte
+basis, but to reset them, an entire sector must be erased).&nbsp; All subsequent
+writes to this file, then, are done directly to the currently allocated
+flash instead of to a new block of flash.&nbsp; Obviously this puts some
+responsibility back on the programmer, but it can potentially save quite
+a bit of overhead if necessary.&nbsp; When a file is created as in-place-modifiable,
+then the TFS API function <a href="api/tfsipmod.html">tfsipmod()</a> should
+be used instead of the standard open-modify-close model.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="user_levels"></a><font face="Arial,Helvetica">User
+Levels</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp; The monitor supports
+the concept of user levels.&nbsp; At any given time, there is an active
+user level.&nbsp; TFS supports the ability to store a file at a particular
+user level, then limit access of that file based on the user level at the
+time of the access.&nbsp; The access can be limited to
+<a href="#attributes">read-only
+or not-even-readable</a>.&nbsp; Refer to the discussion on <a href="userlevels.html">user
+levels</a> for complete details, but in short, this means that certain
+files (and executables) can be configured to be accessible only at certain
+user levels.&nbsp; Since each user level is attainable only via password,
+a system can be built at user level 3, then lowered to user level 2,1,
+or 0 and provide a certain degree of protection from unauthorized access.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="decompression"></a></font>File
+Decompression</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+A typical application file will be either COFF, ELF or AOUT.&nbsp; Each
+of these file formats has multiple sections of text and data that must
+be transferred out of the flash space the file resides in, and into some
+RAM/DRAM space that the application was built to run in.&nbsp; Decompression
+of these file types is done by decompressing each of the sections within
+the file from flash, directly into the RAM/DRAM space the section is destined
+for.&nbsp; This "section-at-a-time" decompression eliminates the need to
+decompress the entire file into some block of memory, then load from that
+block into the actual memory space the image was built for.</font>
+<center>
+<p><img SRC="images/compression.gif" NOSAVE height=512 width=640></center>
+
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+This mechanism requires some post processing of the final application file
+built on a host using the <a href="tools/doc/elf.html">elf</a>, <a href="tools/doc/coff.html">coff</a>
+and <a href="tools/doc/aout.html">aout</a> support tools.&nbsp;&nbsp; Two
+different decompression methods are supported: huffman and zlib, each method
+has its own set of advantages/disadvantages.&nbsp; Using the huffman decompressor
+requires just a small extension to the monitor footprint (3-5 K) and no
+additional memory for malloc, but typical compression is only about 15-20%.&nbsp;
+Using the <a href="http://www.info-zip.org/pub/infozip/zlib/">public domain
+zlib</a> utilities requires a larger extension to the monitor footprint
+(35-40K) and additional heap space (see <a href="appnotes/heapspace.html#zlib_extend">appnote</a>
+on heap space expansion for file decompression) for the monitor's malloc,
+but compression with zlib can result in a 70% reduction in space needed
+for file storage.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="TOD"></a></font>Time-of-Day</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Since the basic model of the monitor is to run without the need of any
+interrupts from the host processor, how is it that TFS can keep track of
+time of day?&nbsp; Actually, it doesn't.&nbsp; It depends on the application
+code to provide it with two functions that will support this: getLtime()
+and getAtime() .&nbsp; The first one, (long)getLtime(void), must return
+a long that is stored in the header of the TFS file when it is created.&nbsp;
+The second one, (char *)getAtime((long *)tval, (char *)buf, (int)buflen)
+can be used to simply return an ascii string representing the current time
+(if tval is 0) or it can return an ascii string representing the value
+stored in tval.&nbsp;&nbsp; The value in tval will typically be the value
+that was previously returned from getLtime().&nbsp; With this interface,
+TFS really doesn't have a clue about time-of-day, but it uses the capabilities
+given to it by the application to make it look like it does.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Note that this is a feature that is used by TFS to populate an entry in
+the header of the file being written at the time.&nbsp; If the two above
+functions are not supplied to TFS, then the header entry is left blank,
+and the file simply has no recollection of its time of creation.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><font face="Arial,Helvetica"><font size=+1>&nbsp;<a NAME="change_log"></a></font><font size=+2>Change-Log
+Facility</font></font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+TFS supports the ability to keep track of all modifications made in the
+file system.&nbsp; This is done by logging an action (add, delete or in-place-modify)
+and a filename to a file in TFS.&nbsp; By default this is not enabled,
+but can be enabled/disabled at any time using the tfs log command.&nbsp;
+The command will only run at the MAX user level and the file is created
+at the maximum user level.&nbsp; If the tfsctrl(TFS_TIMEFUNCS) command
+has been called to establish time-of-day functions in TFS, then the log
+will also reflect the time at which the change was made.&nbsp; Following
+is an example of the content of the TFS change-log (.tfschlog) file...</font>
+<br>&nbsp;
+<blockquote>
+<blockquote>
+<blockquote><tt>ON: startup</tt>
+<br><tt>ADD: cardtilt.gif</tt>
+<br><tt>ADD: construction.gif</tt>
+<br><tt>ADD: lucentlogo.gif</tt>
+<br><tt>ADD: form.html</tt>
+<br><tt>ADD: index.html</tt>
+<br><tt>ADD: info1.html</tt>
+<br><tt>ADD: info2.html</tt>
+<br><tt>ADD: bkgd.jpg</tt>
+<br><tt>ADD: cgiapp</tt>
+<br><tt>ADD: cleanup</tt>
+<br><tt>ADD: .httpadmin</tt>
+<br><tt>ADD: .dhcpsadmin</tt>
+<br><tt>DEL: cardtilt.gif</tt>
+<br><tt>ADD: cardtilt.gif</tt>
+<br><tt>DEL: construction.gif</tt>
+<br><tt>ADD: construction.gif</tt>
+<br><tt>DEL: lucentlogo.gif</tt>
+<br><tt>ADD: lucentlogo.gif</tt></blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><tt><font size=+1>&nbsp;<a NAME="tfs_overhead"></a></font></tt><font face="Arial,Helvetica">Flash
+Space Overhead Required by TFS</font></h2>
+
+<blockquote><font face="Arial,Helvetica"><font size=+1>&nbsp;</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Overlaying TFS onto a FLASH device is not free.&nbsp; There is a certain
+amount of space that is required by TFS; some of that space is fixed; other
+space is based on the number of files stored.&nbsp; The following diagram
+illustrates this...</font>
+<center>
+<p><img SRC="images/tfs_overhead.gif" NOSAVE height=512 width=640></center>
+
+<p><font face="Arial,Helvetica"><b>Note1:</b> a file that is marked as
+deleted in TFS requires less overhead than a file that is "living".&nbsp;
+This is because when a file is dead, there is no need to allocate a defragmentation
+header to that file.&nbsp; This means that removal of a file (even though
+it is not actually erasing the flash) still frees up some memory space
+for new file storage.</font>
+<p><font face="Arial,Helvetica"><b>Note2:</b>&nbsp; the spare sector must
+be larger than all other sectors allocated to a particular flash device
+within TFS; also, the sector that is just before the spare sector must
+be large enough to contain all of the defrag header tables.&nbsp; Files
+can never be stored in the spare sector.&nbsp; Files can be stored in the
+sector that will contain the defrag overhead, but TFS will not allow the
+file storage in that sector to exceed the space that is needed for defragmentation
+overhead; hence, that sector should be as large as possible (but not larger
+than the spare).</font>
+<p><font face="Arial,Helvetica"><b>Note3:</b> when a file is copied into
+TFS flash space, TFS first looks to see if this file with the same name
+already exists.&nbsp; If it does, and the data in the new file is identical
+to that of the current file, then there is no action taken.&nbsp; If on
+the other hand, the new file is different, then the old file is marked
+"stale" while the new one is being transferred into flash.&nbsp; This "<b>install-the-new
+then remove-the-old</b>" mechanism is a protection against the case of
+the new file transfer process being interrupted.&nbsp; If during the transfer
+of the new file something causes the target to restart, then TFS can recover
+by clearing out the partially transferred "new" file and re-installing
+the stale one.&nbsp; The user must be aware of this because it requires
+additional flash overhead... There must be space for the old and the new
+in one device.&nbsp; Note that the user can remove the old one, defragment
+and then install the new one to avoid this overhead, but then the protection
+described above is lost.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><tt><font size=+1>&nbsp;<a NAME="multiple-devices"></a></font></tt><font face="Arial,Helvetica">Multiple
+Storage Devices</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In some hardware designs there may be more than one device that could be
+used for file storage.&nbsp; TFS supports this.&nbsp; A default system
+will have a boot monitor in the base of the flash, then all remaining flash
+in that device is used by TFS and that's it.&nbsp; A more complicated system
+may contain battery backed ram, a boot flash device and a secondary storage
+flash device, etc...&nbsp; TFS supports multiple devices that are not necessarily
+in contiguous address space.&nbsp; Each device appears to the user as a
+directory, so any file can be stored in any device (limited by the size
+of the device, of course), but a file cannot span across multiple non-contiguous
+devices.&nbsp; For each device, the same power-safe defragmentation method
+is used; hence, if battery-backed RAM was on-board, it could be used to
+eliminate the problem of flash-life expectancy (see below) if there is
+a need to modify files at a high frequency.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+To "steer" a file to a particular device, each device has a unique prefix
+that, when made part of the file name, tells TFS that the file is destined
+for that device.&nbsp; If the prefix is omitted from the filename, then
+the default device is used for storage.&nbsp; Similarly, the file-system
+maintenance commands (tfs check, tfs clean, tfs freemem, etc...) can also
+be pointed to a particular device by specifying the device prefix.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><tt><font size=+1>&nbsp;<a NAME="flash_life"></a></font></tt><font face="Arial,Helvetica">Flash
+Life-Expectancy</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+It is important to be aware of the fact that the underlying technology
+(flash) has a limited number of erase cycles.&nbsp;&nbsp; Current flash
+devices typically support 100,000 to 1,000,000 erases per sector.&nbsp;
+Applications will use TFS in different ways, so it is impossible to draw
+any conclusions here with regard to how long the flash will last in a system
+using TFS.&nbsp; This section will; however, discuss the way TFS uses the
+flash so that the user can determine flash life based on their application's
+intended use of the file system.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+First of all, be aware that <i>TFS makes no attempt to do "wear-leveling"</i>.&nbsp;
+If the file system you need is to be used heavily enough to require wear-leveling,
+then buy one!&nbsp; Wear leveling adds a great deal of complexity to the
+underlying implementation and is beyond the scope of TFS.&nbsp; In every
+embedded system project I've been on, the need for clean interface to flash
+by name (instead of by address) has been there.&nbsp; On the other hand,
+the frequency of file modification has never deemed it necessary to even
+consider wear-leveling; expecially with the trend by most flash manufacturers
+to support 1,000,000 erases per sector.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+As mentioned above, the TFS API presents itself to the programmer in much
+the same way a standard OS's file system would be seen.&nbsp; This may
+mislead application developers into thinking that the file system can be
+thought of as a disk that provides the user with the freedom to write/erase
+at any frequency.&nbsp; This is not the case! TFS's defragmentation mechanism
+does not use a floating SPARE sector .&nbsp; This means that the spare
+sector is the portion of flash that is likely to wear out first simply
+because it is used as a temporary storage for all other sectors when defragmentation
+is done.&nbsp; In a current Packet Phone Adapter design, there are 13 sectors
+of flash used for TFS file storage and 1 for the spare sector.&nbsp; Assuming
+worst case defragmentation (all 13 sectors are affected), then a defragmentation
+run once a day on a part having a life expectancy of 100,000 erase cycles
+will be good for over 20 years (100,000/13/365=21) .&nbsp; This value of
+20 years makes the assumption that a defragmentation will be done daily,
+and that all sectors are affected by the defragmentation.&nbsp; The frequency
+of defragmentation and the number of sectors affected are very dependent
+on the application's use of the file system.&nbsp; For projects that TFS
+was originally designed for, this realistically means that there is no
+need to be concerned with flash life expectancy.&nbsp; For newer applications,
+flash usage must be considered.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Let's discuss the way the sectors are utilized and how different applications
+may wear out flash faster than others may... A flash sector is only erased
+during defragmentation.&nbsp; When a file is deleted, it is simply marked
+as deleted (a bit in the header).&nbsp; A file is deleted by the command
+<i>tfs
+rm</i> or through the API functions tfsunlink() and tfsclose() when the
+file was opened to for writing or appending.&nbsp; If a file that exists
+is opened for writing, the actual modification steps are deletion of the
+original file and re-write of the new file after the file that is currently
+the last file in physical flash space.&nbsp; Eventually this process reaches
+the end of the flash space used by TFS, so defragmentation must be run.&nbsp;
+At defragmentation, all of the space wasted by the deleted files is cleaned
+up and the current list of active files is placed end-to-end in the flash.&nbsp;
+This means that each sector used by TFS must be copied to the SPARE sector,
+then that sector is erased and only the active files in that sector are
+copied back to the original sector from the spare sector.&nbsp; This is
+repeated for each sector in TFS.&nbsp; The defragmentation attempts to
+make this as <i>sector-erase-efficient</i> as possible.&nbsp; If a sector
+is not affected by the defragmentation, then it is left untouched; hence,
+the number of sectors actually affected by a defragmentation depends on
+the amount of flash space currently being used by TFS and the position
+of the deleted files within the flash space.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In a typical embedded system project, the files in TFS will be the application
+itself, a monrc file for system configuration followed by other application
+specific files.&nbsp; The application executable is likely to be the largest
+file and also the least likely to change at a high frequency.&nbsp; This
+means that the space taken up by the application executable is fairly static
+hence, the number of sectors occupied by the application will not contribute
+to the wear of the spare sector.&nbsp; This fact in and of itself increases
+the estimated life expectancy calculated above.&nbsp;&nbsp; On the other
+hand, if the application executable is quite large relative to the total
+TFS space available, then, if there are any files that are to be modified
+on a regular basis, defragmentation will be run more frequently.&nbsp;
+The point is that the actual wearing rate of the flash is very application
+specific and must be thought out seriously.</font></blockquote>
+
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><tt><font size=+1>&nbsp;<a NAME="return_values"></a></font></tt><font face="Arial,Helvetica">TFS
+API Return Values</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The TFS API functions typically return TFS_OKAY (<a href="src/common/monitor/tfs.h.html">tfs.h</a>)
+if successful; else they return some negative value.&nbsp; This section
+lists the current return values and their verbose description, followed
+by an example snippet of code that prints out the verbose equivalent of
+the non-TFS_OKAY return value.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">TFS_OKAY</font></li>
+
+<br><font face="Arial,Helvetica">no error</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NOFILE</font></li>
+
+<br><font face="Arial,Helvetica">file not found</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NOSLOT</font></li>
+
+<br><font face="Arial,Helvetica">maximum number of files are currently
+opened</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_EOF</font></li>
+
+<br><font face="Arial,Helvetica">end of file reached</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_BADARG</font></li>
+
+<br><font face="Arial,Helvetica">bad argument passed into api function</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NOTEXEC</font></li>
+
+<br><font face="Arial,Helvetica">file is not executable</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_BADCRC</font></li>
+
+<br><font face="Arial,Helvetica">crc test of file failed</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_FILEEXISTS</font></li>
+
+<br><font face="Arial,Helvetica">file already exists</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_FLASHFAILURE</font></li>
+
+<br><font face="Arial,Helvetica">flash operation failed</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_WRITEMAX</font></li>
+
+<br><font face="Arial,Helvetica">max write count has been exceeded on an
+in-place-modifiable file</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_READONLY</font></li>
+
+<br><font face="Arial,Helvetica">file is read-only</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_BADFD</font></li>
+
+<br><font face="Arial,Helvetica">invalid file descriptor</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_BADHDR</font></li>
+
+<br><font face="Arial,Helvetica">bad coff | elf | aout header</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_CORRUPT</font></li>
+
+<br><font face="Arial,Helvetica">file is corrupted</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_MEMFAIL</font></li>
+
+<br><font face="Arial,Helvetica">some type of memory failure occurred</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NOTIPMOD</font></li>
+
+<br><font face="Arial,Helvetica">file is not in-place-modifiable</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_FLASHFULL</font></li>
+
+<br><font face="Arial,Helvetica">flash space dedicated to TFS is full</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_USERDENIED</font></li>
+
+<br><font face="Arial,Helvetica">user level access denied</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NAMETOOBIG</font></li>
+
+<br><font face="Arial,Helvetica">file name size exceeds limit</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_FILEINUSE</font></li>
+
+<br><font face="Arial,Helvetica">can't remove file if it is in use</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_SCRIPTINSUB</font></li>
+
+<br><font face="Arial,Helvetica">can't put a script in a subroutine</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_NOTAVAILABLE</font></li>
+
+<br><font face="Arial,Helvetica">tfs facility is not available (not included
+in config.h)</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_BADFLAG</font></li>
+
+<br><font face="Arial,Helvetica">unknown tfs flag entered</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_CLEANOFF</font></li>
+
+<br><font face="Arial,Helvetica">defragmentation is disabled</font>
+<li>
+<font face="Arial,Helvetica">TFSERR_FLAKESOURCE</font></li>
+
+<br><font face="Arial,Helvetica">souce is changing during the tfsadd()
+call.&nbsp; This usually means that the source address pass to tfsadd()
+is in TFS space and a defragmentation caused the source data to change.</font></ul>
+<font face="Arial,Helvetica">If the application code using the tfs api
+needs to show the user the verbose equivalent of these return values, following
+is an example...</font>
+<p><tt>&nbsp;&nbsp;&nbsp; int tfd;</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; tfd = tfsopen("file",TFS_RDONLY,0);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; if (tfd &lt; 0)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; printf("%s\n",(char
+*)tfsctrl(TFS_ERRMSG,tfd,0));</tt>
+<br>&nbsp;</blockquote>
+
+</body>
+</html>

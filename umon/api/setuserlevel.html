@@ -1,0 +1,81 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: setUserLevel</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_setUserLevel()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_setUserLevel()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Modify or retrieve the current
+user level of the monitor.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><font size=+1>int&nbsp;&nbsp;&nbsp;
+mon_setUserLevel(int level, char *password);</font></font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the application to query
+or modify the monitor's user level.&nbsp; At this API level, the password
+can be ignored.&nbsp; An incoming password of (char *)NULL tells this function
+not to check the password, but to simply adjust the user level.&nbsp; This
+allows the application to decide whether or not it actually wants to use
+the password protection of user levels in the monitor.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; level</font></li>
+
+<br><font face="Arial,Helvetica">value to be used as the new level.&nbsp;
+If -1, then simply return the current level.&nbsp; The current valid range
+for user levels in the monitor is 0-3.</font>
+<li>
+<font face="Arial,Helvetica">char *password</font></li>
+
+<br><font face="Arial,Helvetica">the string that corresponds to the password
+needed to get to the specified user level.&nbsp; Note that (char *)NULL
+tells this function to ignore the password entry.</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The current (if level
+= -1) or old user level.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/misccmds.c.html#setUsrLvl">misccmds.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

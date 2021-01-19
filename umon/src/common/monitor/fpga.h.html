@@ -1,0 +1,66 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/fpga.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/*
+ * fpga.h
+ *
+ * Xilinx FPGA programming module.
+ *
+ * by Thomas E. Arvanitis (tharvan@inaccessnetworks.com)
+ * by Dimitris Economou (decon@inaccessnetworks.com)
+ */
+
+
+#define FPGA_PROG_PIN 8
+#define FPGA_INIT_PIN 16
+
+#define FPGA_PROG 1&lt;&lt;FPGA_PROG_PIN
+#define FPGA_INIT 1&lt;&lt;FPGA_INIT_PIN
+
+#define FPGA_PROG_ADDR 0x08000000
+
+#define FPGA_BIT_LENGTH 1335840
+#define FPGA_BYTE_LENGTH (FPGA_BIT_LENGTH / 8) 
+
+#define XLNX_DBYTE 0xFF
+
+#define WAIT_TIME 10 /* us */
+#define WAIT_WRITE 5 /* us */
+
+#define INDIR 0
+#define OUTDIR 1
+
+#define MSECOND 1000
+
+#define ERR_BITF -2
+#define ERROR -1
+#define OK 1
+
+#define NULL 0
+
+extern int LoopsPerSecond;
+
+#define LOW 0
+#define HIGH 1
+
+#undef DEBUG_FPGA 1
+
+#ifdef DEBUG_FPGA
+#define <A NAME="D">D</A>(x) x
+#else
+#define <A NAME="D">D</A>(X)
+#endif
+
+
+/*
+ *  General register read/write macros
+ */
+#define <A NAME="wrreg">wrreg</A>(loc, val) (*loc = val)
+#define <A NAME="rdreg">rdreg</A>(loc) (*(loc))
+</HTML>
+</PRE>
+</BODY>

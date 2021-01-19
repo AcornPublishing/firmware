@@ -1,0 +1,94 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: READ</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>READ</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">read</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Interactive shell variable entry.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">read -[ct:T:] {varname1} [varname2]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command provides the monitors
+ability to run a script from TFS with the ability to interact with the
+user by requesting that the user input data that will be loaded into a
+specified shell variable.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">special case that simply waits for any
+COM-port input (like hit-any-key) to to continue;</font>
+<li>
+<font face="Arial,Helvetica">-t {###}</font></li>
+
+<br><font face="Arial,Helvetica">wait for input, but timeout after ###
+milliseconds, timeout is only applied to initial wait prior to receiving
+first character.</font>
+<li>
+<font face="Arial,Helvetica">-T{###}</font></li>
+
+<br><font face="Arial,Helvetica">wait for input, but timeout after ###
+milliseconds, timeout is restarted after each character is received.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">read name</font></li>
+
+<br><font face="Arial,Helvetica">Wait forever for input from the user to
+load into the shell variable <i>name</i></font>
+<li>
+<font face="Arial,Helvetica">read -t3000 name</font></li>
+
+<br><font face="Arial,Helvetica">Wait for up to 3 seconds for the user
+to enter data into the shell variable&nbsp; <i>name</i>.</font>
+<li>
+<font face="Arial,Helvetica">read -c</font></li>
+
+<br><font face="Arial,Helvetica">Wait for any input on the user interface.</font></ul>
+
+</body>
+</html>

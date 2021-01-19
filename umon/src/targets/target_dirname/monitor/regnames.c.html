@@ -1,0 +1,18 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/regnames.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* This file is included by the common file reg_cache.c.
+ * The regs_860.c file is the table of register names.
+ * The purpose behind this multiple level of file inclusion is to allow
+ * the common file "reg_cache.c" to include a file called "regnames.c"
+ * which will have a target-specific register table without the target-
+ * specific filename.
+ */
+#include "regs_860.c"
+</HTML>
+</PRE>
+</BODY>

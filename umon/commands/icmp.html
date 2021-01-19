@@ -1,0 +1,115 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: ICMP</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ICMP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">icmp</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">ICMP operation support.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">icmp -[c:d:f:rv:] {operation}
+[args]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Allows the user to run specific
+ICMP-based queries on the local LAN.&nbsp; Currently, the ICMP TIMESTAMP
+and ECHO are the only supported operations.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-c {##}</font></li>
+
+<br><font face="Arial,Helvetica">repetition count for echo;</font>
+<li>
+<font face="Arial,Helvetica">-d {##}</font></li>
+
+<br><font face="Arial,Helvetica">delta (in hours) relative to GMT;</font>
+<li>
+<font face="Arial,Helvetica">-f&nbsp; {x|d}</font></li>
+
+<br><font face="Arial,Helvetica">hex or decimal output (default is ASCII);</font>
+<li>
+<font face="Arial,Helvetica">-r</font></li>
+
+<br><font face="Arial,Helvetica">check server resolution;</font>
+<li>
+<font face="Arial,Helvetica">v {varname}</font></li>
+
+<br><font face="Arial,Helvetica">load result into shell var "varname".</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPERATIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">time</font></li>
+
+<br><font face="Arial,Helvetica">Issue ICMP TIMESTAMP request.</font>
+<li>
+<font face="Arial,Helvetica">echo</font></li>
+
+<br><font face="Arial,Helvetica">Basic ping capability.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">icmp time 135.3.29.35</font></li>
+
+<br><font face="Arial,Helvetica">Issue an ICMP time request to server on
+135.3.29.35.</font>
+<li>
+<font face="Arial,Helvetica">icmp echo 135.3.29.39</font></li>
+
+<br><font face="Arial,Helvetica">Similar to&nbsp; ping 135.3.29.39.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">The <i>d,f,r &amp; v</i> options are for the
+time operation and <i>c</i>&nbsp; is for echo.</font></li>
+</blockquote>
+
+</body>
+</html>

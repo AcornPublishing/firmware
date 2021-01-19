@@ -1,0 +1,392 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: EDIT</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>EDIT</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">edit</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Line-mode file editor for use
+with TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">edit -[b:c:f:i:m:rs:] {filename}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the user to
+edit ASCII files that are stored in TFS.&nbsp; It is a simple line-based
+file editor that supports line insertion, deletion, display and search.&nbsp;
+If the file already exists in TFS, then the content of that file is copied
+to a buffer in ram space and all interaction and modification with the
+content of the file is done in the buffer.&nbsp; It is not until the 'q'
+(quit) command is issued, that the file is written to flash.&nbsp; If at
+any point during the edit session, the 'x' (exit) command is issued, then
+there is no change to the original file.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-b {addr}</font></li>
+
+<br><font face="Arial,Helvetica">specify the buffer address that edit is
+to use for temporary storage of the file while being edited; if not specified,
+then edit assumes it owns all RAM on the board and the buffer starts at
+the address specified in the <a href="../shellvars.html#APPRAMBASE">APPRAMBASE</a>
+shell variable.;</font>
+<li>
+<font face="Arial,Helvetica">-c {cmd}</font></li>
+
+<br><font face="Arial,Helvetica">in-line command executed prior to entering
+interactive mode;</font>
+<li>
+<font face="Arial,Helvetica">-f&nbsp; {flags}</font></li>
+
+<br><font face="Arial,Helvetica">flags that are applied to the newly created
+file (see TFS for flag description);</font>
+<li>
+<font face="Arial,Helvetica">-i&nbsp; {info}</font></li>
+
+<br><font face="Arial,Helvetica">information field applied to the newly
+created file (see TFS);</font>
+<li>
+<font face="Arial,Helvetica">-m {size}</font></li>
+
+<br><font face="Arial,Helvetica">use monitor's malloc to allocate buffer
+space</font>
+<li>
+<font face="Arial,Helvetica">-r</font></li>
+
+<br><font face="Arial,Helvetica">edit defaults to automatically remove
+carriage returns from the file it is editing, this shuts off that automatic
+removal;</font>
+<li>
+<font face="Arial,Helvetica">-s {size}</font></li>
+
+<br><font face="Arial,Helvetica">size of buffer to use for temporary storage.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">A typical usage of the edit command will put
+the user in an interactive mode that supports a basic set of editing commands.&nbsp;
+At the startup of the interactive mode, edit will display the address of
+the buffer it will be using for temporary storage, followed by the message
+"<i>type ? for help".</i>&nbsp; Following is a list of commands supported
+for interactive mode...</font></li>
+
+<br>&nbsp;
+<center><table WIDTH="80%" >
+<tr>
+<td><b><font face="Arial,Helvetica">d{LRNG}</font></b></td>
+
+<td><font face="Arial,Helvetica">delete line specified by "LRNG" (see below)</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">e#</font></b></td>
+
+<td><font face="Arial,Helvetica">edit line # (uses the same line editor
+as is used by the command line editor)</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">i</font></b></td>
+
+<td><font face="Arial,Helvetica">begin "insert" mode (use '.' to exit insert
+mode)</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">a</font></b></td>
+
+<td><font face="Arial,Helvetica">begin "append" mode (use '.' to exit append
+mode)</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">P[LRNG]</font></b></td>
+
+<td><font face="Arial,Helvetica">print entire buffer with line numbers
+prepended</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">p</font></b></td>
+
+<td><font face="Arial,Helvetica">print entire buffer</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">q[fname]</font></b></td>
+
+<td><font face="Arial,Helvetica">quit edit, write file (with no fname specified)
+it writes the to file originally opened</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">s[srchstr]</font></b></td>
+
+<td><font face="Arial,Helvetica">go to next line that contains "srchstr"</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">x</font></b></td>
+
+<td><font face="Arial,Helvetica">exit edit, do not write file</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">#</font></b></td>
+
+<td><font face="Arial,Helvetica">go to line # (use '$' to go to last line)</font></td>
+</tr>
+
+<tr>
+<td><b><font face="Arial,Helvetica">+/-#</font></b></td>
+
+<td><font face="Arial,Helvetica">go to line relative to current position</font></td>
+</tr>
+</table></center>
+
+<p><font face="Arial,Helvetica">Where...</font>
+<blockquote><font face="Arial,Helvetica"># represents a decimal number;</font>
+<br><font face="Arial,Helvetica">LRNG represents a line number or inclusive
+line range (# or #-#);</font></blockquote>
+<b><font face="Arial,Helvetica">Let's work through a simple example...</font></b>
+<p><font face="Arial,Helvetica">Assume we have the file 'monrc'.&nbsp;
+We want to change a line in monrc.&nbsp; We will simply delete the line
+and re-enter</font>
+<br><font face="Arial,Helvetica">the new line (there are other ways, but
+lets keep the example simple).&nbsp; For the sake of this example, the
+response to each command will be in red,&nbsp; comments will be in blue
+and commands entered in bold.</font>
+<br><font face="Arial,Helvetica">The output of "tfs cat monrc" is as follows...</font>
+<br>&nbsp;
+<center><table WIDTH="70%" >
+<tr>
+<td><tt>uMON> <b>tfs cat monrc</b></tt></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Display the current
+content of the file.</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">set GIPADD 135.17.115.1</font></tt>
+<br><tt><font color="#FF0000">set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><tt>uMON> <b>edit monrc</b></tt></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Start the editing
+process.</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">Edit buffer = 0xf000c000.</font></tt>
+<br><tt><font color="#FF0000">Type '?' for help</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><b><tt>P</tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Print entire file
+with line numbers prepended.</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">> 1: set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 2: set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 3: set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 4: set GIPADD 135.17.115.1</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 5: set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 6: set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">d4</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3366FF">Delete line number
+4</font></font></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">P</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Print and notice
+the removal of the old line 4...</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">> 1: set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 2: set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 3: set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 4: set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 5: set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">3</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3366FF">Move "current position"
+pointer to line 3</font></font></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">P</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Print and notice
+the pointer moved to line 3...</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">&nbsp; 1: set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 2: set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">> 3: set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 4: set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 5: set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">a</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3366FF">Go into append mode
+(after current line pointer)</font></font></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">set GIPADD 135.17.115.2</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">&lt;<b>-- </b>This
+is the text being added</font></font></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">.</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Terminate append
+mode</font></font></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">P</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Print and notice
+new line 4 and pointer at line 5...</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">&nbsp; 1: set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 2: set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 3: set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 4: set GIPADD 135.17.115.2</font></tt>
+<br><tt><font color="#FF0000">> 5: set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">&nbsp; 6: set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><b><tt><font color="#000000">q</font></tt></b></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Write the new file
+to TFS and quit the editor</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#000000">uMON></font><font color="#FF0000"> </font><b><font color="#000000">tfs
+cat monrc</font></b></tt></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">Display the new
+file with the modification...</font></font></td>
+</tr>
+
+<tr>
+<td><tt><font color="#FF0000">set ETHERSPEED 10</font></tt>
+<br><tt><font color="#FF0000">set PROMPT "maint> "</font></tt>
+<br><tt><font color="#FF0000">set MONFLAGS nophdr</font></tt>
+<br><tt><font color="#FF0000">set GIPADD 135.17.115.2&nbsp;</font></tt>
+<br><tt><font color="#FF0000">set IPADD 135.17.115.215</font></tt>
+<br><tt><font color="#FF0000">set NETMASK 255.255.255.0</font></tt></td>
+
+<td></td>
+</tr>
+
+<tr>
+<td><tt><font color="#000000">uMON></font></tt></td>
+
+<td><font face="Arial,Helvetica"><font color="#3333FF">All done!</font></font></td>
+</tr>
+</table></center>
+
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<br>&nbsp;
+<blockquote>&nbsp;</blockquote>
+</blockquote>
+
+</body>
+</html>

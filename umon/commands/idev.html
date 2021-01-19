@@ -1,0 +1,86 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: IDEV</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>IDEV</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">idev</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Device interface.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">idev [-d:] [command] [command-specific
+arg(s)]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command is used on target
+systems that have a set of devices that are to be managed.&nbsp; Typically,
+this is used for systems that have multiple serial ports and currently,
+that is its only use; howerver, it is not confined to that.&nbsp; The command
+allows the user interface to a device and reconfigure various parameters
+applicable to that device.&nbsp; <b><i>Note that this command is not applicable
+to all target systems.</i></b></font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-d {device id}</font></li>
+
+<br><font face="Arial,Helvetica">by default, the command is applied to
+the device that interfaces to the Console port, but this option allows
+that to be overridden.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SUB-COMMANDS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">console</font></li>
+
+<br><font face="Arial,Helvetica">this command allows the user to configure
+a different device to be the Console device.&nbsp; Since the default action
+is taken on the console device, using this sub-command without the -d option
+is of no use.</font>
+<li>
+<font face="Arial,Helvetica">baud {baudrate}</font></li>
+
+<br><font face="Arial,Helvetica">specify a device to run at a newly set
+baudrate.</font></blockquote>
+
+</body>
+</html>

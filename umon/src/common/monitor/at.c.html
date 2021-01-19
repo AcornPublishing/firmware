@@ -1,0 +1,735 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/at.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* At description:
+ *  The 'at' command provides a state-machine-like ability
+ *  for breakpoints.  It uses the breakpoint trap as a way
+ *  of entering the monitor from active application.  Upon
+ *  entry into the monitor, a few different things can happen:
+ *
+ *  1. an action can be taken and then application is resumed;
+ *  2. a condition is checked and if the condition is met, an
+ *     action is taken;
+ *
+ *  It is basically an elaboration of the counting breakpoint (break
+ *  at address HHHH the Nth time).  The counting breakpoint uses the
+ *  break trap to temporarily enter the monitor, change some debug
+ *  state, and, if the state meets some condition (in this case, the 
+ *  count is met), then break; else resume application.
+ *
+ *  Note that several action/condition combinations can be done for
+ *  a single address.  This allows the state machine to be as complex
+ *  as necessary.  The sequence of the action/conditions is changeable.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpu.h"
+#include "cpuio.h"
+#include "genlib.h"
+#if INCLUDE_DEBUG
+#include "ctype.h"
+#include "stddefs.h"
+#include "cli.h"
+
+extern  void    StepOverTrap(), resume(), putreg();
+
+ulong   PCatBreak;          /* Copy of PC at the breakpoint */
+ushort  settrap();
+
+/* Use TRAP for breakpoint */
+#define TRAPNUM     0
+#define TRAPU       0x4e
+#define TRAPL       (0x40+TRAPNUM)
+
+#define ATVARTOT    8   /* Number of AT variables */
+#define ATLISTSIZE  8   /* Number of AT statements */
+
+/* Action definitions: */
+#define VAR_INC     1   /* increment variable: VAR++ */
+#define VAR_DEC     2   /* decrement variable: VAR-- */
+#define VAR_EQ      3   /* assign variable: VAR=vv */
+#define FLG_SET     4   /* set flag: FSETff */
+#define FLG_CLR     5   /* clear flag: FCLRff */
+#define FLG_EQ      6   /* set flag: FEQff */
+#define BREAK       8   /* break: BRK */
+
+/* Condition definitions: */
+#define VAR_EQ_CONST    20  /* Atvar equals constant */
+#define VAR_EQ_LOC  21      /* Atvar equals content of location */
+#define FLG_ALL_SET 22      /* Atflag has all specified bits set */
+#define FLG_ANY_SET 23      /* Atflag has any specified bits set */
+#define FLG_EQ_CONST    24  /* Atflag equals constant */
+#define PASS_COUNT  26      /* At passcount equals constant */
+#define FUNC_CALL   27      /* At function returns constant */
+
+int atinit(), atlist();
+int ata(), atca();
+int atvarset(), atflagset(), atdelete(), atswap();
+static  ulong   atvars[ATVARTOT];
+static  ushort  atflag;
+
+struct atstruct {
+    uchar   inuse;      /* Set if this 'at' structure is in use. */
+    ushort  origtext;   /* Value in text prior to TRAP insertion */
+    ulong   address;    /* Address of breakpoint */
+    ushort  Condition;  /* Condition that will cause action */
+    ushort  Cvar;       /* Variable upon which condition is tested */
+    ulong   Cconst;     /* Constant used in condition */
+    ulong   Cadd;       /* Address used in condition */
+    ushort  Csize;      /* Size used in condition */
+    int Cpcnt;          /* Pass count used in condition */
+    int (*Cfptr)();     /* Function pointer used in condition */
+    ushort  Action;     /* Action to be taken */
+    ushort  Avar;       /* Variable upon which action is taken */
+    ulong   Aconst;     /* Constant used in action */
+    int idx;            /* index into attbl[] */
+} attbl[ATLISTSIZE];
+
+/* At():
+ *  Command line syntax...
+ *  at address action           # ata
+ *  at address ?condition action        # atca
+ */
+int
+<A NAME="At">At</A>(int argc,char *argv[])
+{
+    int opt, i;
+
+    while((opt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"Dd:f:Ilirs:v:")) != -1) {
+        switch(opt) {
+        case 'D':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atdelete>atdelete</A>(-1);
+            break;
+        case 'd':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atdelete>atdelete</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(optarg));
+            break;
+        case 'f':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atflagset>atflagset</A>(optarg);
+            break;
+        case 'I':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atinit>atinit</A>();
+            break;
+        case 'i':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#installatpoints>installatpoints</A>();
+            break;
+        case 'l':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atlist>atlist</A>(1);
+            break;
+        case 'r':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#removeatpoints>removeatpoints</A>();
+            break;
+        case 's':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atswap>atswap</A>(optarg);
+            break;
+        case 'v':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atvarset>atvarset</A>(optarg);
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    /* If any options were specified, then return now. */
+    if (optind != 1)
+        return(CMD_SUCCESS);
+
+    /* If no args, then display 'at' data. */
+    if (argc == 1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atlist>atlist</A>(0);
+        return(CMD_SUCCESS);
+    }
+
+    /* Find an available slot in the atlist table: */
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        if (attbl[i].inuse == 0)
+            break;
+    }
+    if (i == ATLISTSIZE) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("At-table full\n");
+        return(CMD_FAILURE);
+    }
+
+    /* Load the address: */
+    attbl[i].address = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind],(char **)0,0);
+
+    /* Establish the action: */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#setupaction>setupaction</A>(&attbl[i],argc,argv) == -1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Syntax error in action\n");
+        return(CMD_PARAM_ERROR);
+    }
+
+    /* Establish the condition (if any): */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#setupcondition>setupcondition</A>(&attbl[i],argc,argv) == -1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Syntax error in condition\n");
+        return(CMD_PARAM_ERROR);
+    }
+
+    /* Copy the original text: */
+    attbl[i].origtext = *(ushort *)(attbl[i].address);
+
+    /* Mark the 'at' entry as in use: */
+    attbl[i].inuse = 1;
+
+    return(CMD_SUCCESS);
+}
+
+/* setupaction():
+ *  Based on the incoming args, build the action. 
+ *  The action will always be the last argument.
+ */
+int
+<A NAME="setupaction">setupaction</A>(struct atstruct *atp,int argc,char *argv[])
+{
+    char    *action, *cp;
+
+    action = argv[argc-1];
+    cp = action;
+    while(*cp)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#toupper>toupper</A>(*cp++);
+    if (action[0] == '%') {
+        atp-&gt;Avar = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&action[1],&cp,0);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cp,"++"))
+            atp-&gt;Action = VAR_INC;
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cp,"--"))
+            atp-&gt;Action = VAR_DEC;
+        else if (*cp == '=') {
+            atp-&gt;Action = VAR_EQ;
+            atp-&gt;Aconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(cp+1,(char **)0,0);
+        }
+        else
+            return(-1);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(action,"FSET",4)) {
+        atp-&gt;Action = FLG_SET;
+        atp-&gt;Aconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&action[4],(char **)0,0);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(action,"FCLR",4)) {
+        atp-&gt;Aconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&action[4],(char **)0,0);
+        atp-&gt;Action = FLG_CLR;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(action,"FEQU",4)) {
+        atp-&gt;Aconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&action[4],(char **)0,0);
+        atp-&gt;Action = FLG_EQ;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(action,"BREAK")) {
+        atp-&gt;Action = BREAK;
+    }
+    else
+        return(-1);
+    return(0);
+}
+
+/* setupcondition():
+ *  Based on the incoming args, build the condition.
+ *  The condition (if any) will always be the next-to-last argument
+ *  and will be preceded by a question mark.
+ */
+int
+<A NAME="setupcondition">setupcondition</A>(struct atstruct *atp,int argc,char *argv[])
+{
+    char    *condition, *cp, *op;
+    int i;
+
+    condition = (char *)0;
+    for(i=0;i&lt;argc;i++) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[i],"if")) {
+            condition = argv[i+1];
+            break;
+        }
+    }
+
+    cp = condition;
+    while(*cp)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#toupper>toupper</A>(*cp++);
+
+    if (!condition) /* There may not be a condition specified. */
+        return(0);
+
+    op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(condition,'(');
+    atp-&gt;Csize = 1;
+    if (condition[0] == '%') {
+        atp-&gt;Cvar = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&condition[1],&cp,0);
+        if (*cp == '.')
+            atp-&gt;Csize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(cp+1,&cp,0);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(cp,"==",2)) {
+            atp-&gt;Condition = VAR_EQ_CONST;
+            atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(cp+2,(char **)0,0);
+        }
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(cp,"==*")) {
+            atp-&gt;Condition = VAR_EQ_LOC;
+            atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(cp+3,(char **)0,0);
+        }
+        else
+            return(-1);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(condition,"FALL",4)) {
+        atp-&gt;Condition = FLG_ALL_SET;
+        atp-&gt;Aconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&condition[4],(char **)0,0);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(condition,"FANY",4)) {
+        atp-&gt;Condition = FLG_ANY_SET;
+        atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&condition[4],(char **)0,0);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(condition,"FEQU",4)) {
+        atp-&gt;Condition = FLG_EQ_CONST;
+        atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&condition[4],(char **)0,0);
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(condition,"PCNT==",6)) {
+        atp-&gt;Condition = PASS_COUNT;
+        atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&condition[6],(char **)0,0);
+        atp-&gt;Cpcnt = 0;
+    }
+    else if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(op,"()==",4) == 0) {
+        atp-&gt;Condition = FUNC_CALL;
+        atp-&gt;Cfptr = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(condition,(char **)0,0);
+        atp-&gt;Cconst = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(op+4,(char **)0,0);
+    }
+    else
+        return(-1);
+    return(0);
+}
+
+int
+<A NAME="atvarset">atvarset</A>(char *vset)
+{
+    int vnum, val;
+    char    *cp;
+
+    vnum = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(vset,&cp,0);
+    if ((vnum &lt; 0) || (vnum &gt;= ATVARTOT)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Variable number (%d) out of range\n",vnum);
+        return(-1);
+    }
+    if (*cp != '=') {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Variable set syntax error\n");
+        return(-1);
+    }
+    cp++;
+    val = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(cp,(char **)0,0);
+    atvars[vnum] = val;
+    return(0);
+}
+
+int
+<A NAME="atflagset">atflagset</A>(char *fset)
+{
+    atflag = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(fset,(char **)0,0);
+    return(0);
+}
+
+char *AtHelp[] = {
+    "Complex breakpoints",
+    "-[Dd:f:Iilrs:v:] {address} [if condition] {action}",
+    " -D        delete all",
+    " -d{#}     delete specific",
+    " -f{xx}    set atflag to 'xx'",
+    " -I        initialize 'at' structures",
+    " -i        install atpoints",
+    " -l        list current state",
+    " -r        remove atpoints",
+    " -s{x,y}   swap at 'x' with at 'y'",
+    " -v{xx=yy} set atvar 'xx' to 'yy'",
+    "Conditions:",
+    " %VV==##      atvar 'VV' == '##'",
+    " PCNT==##     pass count == '##'",
+    " 0xFFF()==##  func at 0xFFF == '##'",
+    " FEQUXX       atflag equals 'XX'",
+    " FALLXX       atflag OR 'XX' equals 'XX'",
+    " FANYXX       atflag OR 'XX' is non-zero",
+    " %VV[.s]==*YY atvar 'VV' (size 's') equals *'YY'",
+    "Actions:",
+    " %VV=YY   set atvar 'VV' to 'YY'",
+    " %VV++    increment atvar 'VV'",
+    " %VV--    decrement atvar 'VV'",
+    " FEQUXX   set atflag to 'XX'",
+    " FSETXX   OR 'XX' with atflag",
+    " FCLRXX   AND ~'XX' with atflag",
+    " BREAK    break to monitor",
+    "",
+    "%VV ranges from %01 through %08",
+    (char *)0,
+};
+
+int
+<A NAME="atlist">atlist</A>(int type)
+{
+    int i, j, tot;
+    struct atstruct *atp;
+
+    tot = 0;
+    atp = attbl;
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        if (atp-&gt;inuse) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d: AT 0x%x ",
+                i,atp-&gt;address);
+            tot++;
+            switch (atp-&gt;Condition) {
+            case PASS_COUNT:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if PCNT (%d) == %d, ",
+                    atp-&gt;Cpcnt,atp-&gt;Cconst);
+                break;
+            case FUNC_CALL:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if 0x%x() == %d, ",
+                    atp-&gt;Cfptr,atp-&gt;Cconst);
+                break;
+            case VAR_EQ_CONST:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if VAR%d.%d == 0x%x, ",
+                    atp-&gt;Cvar,atp-&gt;Csize,atp-&gt;Cconst);
+                break;
+            case VAR_EQ_LOC:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if VAR%d.%d == *0x%x, ",
+                    atp-&gt;Cvar,atp-&gt;Csize,atp-&gt;Cconst);
+                break;
+            case FLG_ALL_SET:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if FLAG | 0x%x == 0x%x, ",
+                    atp-&gt;Cconst,atp-&gt;Cconst);
+                break;
+            case FLG_ANY_SET:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if FLAG | 0x%x != 0, ",atp-&gt;Cconst);
+                break;
+            case FLG_EQ_CONST:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("if FLAG == 0x%x, ",atp-&gt;Cconst);
+                break;
+            }
+            switch(atp-&gt;Action) {
+            case VAR_INC:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("VAR%d++\n",atp-&gt;Avar);
+                break;
+            case VAR_DEC:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("VAR%d--\n",atp-&gt;Avar);
+                break;
+            case VAR_EQ:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("VAR%d = 0x%x\n",atp-&gt;Avar,atp-&gt;Aconst);
+                break;
+            case FLG_SET:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("FLAG |= 0x%x\n",atp-&gt;Aconst);
+                break;
+            case FLG_CLR:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("FLAG &= 0x%x\n",atp-&gt;Aconst);
+                break;
+            case FLG_EQ:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("FLAG = 0x%x\n",atp-&gt;Aconst);
+                break;
+            case BREAK:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("BREAK\n");
+                break;
+            }
+        }
+        atp++;
+    }
+
+    if (type == 0)
+        return(tot);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("AT VARS:\n");
+    for(j=1,i=0;i&lt;ATVARTOT;i++,j++)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  V%02d: 0x%x (%d)\n",i,atvars[i],atvars[i]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nAT FLAG: 0x%02x\n",atflag);
+    return(tot);
+}
+
+int
+<A NAME="atdelete">atdelete</A>(int n)
+{
+    int i;
+
+    if (n == -1) {
+        for(i=0;i&lt;ATLISTSIZE;i++)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atclearitem>atclearitem</A>(&attbl[i]);
+        return(0);
+    }
+    if (n &lt; ATLISTSIZE)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atclearitem>atclearitem</A>(&attbl[n]);
+    return(0);
+}
+
+/* atclearitem():
+ *  Clear out all members of the specified attbl[] item.
+ */
+void
+<A NAME="atclearitem">atclearitem</A>(struct atstruct *atptr)
+{
+    atptr-&gt;inuse = 0;
+    atptr-&gt;origtext = 0;
+    atptr-&gt;address = 0;
+    atptr-&gt;Condition = 0;
+    atptr-&gt;Cvar = 0;
+    atptr-&gt;Cconst = 0;
+    atptr-&gt;Cadd = 0;
+    atptr-&gt;Csize = 0;
+    atptr-&gt;Action = 0;
+    atptr-&gt;Avar = 0;
+    atptr-&gt;Aconst = 0;
+}
+
+void
+<A NAME="atinit">atinit</A>(void)
+{
+    int i;
+    ulong   *vloc;
+    extern  void at_hdlr(), trace_hdlr();
+
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atclearitem>atclearitem</A>(&attbl[i]);
+        attbl[i].idx = i;
+    }
+    for(i=0;i&lt;ATVARTOT;i++)
+        atvars[i] = 0;
+
+    /* Load the trap handler into the vector table: */
+    vloc = (ulong *)(0x80 + (uchar)(TRAPNUM*4));
+    *vloc = (ulong)at_hdlr;
+
+    /* Load the trace handler into the vector table: */
+    vloc = (ulong *)(0x24);
+    *vloc = (ulong)trace_hdlr;
+
+    atflag = 0;
+}
+
+/* atswap():
+ *  Swap the position of 2 AT structures in the list.
+ *  The incoming string should be formatted as XX,YY
+ *  meaning that items XX and YY are swapped in the at list.
+ *  If either of the items do not exist, the swap is aborted.
+ *  This allows the debugger to arrange the at statments in a 
+ *  particular sequence that carries out the programmed state
+ *  machine.
+ */
+int
+<A NAME="atswap">atswap</A>(char *string)
+{
+    int item1, item2;
+    char    *comma;
+    struct  atstruct atitem;
+
+    comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(string,',');
+    if (!comma) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Swap syntax error\n");
+        return(-1);
+    }
+    item1 = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(string);
+    item2 = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(comma+1);
+    if ((item1 &lt; 0) || (item2 &lt; 0) ||
+        (item1 &gt;= ATLISTSIZE) || (item2 &gt;= ATLISTSIZE)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Swap item out of range\n");
+        return(-1);
+    }
+    if ((attbl[item1].inuse==0) || (attbl[item2].inuse==0)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Swap item not in use\n");
+        return(-1);
+    }
+
+    /* Make the swap: */
+    atitem = attbl[item1];
+    attbl[item1] = attbl[item2];
+    attbl[item2] = atitem;
+    return(0);
+}
+
+/* installatpoints():
+ *  Replace all locations that have at-statements with TRAP.
+ */
+void
+<A NAME="installatpoints">installatpoints</A>(void)
+{
+    int i;
+    ushort  <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#settrap>settrap</A>();
+
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        if (attbl[i].inuse)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#settrap>settrap</A>((uchar *)attbl[i].address);
+    }
+}
+
+ushort  
+<A NAME="settrap">settrap</A>(char *address)
+{
+    ushort  orig;
+
+    orig = *(ushort *)address;
+    *address = TRAPU;
+    *(address+1) = TRAPL;
+    return(orig);
+}
+
+/* removeatpoints():
+ *  Remove all traps and reload the original text.
+ */
+void
+<A NAME="removeatpoints">removeatpoints</A>(void)
+{
+    int i;
+
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        if (attbl[i].inuse)
+            *(ushort *)(attbl[i].address) = attbl[i].origtext;
+    }
+}
+
+/* attrap():
+ *  This is the FIRST piece of code called after a breakpoint trap
+ *  is hit.
+ */
+void
+<A NAME="attrap">attrap</A>(void)
+{
+    extern  int SetStepOverBreakpoint;
+    int i;
+    struct  atstruct *atp;
+    ulong   pc;
+
+    atp = attbl;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#getreg>getreg</A>("PC",&pc);
+    pc -= 2;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("PC",pc);
+    if (SetStepOverBreakpoint) {
+        StepOverTrap();
+        /* Should not return */
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#removeatpoints>removeatpoints</A>();
+    for(i=0;i&lt;ATLISTSIZE;i++) {
+        if ((atp-&gt;inuse) && (atp-&gt;address == pc)) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#atcondition>atcondition</A>(atp))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#ataction>ataction</A>(atp);
+        }
+        atp++;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#setTraceBit>setTraceBit</A>();
+    StateOfMonitor = BREAKPOINT;
+    resume();
+}
+
+/* atcondition():
+ *  Test the specified condition and return 1 if condition is met;
+ *  else return 0.  Note that if there is no condition, then 
+ *  assume an unconditional action and return 1.
+ */
+int
+<A NAME="atcondition">atcondition</A>(struct atstruct *atp)
+{
+    if (atp-&gt;Condition == 0)
+        return(1);
+
+    switch(atp-&gt;Condition) {
+    case PASS_COUNT:
+        atp-&gt;Cpcnt++;
+        if (atp-&gt;Cpcnt &gt;= atp-&gt;Cconst) {
+            atp-&gt;Cpcnt = 0;
+            return(1);
+        }
+        break;
+    case FUNC_CALL:
+        if (atp-&gt;Cfptr() == atp-&gt;Cconst)
+            return(1);
+        break;
+    case VAR_EQ_LOC:
+        if (atp-&gt;Csize == 1) {
+            if (*(uchar *)(atp-&gt;Cadd) == (uchar)atp-&gt;Cconst)
+                return(1);
+        }
+        else if (atp-&gt;Csize == 2) {
+            if (*(ushort *)(atp-&gt;Cadd) == (ushort)atp-&gt;Cconst)
+                return(1);
+        }
+        else {
+            if (*(ulong *)(atp-&gt;Cadd) == (ulong)atp-&gt;Cconst)
+                return(1);
+        }
+        break;
+    case VAR_EQ_CONST:
+        if (atvars[atp-&gt;Cvar] == atp-&gt;Cconst)
+            return(1);
+        break;
+    case FLG_ALL_SET:
+        if ((atflag & atp-&gt;Cconst) == atp-&gt;Cconst)
+            return(1);
+        break;
+    case FLG_ANY_SET:
+        if (atflag & atp-&gt;Cconst)
+            return(1);
+        break;
+    case FLG_EQ_CONST:
+        if (atflag == atp-&gt;Cconst)
+            return(1);
+        break;
+    }
+    return(0);
+}
+
+/* ataction():
+ *  Carry out the action specified in the incoming structure.
+ */
+void
+<A NAME="ataction">ataction</A>(struct atstruct *atp)
+{
+    switch(atp-&gt;Action) {
+    case VAR_INC:
+        atvars[atp-&gt;Avar]++;
+        break;
+    case VAR_DEC:
+        atvars[atp-&gt;Avar]--;
+        break;
+    case VAR_EQ:
+        atvars[atp-&gt;Avar] = atp-&gt;Aconst;
+        break;
+    case FLG_SET:
+        atflag |= atp-&gt;Aconst;
+        break;
+    case FLG_CLR:
+        atflag &= ~(atp-&gt;Aconst);
+        break;
+    case FLG_EQ:
+        atflag = atp-&gt;Aconst;
+        break;
+    case BREAK:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#getreg>getreg</A>("PC",&PCatBreak);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("BREAKPOINT %d 0x%x\n",atp-&gt;idx,atp-&gt;address);
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(BREAKPOINT);
+        break;
+    }
+}
+
+void
+<A NAME="asyncbreak">asyncbreak</A>(void)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ASYNC_BREAK @ 0x%x\n",PCatBreak);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(BREAKPOINT);
+}
+#else
+void
+<A NAME="attrap">attrap</A>(void)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("attrap() called with no debugger\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(BREAKPOINT);
+}
+void
+<A NAME="asyncbreak">asyncbreak</A>(void)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("asyncbreak() called with no debugger\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(BREAKPOINT);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

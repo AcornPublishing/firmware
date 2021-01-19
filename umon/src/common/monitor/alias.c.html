@@ -1,0 +1,96 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/alias.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* alias.c:
+ *
+ *  NOT READY YET
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_ALIAS
+#include "genlib.h"
+#include "cli.h"
+
+#define ALIAS_TOT   16
+
+struct alias {
+    char *name;
+    char *value;
+};
+
+struct alias aliasList[ALIAS_TOT];
+
+void
+<A NAME="aliasInit">aliasInit</A>(void)
+{
+    int i;
+
+    for(i=0;i&lt;ALIAS_TOT;i++) {
+        aliasList[i].name = 0;
+        aliasList[i].value = 0;
+    }
+}
+
+char *AliasHelp[] = {
+        "Establish or list command alias'",
+        "[name=value]",
+        0,
+};
+
+int
+<A NAME="Alias">Alias</A>(int argc,char *argv[])
+{
+    static  int pass;
+    struct  alias   *ap;
+    int debug, i;
+
+    if (pass == 0) {
+        alias_init();
+    }
+    debug = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"d")) != -1) {
+        switch(opt) {
+        case 'd':
+            debug = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (argc == optind) {
+        ap = aliasList;
+        for(i=0;i&lt;ALIAS_TOT;i++) {
+            if (ap-&gt;name) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%16s = ", ap-&gt;name);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(ap-&gt;value);    
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+            }
+            ap++;
+        }
+    }
+    return(CMD_SUCCESS);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

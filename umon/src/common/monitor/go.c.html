@@ -1,0 +1,390 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/go.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* go.c:
+ *  This code is part of the DEBUG code that allows the monitor to do
+ *  some basic debug stuff (go,resume, set breakpoints, etc...).
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpuio.h"
+#include "cpu.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "cli.h"
+
+#define sizeof  (int)sizeof
+
+char    *ArgvAry[32];   /* Used for passing args to application */
+
+
+/* Go():
+ *  Run or resume downloaded application.
+ *
+ *  Arguments...
+ *  If no args, do a resume based on stored pc.
+ *
+ *  arg1:       address.
+ *  arg2-argN:  args passed to function at address "arg1"
+ */
+
+#if INCLUDE_DEBUG
+
+char *GoHelp[] = {
+    "Execute/resume downloaded application",
+    "-[p:Rr:s:u:] [addr]",
+    " -p {PC}  set PC value",
+    " -R       dump regs",
+    " -r {SR}  set SR reg",
+    " -s {SSP} set SSP reg",
+    " -u {USP} set USP reg",
+    0,
+};
+
+int
+<A NAME="Go">Go</A>(int argc,char *argv[])
+{
+    void    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/go.c.html#bailout>bailout</A>();
+    extern  ulong   PCatBreak;
+    ulong   ss, us, pc, sr, reg;
+    int opt, ssset, usset, srset, pcset, regdisp;
+
+    srset = ssset = usset = pcset = 0;
+    regdisp = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"Rp:r:s:u:")) != -1) {
+        switch(opt) {
+        case 'p':
+            pc = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,(char **)0,0);
+            pcset = 1;
+            break;
+        case 'R':
+            regdisp = 1;
+            break;
+        case 'r':
+            sr = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,(char **)0,0);
+            srset = 1;
+            break;
+        case 's':
+            ss = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,(char **)0,0);
+            ssset = 1;
+            break;
+        case 'u':
+            us = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(&optarg[1],(char **)0,0);
+            usset = 1;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (argc &gt; optind) {
+        reg = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind],(char **)0,0);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("PC",reg);
+        if (!srset) {
+            sr = MONITOR_STATUS;
+            srset = 1;
+        }
+        if (!ssset) {
+            ss = SUPERVISOR_STACK;
+            ssset = 1;
+        }
+        if (!usset) {
+            us = USER_STACK;
+            usset = 1;
+        }
+        *(ulong *)(ss+6) = (ulong)bailout;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#installatpoints>installatpoints</A>();
+    }
+    else if (StateOfMonitor == BREAKPOINT) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#getreg>getreg</A>("PC",&reg);
+        if (PCatBreak == reg)
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#setTraceBit>setTraceBit</A>();
+            else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#installatpoints>installatpoints</A>();
+    }
+    if (srset)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("SR",sr);
+    if (ssset)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("SS",ss);
+    if (usset)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("US",us);
+    if (pcset)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>("PC",pc);
+
+    if (regdisp)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#showregs>showregs</A>();
+
+#if INCLUDE_ETHERNET
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#DisableEthernet>DisableEthernet</A>();
+#endif
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#EnableBreakInterrupt>EnableBreakInterrupt</A>();
+    resume();
+    return(CMD_SUCCESS);    /* should not get here */
+}
+#endif
+
+void
+<A NAME="bailout">bailout</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("Program terminated\n");
+#if INCLUDE_DEBUG
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#removeatpoints>removeatpoints</A>();
+#endif
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(BAILOUT);
+}
+
+/* Call():
+ *  This function is called when the user wants to execute an 
+ *  embedded function. 
+ *  The the argument is preceded by an ampersand, then a pointer
+ *  to the argument is passed to the function instead of a 
+ *  strtol() conversion.
+ */
+char *CallHelp[] = {
+    "Call embedded function",
+    "-[aqv:] {address} [arg1] [arg2] ...",
+    " -a       pass (argc,argv) function",
+    " -q       quiet mode",
+    " -v {var} put return val in varname",
+    0,
+};
+
+int
+<A NAME="Call">Call</A>(int argc,char *argv[])
+{
+    char    *varname;
+    long    args[10];
+    int     i, j, ret, opt, useargc, quiet;
+    int     (*func)();
+
+    quiet = 0;
+    useargc = 0;
+    varname = (char *)0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"aqv:")) != -1) {
+        switch(opt) {
+        case 'a':
+            useargc = 1;
+            break;
+        case 'q':
+            quiet = 1;
+            break;
+        case 'v':
+            varname = optarg;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if ((argc &lt; optind+1) || (argc &gt; optind+11))
+        return(CMD_PARAM_ERROR);
+
+    func = (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#int>int</A>(*)())<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind],(char **)0,0);
+
+    /* If useargc flag is not set, then retrieve and convert
+     * args from command line.  If the first character of the
+     * argument is an ampersand (&), then a pointer to the argument
+     * is passed; otherwise, the argument is converted to a long
+     * integer using strtol()...
+     */
+    if (!useargc) {
+        for(j=0,i=optind+1;i&lt;argc;i++,j++) {
+            if (argv[i][0] == '&')
+                args[j] = (ulong)&argv[i][1];
+            else
+                args[j] = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[i],(char **)0,0);
+        }
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#ctxAPP>ctxAPP</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#EnableBreakInterrupt>EnableBreakInterrupt</A>();
+    if (useargc) {
+        ret = func(argc-optind,&argv[optind]);
+    }
+    else {
+        ret = func(args[0],args[1],args[2],args[3],args[4],args[5],args[6],
+            args[7],args[8],args[9]);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#DisableBreakInterrupt>DisableBreakInterrupt</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#ctxMON>ctxMON</A>();
+
+    if (varname)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>(varname,"0x%x",ret);
+    if (!quiet)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Returned: %d (0x%x)\n",ret,ret);
+    return(CMD_SUCCESS);
+}
+
+
+
+/* Reset():
+ *  Used to re-initialize the monitor through the command interface.
+ */
+
+char *ResetHelp[] = {
+    "Reset monitor firmware",
+    "-[xt:]",
+    " -x      app_exit",
+    " -t ##   setjmp type",
+    0,
+};
+
+int
+<A NAME="Reset">Reset</A>(int argc,char *argv[])
+{
+    extern  void <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#appexit>appexit</A>(int);
+    int opt;
+    volatile int i;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#intsoff>intsoff</A>();
+
+    /* For some systems, the reset occurs while characters are in the
+     * UART FIFO (so they don't get printed).  Adding this delay will
+     * hopefully allow the characters in the FIFO to drain...
+     */
+    for(i=0;i&lt;LoopsPerSecond;i++);
+
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"xt:")) != -1) {
+        switch(opt) {
+        case 'x':
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#appexit>appexit</A>(0);
+            break;
+        case 't':
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(optarg));
+            break;
+        default:    
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monrestart>monrestart</A>(INITIALIZE);
+    return(CMD_SUCCESS);
+}
+
+#if (INCLUDE_DEBUG | INCLUDE_TFS | INCLUDE_ARGV)
+
+/* Argv():
+ *  Used to display/modify the current argv list that is accessed by
+ *  the application through the jump table or through command options.
+ */
+char *ArgvHelp[] = {
+    "Build argv list",
+    "-[clv] [arg0] [arg1] ...",
+    " -c   copy argc to $ARGC (only)",
+    " -i   initialize (clear) arglist",
+    " -l   list argv strings",
+    " -v   copy arglist to $ARG{0-N} and $ARGC",
+    0,
+};
+
+int
+<A NAME="Argv">Argv</A>(int argc,char *argv[])
+{
+    char    *cp, buf[16];
+    int i, opt;
+
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"cilv")) != -1) {
+        switch(opt) {
+        case 'i':
+            for(i=0;i&lt;(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ArgvAry)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(char *));i++) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"ARG%d",i);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(buf,0);
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("ARGC",0);
+            ArgvAry[0] = (char *)0;
+            break;
+        case 'c':
+            for(i=0;(i&lt;(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ArgvAry)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(char *)) && ArgvAry[i]);i++);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>("ARGC","%d",i);
+            break;
+        case 'v':
+            for(i=0;(i&lt;(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ArgvAry)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(char *)) && ArgvAry[i]);i++) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"ARG%d",i);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(buf,ArgvAry[i]);
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>("ARGC","%d",i);
+            break;
+        case 'l':       /* List args */
+            for(i=0;(i&lt;(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ArgvAry)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(char *)) && ArgvAry[i]);i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\targv[%d]: '%s'\n", i,ArgvAry[i]);
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (optind != 1)
+        return(CMD_SUCCESS);
+
+    cp = ((char *)&ArgvAry[0] + (argc-optind+1)*4);
+    for(i=optind;i&lt;argc;i++) {
+        ArgvAry[i-1] = cp;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(cp,argv[i]);
+        cp += (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(cp) + 1);
+    }
+    ArgvAry[i-1] = 0;   /* Null terminate the list */
+    return(CMD_SUCCESS);
+}
+
+int
+<A NAME="putargv">putargv</A>(int argnum,char *argptr)
+{
+    if (argnum &gt;= (<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ArgvAry)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(char *)))
+        return(-1);
+
+    ArgvAry[argnum] = argptr;
+    return(0);
+}
+
+/* getargv():
+ *  Provides a hook allowing the downloaded application code to 
+ *  handle main(argc,argv) in a painless way.  The Argv[] array
+ *  location is returned by get_argv() and is assumed to contain
+ *  the NULL terminated list of argv pointers...  Immediately
+ *  after the NULL termination is the data that the argv pointers
+ *  are referencing.  
+ *  This provides a total of 64*4 bytes of space to accomodate
+ *  the needs of argv.
+ */
+
+void
+<A NAME="getargv">getargv</A>(int *argc,char ***argv)
+{
+    int i;
+
+    if (argv)
+        *argv = &ArgvAry[0];
+    for(i=0;;i++)
+        if (ArgvAry[i] == 0)
+            break;
+    if (argc)
+        *argc = i;
+}
+#else
+void
+<A NAME="getargv">getargv</A>(int *argc,char ***argv)
+{
+    if (argc)
+        *argc = -1;
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

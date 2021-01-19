@@ -1,0 +1,104 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: MTRACE</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>MTRACE</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mtrace</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Configure and/or display the memory
+trace buffer used by the <a href="../api/memtrace.html">mon_memtrace()</a>
+API call..</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">mtrace {command} [command-specific
+arguments]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command works in conjunction
+with the mon_memtrace() API call to provide the application with the ability
+to build formatted (printf-like) strings that will be logged to a buffer
+in RAM and can be observed (dump) some time later.&nbsp; The purpose of
+this is to give the programmer the ability to use printf-like tracing,
+but not be concerned with the status of the console device (UART).</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>COMMANDS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">cfg [{base} {size}]</font></li>
+
+<br><font face="Arial,Helvetica">display or specify the base and size of
+the ram buffer to be used as the memory trace circular buffer.&nbsp; The
+buffer must be at least 256 bytes otherwise the facility is left uninitialized.</font>
+<li>
+<font face="Arial,Helvetica">dump</font></li>
+
+<br><font face="Arial,Helvetica">display the current trace buffer</font>
+<li>
+<font face="Arial,Helvetica">log {string}</font></li>
+
+<br><font face="Arial,Helvetica">add an entry to the trace buffer from
+the command line</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">mtrace dump</font></li>
+
+<br><font face="Arial,Helvetica">Dump the content of the trace buffer</font>
+<li>
+<font face="Arial,Helvetica">mtrace cfg $APPRAMBASE 0x1000</font></li>
+
+<br><font face="Arial,Helvetica">Establish a memory buffer of 4K starting
+at $APPRAMBASE</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">For best formatted results in
+the dump, the mon_memtrace() function should be used without any final
+new-line character appended.&nbsp; Each time mon_memtrace() is called,
+it will automatically prepend the string with a newline and a sequence
+number.</font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

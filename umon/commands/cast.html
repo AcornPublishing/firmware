@@ -1,0 +1,186 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>cast</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>CAST</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">cast</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Overlay a structure definition
+onto a block of memory and display it.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">cast -[al:n:pt:] {structure name}
+{address in memory}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the user of
+the monitor to display a block of memory as a structure, table of structures
+or linked list of structures.&nbsp; The definition of the structure is
+assumed to be in the TFS file called "structfile", and any number of structure
+definitions can be in that file.&nbsp; The format of the structure definition
+is similar in syntax to that of standard 'C'.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a</font></li>
+
+<br><font face="Arial,Helvetica">display the address of each member of
+each structure;</font>
+<li>
+<font face="Arial,Helvetica">-l {linkname}</font></li>
+
+<br><font face="Arial,Helvetica">treat the specified address as the base
+of a linked list and get the next link from the member of the structure
+that matches the string 'linkname';</font>
+<li>
+<font face="Arial,Helvetica">-n {structure name}</font></li>
+
+<br><font face="Arial,Helvetica">specify the name of the structure to be
+displayed (not needed, but provides a nicer display output);</font>
+<li>
+<font face="Arial,Helvetica">-p</font></li>
+
+<br><font face="Arial,Helvetica">display any padding that is part of the
+structure definition;</font>
+<li>
+<font face="Arial,Helvetica">-t {table name}</font></li>
+
+<br><font face="Arial,Helvetica">treat the specified address as the base
+of a table and query the user for permission to display each successive
+entry in the table of structures.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNTAX OF "structfile":</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">To cast a structure over a block
+of memory, there must be some structure definition.&nbsp; The definition
+used by the cast command is assumed to be in the file "structfile".&nbsp;
+In general, the format of this file is similar to that of standard 'C'
+structure definitions, but with some limitations.&nbsp; The types "char",
+"short" and "long" are supported and they will be displayed as a 1,2 or
+4-byte decimal integer respectively.&nbsp; To support the ability to display
+in hex, the types "char.x", "short.x" and "long.x" are supported, and,
+if a character is to be displayed as a character (hex 0x31 printed as '1'),
+the "char.c" type can be applied. For example, in the following structure
+definition...</font>
+<blockquote>
+<blockquote><tt>struct abc {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; long i;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; long.x j;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; char.c c;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; char.x d;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; char e;</tt>
+<br><tt>}</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">The member 'i' would be displayed in decimal
+format and 'j' would be displayed in hex.&nbsp; The member 'c' would be
+displayed as a character, 'd' would be displayed in hex, and 'e' would
+be displayed as a 1-byte decimal integer.</font>
+<br><font face="Arial,Helvetica">If a structure has an array in it, then
+the user must define that as an array of one of the fundamental types described
+above with the appropriate size.&nbsp; This cast command does not display
+arrays within structures simply because of the complexity of the output
+generated, so it is treated like padding with only the name and array size
+displayed.</font>
+<br><font face="Arial,Helvetica">Here is an example of a structure defintion
+file that demonstrates all of the functionality of the cast command.&nbsp;
+Note that the '#' sign signfies a comment..</font>
+<blockquote>
+<blockquote><tt># Structures abc and def:</tt>
+<br><tt>struct abc {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; long i;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; char.x c1;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; pad[3];&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+# Invisible unless -p specified.</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; struct def d;</tt>
+<br><tt>}</tt>
+<p><tt>struct def {</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; short s1;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; long ltbl[32];&nbsp;&nbsp;&nbsp; # Array of
+32 integers (not dumped)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; short s2;</tt>
+<br><tt>}</tt></blockquote>
+</blockquote>
+<font face="Arial,Helvetica">Notice the embedded structures, use of the
+'.x' suffix and the pad[] format.&nbsp; Also, be aware that this cast command
+is totally unaware of compiler-specific padding and cpu-specific alignment
+requirements.&nbsp; If the structure definition puts a long on an odd boundary
+and the CPU does not support that, then cast will generate an exception
+itself.&nbsp; The user must add the appropriate padding to deal with this.&nbsp;&nbsp;
+As a result, the "pad[]" descriptor above is used for cpu/compiler-specific
+padding.</font>
+<br><font face="Arial,Helvetica">If the member is of type "char.c *" or
+"char.c []", then cast will display the ascii string (if you don't want
+it to be dereferenced, use "char.x *").&nbsp; Finally, do not "test" this
+command's parsing ability.&nbsp; Put one member on each line of the file
+and keep it syntactically simple; otherwise, you will break it!</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">cast struct_x 0x10010000</font></li>
+
+<br><font face="Arial,Helvetica">Display memory at location 0x10010000
+as if it was the structure "struct_x" as defined in the TFS file "structfile"</font>
+<li>
+<font face="Arial,Helvetica">cast -a struct_y 0x4000</font></li>
+
+<br><font face="Arial,Helvetica">Display memory at location 0x4000 as if
+it was the structure "struct_y" as defined in the TFS file "structfile".&nbsp;
+Prefix the display of each member with the address at which that member
+is being retrieved from memory.</font>
+<li>
+<font face="Arial,Helvetica">cast -t tasktbl tstruct 0x4100100</font></li>
+
+<br><font face="Arial,Helvetica">Starting at location 0x4100100, overlay
+the structure "tstruct" onto memory.&nbsp; Repeat the display process at
+what would be considered the next table entry (based on the size of the
+tstruct structure).</font>
+<li>
+<font face="Arial,Helvetica">cast -l next list 0x1000</font></li>
+
+<br><font face="Arial,Helvetica">Assume a structure of type "list" exists
+at location 0x1000, then use the content of the "next" member to determine
+the location of the next structure to display (a linked list).</font></ul>
+
+</body>
+</html>

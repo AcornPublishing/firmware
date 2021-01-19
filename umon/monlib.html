@@ -1,0 +1,567 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor: MonLib</title>
+</head>
+<body text="#000000" bgcolor="#F0F0F0" link="#0000EE" vlink="#551A8B" alink="#FF0000" background="images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font face="Arial,Helvetica"><font size=+0>&nbsp;</font></font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Bit-By-Bit</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Monitor-to-Application Hookup</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%">
+<p><font face="Arial,Helvetica">The following discussion focuses on how
+the application code and the monitor get connected. The monitor is a standalone
+executable, and for the most part, the application is designed as a standalone
+executable, so how do the two programs communicate when they are together
+on a target system?&nbsp; The following information will answer this question
+and also provide the user with a description of the API that is provided
+to the application by the monitor once this connection is made.</font>
+<p><font face="Arial,Helvetica"><a href="#relationship">The Monitor/Application
+Relationship</a></font>
+<br><font face="Arial,Helvetica"><a href="#connection">The Monitor-to-Application
+Connection</a></font>
+<br><font face="Arial,Helvetica"><a href="#app_functionality">Application-Provided
+Functionality</a></font>
+<br><font face="Arial,Helvetica"><a href="#app_mutex">Application-Provided
+Mutual Exclusion</a></font>
+<br><font face="Arial,Helvetica"><a href="#simple_example">A Hookup Example
+with a Small Single-Threaded Application</a></font>
+<br><font face="Arial,Helvetica"><a href="#vxworks_example">A Hookup Example
+with VxWorks</a></font>
+<br><font face="Arial,Helvetica"><a href="#api">Monitor API</a></font></center>
+
+<p>
+<hr WIDTH="100%">
+<br>
+<hr WIDTH="100%">
+<br>&nbsp;
+<h2>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="relationship"></a><font face="Arial,Helvetica">The
+Monitor/Application Relationship</font></h2>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In much of the discussion regarding the monitor, there is distinction made
+between the <i>application</i> and the <i>monitor</i> code.&nbsp; This
+is done simply to make it clear that the monitor and the application are
+two totally isolated programs as far as their linkage is concerned.&nbsp;
+In general, if the monitor is modified, there is no need to rebuild the
+application to compensate for this; and likewise, if the application is
+modified, there is no need to rebuild the monitor to compensate.&nbsp;
+Both the monitor and the application are thought of as standalone programs,
+meaning that neither of them need the other to run.&nbsp; This is not entirely
+true.&nbsp; The monitor, by design, provides a platform that the application
+can assume exists when it starts up; so although the monitor can run without
+the application; the application typically cannot run unless it has been
+hooked up to the monitor.&nbsp; The application is designed this way and
+<i>to
+a certain degree</i>, can be compared to a DOS application that runs on
+a PC and relies on the underlying BIOS functionality to work properly...
+BIOS doesn' t need the application, but the application needs BIOS.</font></blockquote>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="connection"></a><b><font face="Arial,Helvetica"><font size=+2>
+The Monitor-to-Application Connection</font></font></b>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Like an application/BIOS relationship,&nbsp; the application/monitor relationship
+can vary.&nbsp; The application can use the functionality provided by BIOS,
+or it can be clever and get around it.&nbsp; Similarly, the application
+that runs out of TFS through the monitor can use certain monitor facilities,
+or it can totally ignore the fact that the monitor is present, and execute
+100% on its own.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+In most cases, the facilities provided by the monitor (particularly <a href="tfs.html">TFS</a>)
+are considered useful in application space, so the application must "connect"
+to the monitor.&nbsp; For each target, there is some "well known address"
+provided by the monitor so that the application can make the connection.&nbsp;
+This well known address is a location that is assumed to contain a pointer
+to the <a href="src/common/monitor/moncom.c.html#moncom">moncom()</a> function
+within the monitor.&nbsp; In addition, the application includes one object
+file that is built from a file that is considered one of the "common" blocks
+of code within the monitor, <a href="src/common/monitor/monlib.c.html">monlib.c</a>.&nbsp;
+This file could just as easily be compiled by the application build, but
+it is kept as part of the monitor because it is generic code, independent
+of the target or application that uses it.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The first call that must be made by the application is a call to <a href="src/common/monitor/monlib.c.html#monConnect">monConnect(ulong
+addr,void (*lock)(), void (*unlock)())</a>. This function must be given
+the "well-known-address" and optionally, two additional function pointers
+that will provide the monitor interface with an application-provided mutual-exclusion
+mechanism (more on that later).&nbsp; For basic connection between monitor
+and application, the second and third arguments to monConnect() can be
+NULL.&nbsp; After monConnect() returns, it is then safe for the application
+to assume that the whole set of "mon_" <a href="#api">API functions</a>
+are available for use.</font></blockquote>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="app_functionality"></a><b><font face="Arial,Helvetica"><font size=+2>
+Application-Provided Functionality</font></font></b>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+To this point, our discussion has been with regard to how we can hook up
+the monitor and the application so that the application can use some of
+the monitor's functionality.&nbsp; Now we will discuss the fact that the
+monitor must be given some function pointers to be able to run as part
+of the application.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+When the monitor is running stand-alone, it has established its own driver
+interface to the target hardware.&nbsp; For example, it calls its own function
+to write a character to the console (UART) port of the hardware.&nbsp;
+Now that the application has taken over the hardware, the application may
+have re-established these interfaces, so the application must now provide
+the monitor with pointers to functionality that it needs (for example,
+to interface to the console port).&nbsp; Notice in <a href="src/common/monitor/monlib.c.html">monlib.c</a>
+that all of the calls to <a href="src/common/monitor/moncom.c.html#moncom">moncom()</a>
+are "GET_XXX" functions.&nbsp; This is the application "getting" connections
+to each of the "mon_" functions.&nbsp; The file <a href="src/common/monitor/monlib.h.html">monlib.h</a>
+contains all of these #define definitions, but notice that it also has
+other macros that are not "GET_XXX" type macros.&nbsp; These macros provide
+the interface to the monitor that allows the application to give the monitor
+pointers to certain functions...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">CACHEFTYPE_DFLUSH: allows the application
+to give the monitor a pointer to a data-cache flush routine with the following
+prototype: dcache_flush(char *addr, int size).</font></li>
+
+<li>
+<font face="Arial,Helvetica">CACHEFTYPE_IINVALIDATE: allows the application
+to give the monitor a pointer to an instruction cache invalidate routine
+with the following prototype: icache_invalidate(char *addr, int size).</font></li>
+
+<li>
+<font face="Arial,Helvetica">CHARFUNC_PUTCHAR: allows the application to
+give the monitor a pointer to a putchar function.</font></li>
+
+<li>
+<font face="Arial,Helvetica">CHARFUNC_GETCHAR: allows the application to
+give the monitor a pointer to a getchar function.</font></li>
+
+<li>
+<font face="Arial,Helvetica">CHARFUNC_GOTACHAR: allows the application
+to give the monitor a pointer to a function that, when called, will return
+1 if there is a character queued up on the console port; else 0.</font></li>
+
+<li>
+<font face="Arial,Helvetica">CHARFUNC_RAWMODEON: allows the application
+to give the monitor a pointer to a function that will enable "raw" mode
+on the console port.</font></li>
+
+<li>
+<font face="Arial,Helvetica">CHARFUNC_RAWMODEOFF: allows the application
+to give the monitor a pointer to a function that will disable "raw" mode
+on the console port.</font></li>
+</ul>
+<font face="Arial,Helvetica">For example, a call to <a href="src/common/monitor/moncom.c.html#moncom">moncom</a>(CHARFUNC_PUTCHAR,app_putchar,0,0)
+will tell the monitor to use the function "app_putchar()" instead of its
+own putchar function for sending characters to the console port.</font></blockquote>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="app_mutex"></a><b><font face="Arial,Helvetica"><font size=+2>
+Application-Provided Mutual Exclusion</font></font></b>
+<blockquote><font face="Arial,Helvetica"><b>&nbsp; </b>Now, the monitor
+claims to be independent of the application running on top of it, and potentially
+there will be a multi-tasking operating system as part of the application.&nbsp;
+How does the monitor keep its non-reentrant code from being reentered?&nbsp;
+This is where the second and third arguments to the <a href="src/common/monitor/monlib.c.html#monConnect">monConnect()</a>
+function come in.&nbsp; Like the other "application-provided" functions,
+the second and third arguments to monConnect() give the monitor a function
+to call for locking and unlocking the fact that some piece of application
+code is accessing a monitor facility.&nbsp; Each of the "mon_" functions
+is wrapped with a call to the lock() and unlock() functions that are provided
+to the monitor by monConnect() (refer to <a href="src/common/monitor/monlib.c.html#mon_putchar">mon_putchar()</a>
+as an example). Ideally then, the functions handed to monConnect() for
+this purpose, should provide priority inversion protection; otherwise,
+you must be aware of that (as you would any other use of a semaphore).</font></blockquote>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="simple_example"></a><b><font face="Arial,Helvetica"><font size=+2>
+Application-Monitor Hookup: a Small, Single-Threaded example.</font></font></b>
+<blockquote><font face="Arial,Helvetica"><b>&nbsp; </b>The following example
+shows the code that is needed to establish a basic hookup between a small,
+single-threaded application and the monitor.&nbsp; The code is compiled/linked
+with start() being the entrypoint and runs off the stack of the monitor.&nbsp;
+Note the USE_EXIT definition.&nbsp; Refer to the discussion on <a href="scripts.html#nesting">script
+nesting</a> for details on this.</font>
+<p><tt>#include "monlib.h"</tt>
+<p><tt>int</tt>
+<br><tt>main(int argc, char *argv)</tt>
+<br><tt>{</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; mon_printf("Hey, application %s is running!\n",argv[0]);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; mon_printf("Here are the args...\n");</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; for (i=1;i&lt;argc;i++)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; mon_printf("arg[%d]
+= %s\n",argv[i]);</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; return(0);</tt>
+<br><tt>}</tt>
+<p><tt>void</tt>
+<br><tt>start()</tt>
+<br><tt>{</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; char&nbsp;&nbsp;&nbsp; **argv;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; int argc;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; extern&nbsp; uchar bss_start, bss_end;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; register uchar&nbsp; *ramstart;</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; /* Clear out .bss space: */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* (not really necessary, done already by the
+TFS loader) */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; ramstart = &amp;bss_start;</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; while(ramstart &lt; &amp;bss_end)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *ramstart++ = 0;</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; /* Connect the application to the monitor.&nbsp;
+This MUST be done */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* prior to the application making any other
+attempts to use the */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* "mon_" functions provided by the monitor.&nbsp;
+Note that the value */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* of the first argument is the value returned
+by mstat (moncom */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* pointer) in the monitor. */</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; monConnect((int(*)())(*(unsigned long *)0x20),(void
+*)0,(void *)0);</tt>
+<p><tt>&nbsp;&nbsp;&nbsp; /* Extract argc/argv from structure and call
+main(): */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; mon_getargv(&amp;argc,&amp;argv);</tt>
+<p><tt>#ifdef USE_EXIT</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* Call main, then re-enter the monitor. */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; mon_appexit(main(argc,argv));</tt>
+<br><tt>#else</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; /* Call main, then return to monitor. */</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; return(main(argc,argv));</tt>
+<br><tt>#endif</tt>
+<br><tt>}</tt></blockquote>
+
+<p><br><a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="vxworks_example"></a><b><font face="Arial,Helvetica"><font size=+2>
+Application-Monitor Hookup: a VxWorks example.</font></font></b>
+<blockquote><font face="Arial,Helvetica"><b>&nbsp; </b>The following example
+shows the code that is needed to establish a connection between a VxWorks
+application and the monitor.&nbsp; The majority of this code would be inserted
+into the usrConfig.c file of the BSP.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; First of all, VxWorks
+uses the BOOT_LINE_ADRS definition to point to some location in memory
+that it can use to configure itself.&nbsp; The address is assumed to contain
+a string that is parsed during the early stages of VxWorks startup.&nbsp;
+This address should be set to some location in RAM space that is not used
+by the monitor or the application.&nbsp; Typically, the application is
+configured to be loaded somewhere above the value of <a href="shellvars.html#APPRAMBASE">$APPRAMBASE</a>
+in the monitor.&nbsp; The BOOT_LINE_ADRS address should be set to some
+block of space between $APPRAMBASE and the actual starting point of the
+application.&nbsp; For the sake of this example, we will assume $APPRAMBASE
+is 0x10000 and the starting point of the VxWorks application is 0x18000.&nbsp;
+We will then build the VxWorks application with BOOT_LINE_ADRS set to 0x17000
+and have the following added to our monrc file (obviously each board's
+details will be different, this is just an example)...</font>
+<p><tt># Basic set of bootup shell variables:</tt>
+<br><tt>set ETHERADD 00:60:1d:02:0b:fe</tt>
+<br><tt>set IPADD 135.3.94.136</tt>
+<br><tt>set HIPADD 135.3.94.76</tt>
+<br><tt>set GIPADD 135.3.94.1</tt>
+<br><tt>set NETMASK 255.255.255.0</tt>
+<p><tt># Build the VxWorks BOOT_LINE based on the variables established
+above...</tt>
+<br><tt># The "pm -s" command builds a string starting at the specified
+address</tt>
+<br><tt># The "pm -S" command concatenates a string to the end of the string
+that</tt>
+<br><tt>#&nbsp; starts at the specified address</tt>
+<br><tt>set BOOT_LINE_ADRS 0x17000</tt>
+<br><tt>pm -s $BOOT_LINE_ADRS "cpm(0,0)"</tt>
+<br><tt>pm -S $BOOT_LINE_ADRS " e=" $IPADD</tt>
+<br><tt>pm -S $BOOT_LINE_ADRS " h=" $HIPADD</tt>
+<br><tt>pm -S $BOOT_LINE_ADRS " g=" $GIPADD</tt>
+<br><tt>pm -S $BOOT_LINE_ADRS " tn=target u=anonymous pw=vxworks"</tt>
+<p><font face="Arial,Helvetica">The result of these entries in the monrc
+file is that the location 0x17000 will contain the following string...</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; </font><tt>cpm(0,0)
+e=135.3.94.136 h=135.3.94.76 g=135.3.94.1 tn=target u=anonymous pw=vxworks</tt>
+<p><font face="Arial,Helvetica">Notice that the content of the BOOT_LINE_ADRS
+string is dependent on the content of the shell variables established above.</font>
+<p><font face="Arial,Helvetica">In the BSP (probably in usrConfig.c), the
+following code makes some of the initial connections...</font>
+<p><tt>#include "monlib.h"</tt>
+<p><tt>/* Connect the application to the monitor.&nbsp; This must be done&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* prior to the application making any other attempts to use the
+"mon_"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */</tt>
+<br><tt>/* functions provided by the monitor. The value of 0x80000010 below
+is the&nbsp;&nbsp; */</tt>
+<br><tt>/* "moncom pointer".&nbsp; This can be retrieved from the monitor
+with the&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; */</tt>
+<br><tt>/* "mstat" command. */</tt>
+<br><tt>monConnect((int(*)())(*(unsigned long *)0x80000010),(void *)0,(void
+*)0);</tt>
+<p><tt>/* Tell uMON to use a few of this application's functions... */</tt>
+<br><tt>mon_com(CHARFUNC_PUTCHAR,iasPutchar,0,0);</tt>
+<br><tt>mon_com(CHARFUNC_GETCHAR,iasGetchar,0,0);</tt>
+<br><tt>mon_com(CHARFUNC_GOTACHAR,iasGotachar,0,0);</tt>
+<br><tt>mon_com(CHARFUNC_RAWMODEON,iasRawon,0,0);</tt>
+<br><tt>mon_com(CHARFUNC_RAWMODEOFF,iasRawoff,0,0);</tt>
+<br><tt>mon_com(CACHEFTYPE_DFLUSH,iasDcacheFlush,0,0);</tt>
+<br><tt>mon_com(CACHEFTYPE_IINVALIDATE,iasIcacheInvalidate,0,0);</tt>
+<p><font face="Arial,Helvetica">Following are the functions that are referenced
+by the above calls...</font>
+<p><tt><font size=+0>void</font></tt>
+<br><tt><font size=+0>iasRawoff( void )</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; ioctl(0,FIOSETOPTIONS,OPT_CRMOD
+| OPT_TANDEM | OPT_7_BIT);</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>int</font></tt>
+<br><tt><font size=+0>iasGetchar( void )</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; char&nbsp;&nbsp;&nbsp; onechar;</font></tt>
+<p><tt><font size=+0>&nbsp;&nbsp;&nbsp; read(0,&amp;onechar,1);</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; return((int)onechar);</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>int</font></tt>
+<br><tt><font size=+0>iasPutchar(char onechar)</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; return(write(1,&amp;onechar,1));</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>int</font></tt>
+<br><tt><font size=+0>iasGotachar(void)</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; int avail;</font></tt>
+<p><tt><font size=+0>&nbsp;&nbsp;&nbsp; avail = 0;</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; if (ioctl(0,FIONREAD,(int)&amp;avail)
+!= ERROR) {</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; if (avail)</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+return(1);</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; }</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; return(0);</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>int</font></tt>
+<br><tt><font size=+0>iasDcacheFlush(char *addr, int size)</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; return(cacheFlush(DATA_CACHE,addr,size));</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>int</font></tt>
+<br><tt><font size=+0>iasIcacheInvalidate(char *addr, int size)</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; return(cacheInvalidate(INSTRUCTION_CACHE,addr,size));</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><font face="Arial,Helvetica">Once the application's ROOT task has started,
+and prior to starting up any other tasks, monConnect() should be called
+a second time to establish the <a href="#app_mutex">mutual exclusion protection
+mentioned above</a>...</font>
+<p><tt>/********************************************************************/</tt>
+<br><tt>/* Call monConnect a second time (it was already called in&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* usrConfig.c).&nbsp; This time, pass in the lock/unlock arguments.&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* Note that this MUST be done prior to starting up any other tasks
+*/</tt>
+<br><tt>/* that may use the monitor.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* Note also, that if the semMCreate fails, there is no need to&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* call monConnect again, since it was called in usrConfig.c.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/********************************************************************/</tt>
+<br><tt>monSemId = semMCreate(SEM_INVERSION_SAFE | SEM_Q_PRIORITY);</tt>
+<br><tt>if (!monSemId)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; printf("Could not create monitor access semaphore.\n");</tt>
+<br><tt>else</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; monConnect(0,monLock,monUnlock);</tt>
+<p><font face="Arial,Helvetica">Following are the functions that are referenced
+by the above calls...</font>
+<p><tt><font size=+0>/* monLock() &amp; monUnlock():</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; Pointers to these functions are
+passed to monConnect() so that the</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; monitor is guaranteed not to have
+any re-entrancy problems.</font></tt>
+<br><tt><font size=+0>*/</font></tt>
+<br><tt><font size=+0>SEM_ID&nbsp; monSemId;</font></tt>
+<p><tt><font size=+0>void</font></tt>
+<br><tt><font size=+0>monLock()</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; semTake(monSemId,WAIT_FOREVER);</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><tt><font size=+0>void</font></tt>
+<br><tt><font size=+0>monUnlock()</font></tt>
+<br><tt><font size=+0>{</font></tt>
+<br><tt><font size=+0>&nbsp;&nbsp;&nbsp; semGive(monSemId);</font></tt>
+<br><tt><font size=+0>}</font></tt>
+<p><font face="Arial,Helvetica">Finally, if the application has a command
+interpreter and wants to be able to hook its command interpreter to the
+script runner in TFS, do the following...</font>
+<br>&nbsp;
+<p><tt>/********************************************************************/</tt>
+<br><tt>/* Tell TFS to use this application's command interpreter when&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/* executing scripts.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*/</tt>
+<br><tt>/********************************************************************/</tt>
+<br><tt>err = mon_tfsctrl(TFS_DOCOMMAND,(long)docommand,0);</tt>
+<br><tt>if (err != TFS_OKAY)</tt>
+<br><tt>&nbsp;&nbsp;&nbsp; printf("TFS docommand reassign failed: ",mon_tfsctrl(TFS_ERRMSG,err,0));</tt></blockquote>
+<a href="#top"><img SRC="images/top.gif" NOSAVE height=20 width=20></a><a NAME="api"></a><b><font face="Arial,Helvetica"><font size=+2>
+Monitor API</font></font></b>
+<blockquote><font face="Arial,Helvetica"><b>&nbsp; </b>This section provides
+a tabular listing of each of the functions that are made available by the
+monitor for use by the application.&nbsp; The listing provides the function
+names, a short description of the interface provided, and a pointer to
+a complete description of each function.&nbsp;&nbsp; The header file <a href="src/common/monitor/monlib.h.html">monlib.h</a>
+should be included with the application code to provide a full set of function
+prototypes.&nbsp; Note that the descriptions of each of these API functions
+also provides a pointer to a source file of the monitor code that contains
+the corresponding function.&nbsp; This code is for reference only, do not
+assume that it is the latest version of the monitor.</font>
+<p><font face="Arial,Helvetica">mon_<a href="api/addcommand.html">addcommand</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+add a command to the monitor.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/appexit.html">appexit</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+call this function when application exits.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/com.html">com</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+basic hook between the monitor and application.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/cprintf.html">cprintf</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+centered small printf().</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/crc32.html">crc32</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+a crc32 function.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/decompress.html">decompress</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+decompress a block of data.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/docommand.html">docommand</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+invoke a command in the monitor.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/free.html">free</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+see above</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/getargv.html">getargv</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieve the current argument list from the monitor.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/getbytes.html">getbytes</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieves characters from the console port.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/getchar.html">getchar</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to getchar.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/getenv.html">getenv</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard getenv().</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/getline.html">getline</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieve a line of characters from the console port.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/gotachar.html">gotachar</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+returns indication of character presence on console port.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/heapextend.html">heapextend</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+allows the application to extend (or release an extension of) the current
+monitor heap.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/intsoff.html">intsoff</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+turn off interrupts.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/intsrestore.html">intsrestore</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+restore interrupt state.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/malloc.html">malloc</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+a memory allocator whose heap is managed by the monitor.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/memtrace.html">memtrace</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+a printf-like function for dumping formatted strings to a cirular buffer.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/pioclr.html">pioclr</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+clear status of a specified PIO pin.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/pioget.html">pioget</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieve status of a specified PIO pin.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/pioset.html">pioset</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+set status of a specified PIO pin.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/printf.html">printf</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+small printf() (no floating point).</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/profiler.html">profiler</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+runtime profiling function called to gather profiling statistics.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/putchar.html">putchar</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to putchar.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/restart.html">restart</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+monitor restart point</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/setenv.html">setenv</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard setenv().</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/setuserlevel.html">setUserLevel</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+establish a new user level in the monitor.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/sprintf.html">sprintf</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+small sprintf().</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsadd.html">tfsadd</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+add file to TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfseof.html">tfseof</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+return EOF state of opened file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsinit.html">tfsinit</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+initialize flash used by TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsclose.html">tfsclose</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard close() on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsctrl.html">tfsctrl</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+perform various control functions on TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsfstat.html">tfsfstat</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieve a local copy of a file's header.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsgetline.html">tfsgetline</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+retrieve next line of ascii file in TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsipmod.html">tfsipmod</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+do an <a href="tfs.html#ipmod">in-place-modification</a> on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfslink.html">tfslink</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+link one TFS file to another.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsnext.html">tfsnext</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+step through list of file headers in TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsopen.html">tfsopen</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard open() on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsread.html">tfsread</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard read() on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsrun.html">tfsrun</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+run some executable file in TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsseek.html">tfsseek</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard seek() on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsstat.html">tfsstat</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+return status of file in TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfstruncate.html">tfstruncate</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+truncate the size of a file currently opened for writing.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfsunlink.html">tfsunlink</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+remove file from TFS.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/tfswrite.html">tfswrite</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+similar to standard write() on a TFS file.</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/version.html">version()</a>:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+return the char * string that is seen by the CLI "version" command..</font>
+<br><font face="Arial,Helvetica">mon_<a href="api/crc16.html">xcrc16</a>():</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+a crc16 function.</font></blockquote>
+
+</body>
+</html>

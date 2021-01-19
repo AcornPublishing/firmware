@@ -1,0 +1,118 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: PM</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>PM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">pm</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Patch memory local to the target.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">pm -[24efSs] {address} {value
+| string} [value&agrave;]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Refer to the <a href="dm.html">dm</a>
+command description for a discussion on the different types of memory that
+can reside on a target.&nbsp; This command attempts to support all modes
+of memory access through different options.&nbsp; Width can be specified
+for 8/16/32 bit access, the exact number of accesses can also be specified;
+there is no modulo of the user-specified count. This is actually quite
+important for FIFO and/or memory mapped peripherals because you want to
+read the EXACT number of units of memory specified.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-2</font></li>
+
+<br><font face="Arial,Helvetica">assume the width of the memory accesses
+is x2;</font>
+<li>
+<font face="Arial,Helvetica">-4</font></li>
+
+<br><font face="Arial,Helvetica">assume the width of the memory accesses
+is x4;</font>
+<li>
+<font face="Arial,Helvetica">-e</font></li>
+
+<br><font face="Arial,Helvetica">for data written as 2 and 4-byte units,
+endian-swap prior to placing into memory location;</font>
+<li>
+<font face="Arial,Helvetica">-f</font></li>
+
+<br><font face="Arial,Helvetica">assume the destination address is a FIFO;</font>
+<li>
+<font face="Arial,Helvetica">-s</font></li>
+
+<br><font face="Arial,Helvetica">assume the data is an ASCII string and
+process \t\r\n\b appropriately</font>
+<li>
+<font face="Arial,Helvetica">-S</font></li>
+
+<br><font face="Arial,Helvetica">similar to -s except that the string is
+concatenated to the end of the string specified by the start address.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">pm -2 0xa3000000 0x4411</font></li>
+
+<br><font face="Arial,Helvetica">Place in short (16-bit) format, 0x4411
+at location 0xa3000000</font>
+<li>
+<font face="Arial,Helvetica">pm -f 0xa010000 0x32 0x33 0x34 0x35</font></li>
+
+<br><font face="Arial,Helvetica">Assume a FIFO is memory mapped at address
+0xa010000 and push those four bytes onto it.</font>
+<li>
+<font face="Arial,Helvetica">pm -s 0x401000 "hello world"</font></li>
+
+<br><font face="Arial,Helvetica">Put the string "hello world" into memory
+at location 0x401000 and terminate it with a 0x00.</font>
+<li>
+<font face="Arial,Helvetica">pm -S 0x401000 " again"</font></li>
+
+<br><font face="Arial,Helvetica">Concatenate the string that starts at
+address 0x401000 with the string " again".</font></ul>
+
+</body>
+</html>

@@ -1,0 +1,214 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/symtbl.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* symtbl.c:
+ *  This file contains functions related to the symbol table option in
+ *  the monitor.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+
+#include "config.h"
+#include "stddefs.h"
+#include "genlib.h"
+#if INCLUDE_TFSSYMTBL
+#include "ctype.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+
+/* SymFileFd():
+ * Attempt to open the symbol table file.  First look to the SYMFILE env var;
+ * else default to SYMFILE definition.  If the file exists, open it and return
+ * the file descriptor; else return TFSERR_NOFILE.
+ */
+int
+<A NAME="SymFileFd">SymFileFd</A>(int verbose)
+{
+    TFILE   *tfp;
+    int     tfd;
+    char    *symfile;
+
+    /* Load symbol table file name.  If SYMFILE is not a variable, default
+     * to the string defined by SYMFILE.
+     */
+    symfile = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("SYMFILE");
+    if (!symfile)
+        symfile = SYMFILE;
+
+    tfp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(symfile);
+    if (!tfp) 
+        return(TFSERR_NOFILE);
+
+    tfd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsopen>tfsopen</A>(symfile,TFS_RDONLY,0);
+    if (tfd &lt; 0) {
+        if (verbose)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",symfile,(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,tfd,0));
+        return(TFSERR_NOFILE);
+    }
+    return(tfd);
+}
+
+/* AddrToSym():
+ *  Assumes each line of symfile is formatted as...
+ *      synmame SP hex_address
+ *  and that the symbols are sorted from lowest to highest address.
+ *  Using the file specified by the incoming TFS file descriptor, 
+ *  determine what symbol's address range covers the incoming address.
+ *  If found, store the name of the symbol as well as the offset between
+ *  the address of the symbol and the incoming address.
+ *  Note, if the incoming file descriptor is -1, then we open (and later
+ *  close) the file here.
+ *
+ *  Return 1 if a match is found, else 0.
+ */
+int
+<A NAME="AddrToSym">AddrToSym</A>(int tfdin,ulong addr,char *name,ulong *offset)
+{
+    int     lno, tfd;
+    char    *space;
+    ulong   thisaddr, lastaddr;
+    char    thisline[84];
+    char    lastline[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(thisline)];
+
+    lno = 1;
+    *offset = 0;
+    lastaddr = 0;
+    if (tfdin == -1) {
+        tfd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/symtbl.c.html#SymFileFd>SymFileFd</A>(0);
+        if (tfd == TFSERR_NOFILE)
+            return(0);
+    }
+    else
+        tfd = tfdin;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsseek>tfsseek</A>(tfd,0,TFS_BEGIN);
+    while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsgetline>tfsgetline</A>(tfd,thisline,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(thisline)-1)) {
+        space = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(thisline,"\t ");
+        if (!space)
+            continue;
+        *space++ = 0;
+        while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*space))
+            space++;
+    
+        thisaddr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(space,0,0);  /* Compute address from entry in    */
+                                        /* symfile.                         */
+
+        if (thisaddr == addr) {         /* Exact match, use this entry      */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(name,thisline);      /* in symfile.                      */
+            if (tfdin == -1)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+            return(1);
+        }
+        else if (thisaddr &gt; addr) {     /* Address in symfile is greater    */  
+            if (lno == 1)               /* than incoming address...         */
+                break;                  /* If this is first line of symfile */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(name,lastline);      /* then return error.               */
+            if (offset)
+                *offset = addr-lastaddr;/* Otherwise return the symfile     */
+            if (tfdin == -1)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+            return(1);                  /* entry previous to this one.      */
+        }
+        else {                          /* Address in symfile is less than  */
+            lastaddr = thisaddr;        /* incoming address, so just keep   */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(lastline,thisline);  /* a copy of this line and go to    */
+            lno++;                      /* the next.                        */
+        }
+    }
+    if (tfdin == -1)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(name,"0x%lx",addr);
+    return(0);
+}
+
+/* getsym():
+ * Provides a similar capability to shell variables on the command line
+ * except that here, the variable replacement is based on the content of
+ * a symbol file.  The file would be be loaded into TFS to provide
+ * a potentially large number of symbols.
+ * Looks for the file SYMFILE.  If non-existent, just return NULL.
+ * If file exists, then search through the file for the incoming
+ * symbol name and, if found, return the replacement for the symbol.
+ * else return NULL.
+ * The text file is formatted such that no line is greater than 40 characters.
+ * Each line has 2 whitespace delimited strings.  The first string is
+ * the symbol name and the second string is the replacement value for that
+ * symbol.  The first string is assumed to start at the beginning of the
+ * line, and the second string is separated from the first string by
+ * spaces and/or tabs.
+ * For example, here are a few lines:
+ *
+ *     main     0x10400
+ *     func     0x10440
+ *
+ * With the above lines in SYMFILE, if %main were on the command line, it
+ * would be replaced with 0x10400.
+ */
+char *
+<A NAME="getsym">getsym</A>(char *symname,char *line,int sizeofline)
+{
+    int     tfd;
+    char    *space;
+
+    if ((tfd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/symtbl.c.html#SymFileFd>SymFileFd</A>(1)) &lt; 0) {
+        return((char *)0);
+    }
+
+    while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsgetline>tfsgetline</A>(tfd,line,sizeofline)) {
+        char *eol;
+        eol = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(line,"\r\n");
+        if (eol)
+            *eol = 0;
+        space = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(line,"\t ");
+        if (!space)
+            continue;
+        *space = 0;
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(line,symname)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+            space++;
+            while((*space == ' ') || (*space == '\t'))
+                space++;
+            return(space);
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+    return((char *)0);
+}
+
+#else
+
+char *
+<A NAME="getsym">getsym</A>(char *symname,char *line,int sizeofline)
+{
+    return((char *)0);
+}
+
+int
+<A NAME="AddrToSym">AddrToSym</A>(int tfd,ulong addr,char *name,ulong *offset)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(name,"0x%lx",addr);
+    return(0);
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

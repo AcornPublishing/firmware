@@ -1,0 +1,479 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/arp.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* arpstuff.c:
+ *  This code supports some basic arp/rarp stuff.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_ETHERNET
+#include "endian.h"
+#include "genlib.h"
+#include "ether.h"
+#include "stddefs.h"
+#include "cli.h"
+
+void    ArpFlush(void), ArpShow(char *);
+int     ArpStore(uchar *,uchar *);
+int     IpIsOnThisNet(uchar *);
+
+/* arpcache[]:
+ *  Used to store the most recent set of IP-to-MAC address correlations.
+ */
+struct arpcache {
+    uchar   ip[4];
+    uchar   ether[6];
+} ArpCache[SIZEOFARPCACHE];
+
+/* ArpIdx & ArpTot:
+ *  Used for keeping track of current arp cache content.
+ */
+int ArpIdx, ArpTot;
+
+/* ArpStore():
+ *  Called with binary ip and ethernet addresses.
+ *  It will store that set away in the cache.
+ */
+int
+<A NAME="ArpStore">ArpStore</A>(uchar *ip,uchar *ether)
+{
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#EtherFromCache>EtherFromCache</A>(ip))
+        return(0);
+    if (ArpIdx &gt;= SIZEOFARPCACHE)
+        ArpIdx=0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)ArpCache[ArpIdx].ip,(char *)ip,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)ArpCache[ArpIdx].ether,(char *)ether,6);
+    ArpIdx++;
+    ArpTot++;
+    return(0);
+}
+
+/* EtherFromCache():
+ *  Called with a binary (4-byte) ip address.  If a match is found
+ *  in the cache, return a pointer to that ethernet address; else
+ *  return NULL.
+ */
+uchar *
+<A NAME="EtherFromCache">EtherFromCache</A>(uchar *ip)
+{
+    int i, max;
+
+    if (ArpTot &gt;= SIZEOFARPCACHE)
+        max = SIZEOFARPCACHE;
+        else
+        max = ArpTot;
+
+    for(i=0;i&lt;SIZEOFARPCACHE;i++) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(ArpCache[i].ip,ip,4))
+            return(ArpCache[i].ether);
+    }
+    return(0);
+}
+
+void
+<A NAME="ArpFlush">ArpFlush</A>(void)
+{
+    int i;
+
+    for(i=0;i&lt;SIZEOFARPCACHE;i++) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(ArpCache[i].ip,0,4);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(ArpCache[i].ether,0,6);
+    }
+    ArpIdx = ArpTot = 0;
+}
+
+/* ArpShow():
+ *  Dump the content of the current arp cache.
+ */
+void
+<A NAME="ArpShow">ArpShow</A>(char *ip)
+{
+    struct  arpcache *ap, *end;
+
+    if (ArpTot &lt; SIZEOFARPCACHE)
+        end = &ArpCache[ArpTot];
+        else
+        end = &ArpCache[SIZEOFARPCACHE];
+
+    for (ap=ArpCache;ap&lt;end;ap++) {
+        if ((!ip) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(ip,ap-&gt;ip,4))) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%02x:%02x:%02x:%02x:%02x:%02x = ",
+                ap-&gt;ether[0], ap-&gt;ether[1], ap-&gt;ether[2], ap-&gt;ether[3],
+                ap-&gt;ether[4], ap-&gt;ether[5]);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d.%d.%d.%d\n",
+                ap-&gt;ip[0], ap-&gt;ip[1], ap-&gt;ip[2], ap-&gt;ip[3]);
+        }
+    }
+}
+
+/* SendArpResp():
+ *  Called in response to an ARP REQUEST.  The incoming ethernet
+ *  header pointer points to the memory area that contains the incoming
+ *  ethernet packet that this function is called in response to.
+ *  In other words, it is used to fill the majority of the response
+ *  packet fields.
+ */
+int
+<A NAME="SendArpResp">SendArpResp</A>(struct ether_header *re)
+{
+    struct ether_header *te;
+    struct arphdr *ta, *ra;
+
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_shost),BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_dhost),(char *)&(re-&gt;ether_shost),6);
+    te-&gt;ether_type = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_ARP);
+
+    ta = (struct arphdr *) (te + 1);
+    ra = (struct arphdr *) (re + 1);
+    ta-&gt;hardware = ra-&gt;hardware;
+    ta-&gt;protocol = ra-&gt;protocol;
+    ta-&gt;hlen = ra-&gt;hlen;
+    ta-&gt;plen = ra-&gt;plen;
+    ta-&gt;operation = ARP_RESPONSE;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;senderha,BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;senderia,ra-&gt;targetia,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;targetha,ra-&gt;senderha,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;targetia,ra-&gt;senderia,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(ta-&gt;hardware);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(ta-&gt;protocol);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(ta-&gt;operation);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(ARPSIZE);
+    return(0);
+}
+
+/* SendArpRequest():
+ */
+int
+<A NAME="SendArpRequest">SendArpRequest</A>(uchar *ip)
+{
+    struct ether_header *te;
+    struct arphdr *ta;
+
+    /* Populate the ethernet header: */
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_shost),BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(te-&gt;ether_dhost),BroadcastAddr,6);
+    te-&gt;ether_type = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_ARP);
+
+    /* Populate the arp header: */
+    ta = (struct arphdr *) (te + 1);
+    ta-&gt;hardware = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(1);      /* 1 for ethernet */
+    ta-&gt;protocol = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_IP);
+    ta-&gt;hlen = 6;       /* Length of hdware (ethernet) address */
+    ta-&gt;plen = 4;       /* Length of protocol (ip) address */
+    ta-&gt;operation = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ARP_REQUEST);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;senderha,BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;senderia,BinIpAddr,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;targetha,BroadcastAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ta-&gt;targetia,ip,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(ARPSIZE);
+    return(0);
+}
+
+/* IpIsOnThisNet():
+ *  Return 1 if the incoming ip is on this subnet; else 0.
+ *  For each bit in the netmask that is set to 1...
+ *  If the corresponding bits in the incoming IP and this board's IP
+ *  do not match, return 0; else return 1.
+ *
+ *  Since this function needs a netmask, if NETMASK is not set, then
+ *  it uses the default based on the upper 3 bits of the IP address
+ *  (refer to TCP/IP Illustrated Volume 1 Pg8 for details).
+ */
+int
+<A NAME="IpIsOnThisNet">IpIsOnThisNet</A>(uchar *ip)
+{
+    static  int printedwarning;
+    int     i;
+    char    *nm, *class;
+    uchar   binnetmask[8];
+
+    nm = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("NETMASK");
+    if (!nm) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(binnetmask,0xff,4);
+        if ((BinIpAddr[0] & 0xe0) == 0xc0) {        /* Class C */
+            binnetmask[3] = 0;
+            class = "C";
+        }
+        else if ((BinIpAddr[0] & 0xc0) == 0x80) {   /* Class B */
+            binnetmask[3] = 0;
+            binnetmask[2] = 0;
+            class = "B";
+        }
+        else if ((BinIpAddr[0] & 0x80) == 0x00) {   /* Class A */
+            binnetmask[3] = 0;
+            binnetmask[2] = 0;
+            binnetmask[1] = 0;
+            class = "A";
+        }
+        else
+            class = "???";
+
+        if (!printedwarning) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Warning: NETMASK not set, defaulting to class %s ",class);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("(%d.%d.%d.%d)\n",
+                binnetmask[0],binnetmask[1],binnetmask[2],binnetmask[3]);
+            printedwarning = 1;
+        }
+    }
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(nm,binnetmask);
+    
+
+    for(i=0;i&lt;4;i++) {
+        if ((ip[i] & binnetmask[i]) != (BinIpAddr[i] & binnetmask[i])) {
+            return(0);
+        }
+    }
+    return(1);
+}
+
+/* Arp():
+ *  If no args, just dump the arp cache.
+ *  If arg is present, then assume it to be an ip address.  
+ *  Check the arp cache for the presence of that ip-correlation, if
+ *  present, print it; else issue and arp request for that IP and wait
+ *  for a response.
+ */&lt;&gt;
+
+char *ArpHelp[] = {
+    "Address resolution protocol",
+    "-[fps:v] [IP]",
+    " -f   flush cache",
+    " -p   proxy arp",
+    " -s{eadr}   store eadr/IP into cache",
+    " -v   verbose",
+    0,
+};
+
+int
+<A NAME="Arp">Arp</A>(int argc,char *argv[])
+{
+    int     opt, proxyarp;
+    char    binip[8], binether[8], *storeether;
+
+    proxyarp = 0;
+    storeether = (char *)0;
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"fps:v")) != -1) {
+        switch(opt) {
+        case 'f':   /* Flush current arp cache */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpFlush>ArpFlush</A>();
+            break;
+        case 's':   /* Store specified IP/MAC combination in arp cache. */
+            storeether = optarg;
+            break;
+        case 'p':   /* Assume gateway will run proxy arp */
+            proxyarp = 1;
+            break;
+        case 'v':   /* Enable verbosity for ARP. */
+            EtherVerbose |= SHOW_ARP;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc == (optind+1)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(argv[optind],binip);
+        if (storeether) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherToBin>EtherToBin</A>(storeether,binether);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpStore>ArpStore</A>(binip,binether);
+        }
+        else {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpEther>ArpEther</A>(binip,0,proxyarp))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpShow>ArpShow</A>(binip);
+        }
+    }
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpShow>ArpShow</A>(0);
+    EtherVerbose &= ~ SHOW_ARP;
+    return(CMD_SUCCESS);
+}
+
+/* ArpEther():
+ *  Retrieve the ethernet address that corresponds to the incoming IP 
+ *  address.  First check the local ArpCache[], then if not found issue
+ *  an ARP request... If the incoming IP is on this net, then issue the
+ *  request for the MAC address of that IP; otherwise, issue the request
+ *  for this net's GATEWAY.
+ */
+uchar *
+<A NAME="ArpEther">ArpEther</A>(uchar *binip, uchar *ecpy, int proxyarp)
+{
+    int     timeoutsecs, timeoutloops, retry;
+    char    *gip;
+    uchar   gbinip[8], *Ip, *ep;
+
+    /* First check local cache. If found, return with pointer to MAC. */
+    ep = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#EtherFromCache>EtherFromCache</A>(binip);
+    if (ep) {
+        if (ecpy) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ecpy,ep,6);
+            ep = ecpy;
+        }
+        return(ep);
+    }
+
+    retry = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_ARP);
+    while(1) {
+        /* If IP is not on this net, the get the GATEWAY IP address. */
+        if (!proxyarp && !<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#IpIsOnThisNet>IpIsOnThisNet</A>(binip)) {
+            gip = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("GIPADD");
+            if (gip) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(gip,gbinip);
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#IpIsOnThisNet>IpIsOnThisNet</A>(gbinip)) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("GIPADD/IPADD subnet confusion.\n");
+                    return(0);
+                }
+                ep = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#EtherFromCache>EtherFromCache</A>(gbinip);
+                if (ep) {
+                    if (ecpy) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ecpy,ep,6);
+                        ep = ecpy;
+                    }
+                    return(ep);
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#SendArpRequest>SendArpRequest</A>(gbinip);
+                Ip = gbinip;
+            }
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#SendArpRequest>SendArpRequest</A>(binip);
+                Ip = binip;
+            }
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#SendArpRequest>SendArpRequest</A>(binip);
+            Ip = binip;
+        }
+        if (retry) {
+            ulong ip;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ip,binip,4);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  ARP Retry #%d (%I)\n",retry,ip);
+        }
+
+        /* Now that the request has been issued, wait for a while to see if
+         * the ARP cache is loaded with the result of the request.
+         */
+        timeoutsecs = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_OR_TIMEOUT_RETURN);
+        if (timeoutsecs == RETRANSMISSION_TIMEOUT)
+            break;
+        timeoutloops = LoopsPerSecond*timeoutsecs;
+
+        while(timeoutloops &gt; 0) {
+            ep = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#EtherFromCache>EtherFromCache</A>(Ip);
+            if (ep)
+                break;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+            timeoutloops--;
+        }
+        if (ep) {
+            if (ecpy) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(ecpy,ep,6);
+                ep = ecpy;
+            }
+            return(ep);
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INCREMENT);
+        retry++;
+    }
+    if ((EtherVerbose & SHOW_ARP) && (retry))
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  ARP giving up\n");
+    return(0);
+}
+
+/* processRARP();
+ *  Called by the fundamental ethernet driver code to process a RARP
+ *  request.
+ */
+int
+<A NAME="processRARP">processRARP</A>(struct ether_header *ehdr,ushort size)
+{
+    struct  arphdr *arpp;
+
+    arpp = (struct arphdr *)(ehdr+1);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;hardware);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;protocol);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;operation);
+
+    switch(arpp-&gt;operation) {
+    case RARP_RESPONSE:
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(arpp-&gt;targetha,BinEnetAddr,6)) {
+            if (EtherVerbose & SHOW_ARP) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  RARP Response from %d.%d.%d.%d\n",
+                    arpp-&gt;senderia[0],arpp-&gt;senderia[1],
+                    arpp-&gt;senderia[2],arpp-&gt;senderia[3]);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  MY IP: from %d.%d.%d.%d\n",
+                    arpp-&gt;targetia[0],arpp-&gt;targetia[1],
+                    arpp-&gt;targetia[2],arpp-&gt;targetia[3]);
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(BinIpAddr,arpp-&gt;targetia,6);
+        }
+        break;
+    case RARP_REQUEST:
+        break;
+    default:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Invalid RARP operation: 0x%x\n",arpp-&gt;operation);
+        return(-1);
+    }
+    return(0);
+}
+
+/* processARP();
+ *  Called by the fundamental ethernet driver code to process a ARP
+ *  request.
+ */
+char *
+<A NAME="processARP">processARP</A>(struct ether_header *ehdr,ushort size)
+{
+    struct  arphdr *arpp;
+
+    arpp = (struct arphdr *)(ehdr+1);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;hardware);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;protocol);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(arpp-&gt;operation);
+
+    switch(arpp-&gt;operation) {
+    case ARP_REQUEST:
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(arpp-&gt;targetia,BinIpAddr,4)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpStore>ArpStore</A>(arpp-&gt;senderia,arpp-&gt;senderha);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#SendArpResp>SendArpResp</A>(ehdr);
+        }
+        break;
+    case ARP_RESPONSE:
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(arpp-&gt;targetia,BinIpAddr,4)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpStore>ArpStore</A>(arpp-&gt;senderia,arpp-&gt;senderha);
+        }
+        break;
+    default:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Invalid ARP operation: 0x%x\n",arpp-&gt;operation);
+        return((char *)0);
+    }
+    return((char *)(arpp + 1));
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

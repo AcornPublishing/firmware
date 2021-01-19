@@ -1,0 +1,298 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/chario.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* chario.c:
+ *  This code supports some basic character io functionality.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpuio.h"
+#include "genlib.h"
+#include "stddefs.h"
+
+#define CTLC    0x03    /* control-c */
+
+int (*remoterawon)();
+int (*remoterawoff)();
+int (*remoteputchar)();
+int (*remotegetchar)();
+int (*remotegotachar)();
+
+/* putchar():
+ *  Output a character to the stdout RS232 port.  If char is '\n'
+ *  then precede it with '\r';
+ */
+int
+<A NAME="putchar">putchar</A>(uchar c)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.h.html#RedirectCharacter>RedirectCharacter</A>(c);
+    if (c == '\n')
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>('\r');
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#rputchar>rputchar</A>(c);
+    return((int)c);
+}
+
+/* puts():
+ *  Use putchar() to output an "assumed-to-be" null-terminated string.
+*/
+void
+<A NAME="puts">puts</A>(char *string)
+{
+    while(*string) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(*string);
+        string++;
+    }
+}
+
+/* _getline():
+ * Basic line retrieval; but with a few options...
+ * This function is accessed through the getline_xx functions
+ * below.
+ * Args...
+ *  buf:     pointer to buffer to be used to place the incoming characters.
+ *  max:     size of the buffer.
+ *  ledit:   if set, then allow the line-editor to be used if ESC is input.
+ *  timeout: if set, then after 'timeout' number of seconds waiting, giveup.
+ *  prefill: if set, prefill the buffer with that string and show the user.
+ */
+static int
+<A NAME="_getline">_getline</A>(char *buf,int max,int ledit, int timeout,char *prefill)
+{
+    static  unsigned char  crlf;
+    int     tmt, tot, idx;
+    char    *base;
+
+    tot = idx = 0;
+    base = buf;
+    max -= 1;       /* Make sure there is space for the null terminator. */
+
+    if (prefill) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(base,prefill);
+        tot = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(prefill);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(prefill);
+        buf += tot;
+        idx = tot;
+    }
+
+    for(;idx&lt;max;idx++) {
+        if (timeout &gt; 0) {
+            for(tmt=timeout;tmt&gt;0;tmt--) {
+                if (<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>())
+                    break;
+            }
+            if (tmt == 0) {
+                *buf = 0;
+                return(0);
+            }
+        }
+        *buf = (char)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        if (!*buf) {
+            idx--;
+            continue;
+        }
+#if INCLUDE_LINEEDIT
+        if ((*buf == 0x1b) && (ledit)) {
+            (void)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ledit_vt.c.html#line_edit>line_edit</A>(base);
+            break;
+        }
+        else
+#endif
+        {
+            if ((*buf == '\r') || (*buf == '\n')) {
+                if ((crlf) && (*buf != crlf)) {
+                    crlf = 0;
+                    continue;
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("\r\n");
+                crlf = *buf;
+                *buf = 0;
+                break;
+            }
+            if (*buf == '\b') {
+                if (tot) {
+                    idx -= 2;
+                    buf--; 
+                    tot--;
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("\b \b");
+                }
+            }
+            else if (*buf == CTLC) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("^C\n");
+                *base = 0;
+                return(0);
+            }
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(*buf);
+                tot++; 
+                buf++;
+            }
+            crlf = 0;
+        }
+    }
+    if (idx == max) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\007\nInput too long (exceeds %d bytes).\n",max+1);
+        *buf = 0;
+        return(0);
+    }
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(base));
+}
+
+int
+<A NAME="getline">getline</A>(char *buf, int max, int ledit)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#_getline>_getline</A>(buf,max,ledit,0,0));
+}
+
+int
+<A NAME="getline_t">getline_t</A>(char *buf, int max, int timeout)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#_getline>_getline</A>(buf,max,0,timeout,0));
+}
+
+int
+<A NAME="getline_p">getline_p</A>(char *buf, int max, int ledit, char *prefill)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#_getline>_getline</A>(buf,max,ledit,0,prefill));
+}
+
+
+/* getpass():
+ */
+char *
+<A NAME="getpass">getpass</A>(prompt,buf,max)
+int     max;
+char    *prompt, *buf;
+{
+    int     i;
+    char    *bp;
+
+    bp = buf;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(prompt);
+    for (i=0;i&lt;max;i++) {
+        *bp = (char)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+        if ((*bp == '\r') || (*bp == '\n')) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("\r\n");
+            break;
+        }
+        bp++;
+    }
+    *bp = 0;
+    return(buf);
+}
+
+/* getbytes():
+ *  Similar to gets() except that the caller specifies the number
+ *  of characters and whether or not to block.
+ */
+
+int
+<A NAME="getbytes">getbytes</A>(char *buf,int cnt,int block)
+{
+    int i;
+
+    for(i=0;i&lt;cnt;i++) {
+        if (block)
+            while(!<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>());
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>())
+            break;
+        buf[i] = (char)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>();
+    }
+    return(i);
+}
+
+int
+<A NAME="putbytes">putbytes</A>(char *buf, int cnt)
+{
+    char *end;
+
+    end = buf + cnt;
+
+    while(buf &lt; end) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(*buf++);
+    }
+    return(cnt);
+}
+
+int
+<A NAME="askuser">askuser</A>(msg)
+char    *msg;
+{
+    int yes, len;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(msg);
+    len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(msg);
+    switch((char)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#getchar>getchar</A>()) {
+    case ' ':
+    case 'y':
+    case '\r':
+    case '\n':
+        yes = 1;
+        break;
+    default:
+        yes = 0;
+        break;
+    }
+    while(len) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("\b \b");
+        len--;
+    }
+    return(yes);
+}
+
+int
+<A NAME="More">More</A>()
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#askuser>askuser</A>("more?"));
+}
+
+int
+<A NAME="hitakey">hitakey</A>()
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#askuser>askuser</A>("hit any key to continue..."));
+}
+
+/* RemoteIO functions:
+ * The idea of "remote io" is to allow the monitor commands to still
+ * run when the application has taken over the system.  The monitor's
+ * connection to the serial port is a simple polled interface.  When 
+ * the application comes up, it is very likely that it will overlay a
+ * new driver onto the serial port.  If this happens, and the user at
+ * the console interface of the application wants to execute a monitor
+ * command, then the monitor's putchar/getchar/gotachar functions must
+ * use functions that are part of the application.  These remote io
+ * function pointers, if set, will point to those functions.
+ */
+
+void
+<A NAME="InitRemoteIO">InitRemoteIO</A>(void)
+{
+    /* Null out the remote put/getchar functions. */
+    remoterawon = 0;
+    remoterawoff = 0;
+    remoteputchar = 0;
+    remotegetchar = 0;
+    remotegotachar = 0;
+}
+</HTML>
+</PRE>
+</BODY>

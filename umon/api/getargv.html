@@ -1,0 +1,76 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: getargv</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_getargv()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<p><br>
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_getargv()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Retrieve an argument list.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">void&nbsp;&nbsp;&nbsp; mon_getargv(int
+*argc, char ***argv);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This function provides the hook
+needed by the application to retrieve an argument list that was created
+previously by either the <a href="../commands/argv.html">argv</a> command
+or by direct command line invocation.&nbsp; The integer pointed to by argc
+is loaded with the argument count and a the pointer to a character array
+is loaded with the location of the char *argv[] table.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int *argc;</font></li>
+
+<br><font face="Arial,Helvetica">pointer to an integer that is to be loaded
+with the number of arguments.</font>
+<li>
+<font face="Arial,Helvetica">char ***argv</font></li>
+
+<br><font face="Arial,Helvetica">pointer to an array of string pointers
+that is loaded with the char *argv[] table.</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Void.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/go.c.html#getargv">go.c</a></font></blockquote>
+
+</body>
+</html>

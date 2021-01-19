@@ -1,0 +1,200 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/main.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* main.c:
+
+    General notice:
+    This code is part of a boot-monitor package developed as a generic base
+    platform for embedded system designs.  As such, it is likely to be
+    distributed to various projects beyond the control of the original
+    author.  Please notify the author of any enhancements made or bugs found
+    so that all may benefit from the changes.  In addition, notification back
+    to the author will allow the new user to pick up changes that may have
+    been made by other users after this version of the code was distributed.
+
+    Author: Ed Sutter
+    email:  esutter@lucent.com      (home: lesutter@worldnet.att.net)
+    phone:  908-582-2351            (home: 908-889-5161)
+*/
+#include "config.h"
+#include "cpu.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "monapp.h"
+#include "monflags.h"
+#include "masks860.h"
+#include "ether.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "arch_ppc.h"
+
+
+int     StateOfMonitor, AppExitStatus;
+extern  ulong   APPLICATION_RAMSTART;
+extern  void init1(), init2(), init3();
+void    reinit();
+
+int
+<A NAME="main">main</A>(int argc,char *argv[])
+{
+    char    ename[48];
+
+    /* Set user level to its max, then allow monrc file to adjust it. */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#initUsrLvl>initUsrLvl</A>(MAXUSRLEVEL);
+
+    switch(StateOfMonitor) {
+    case INITIALIZE:
+        /* Second phase of hardware initialization. */
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#init2>init2</A>();
+        /* Init register data structures. */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#reginit>reginit</A>();
+        /* Initialize target-independent stuff. */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#init3>init3</A>();
+        break;
+    case MISC:
+    case SSTEP:
+    case BAILOUT:
+    case MORESTART:
+    case BREAKPOINT:
+#if INCLUDE_DEBUG
+        regbackup();
+#endif
+        break;
+    case APP_EXIT:
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#reinit>reinit</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nApplication Exit Status: %d (0x%x)\n",
+            AppExitStatus,AppExitStatus);
+        break;
+    case EXCEPTION:
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#reinit>reinit</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nEXCEPTION: '%s'\n Occurred near 0x%lx",
+            <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/except_860.c.html#ExceptionType2String>ExceptionType2String</A>(ExceptionType),ExceptionAddr);
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/symtbl.c.html#AddrToSym>AddrToSym</A>(-1,ExceptionAddr,ename,0))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" (within %s)",ename);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n\n");
+/*      showregs(); */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#exceptionAutoRestart>exceptionAutoRestart</A>(INITIALIZE);
+        break;
+    default:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Unexpected monitor state: 0x%x\n",StateOfMonitor);
+        break;
+    }
+
+    /* Enter the endless loop of command processing: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#CommandLoop>CommandLoop</A>();
+
+    /* Should not get here. */
+    return(0);
+}
+
+void
+<A NAME="reinit">reinit</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/start.c.html#init1>init1</A>(0);                   /* reinit hdware */
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#init2>init2</A>();
+#if INCLUDE_ETHERNET
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EthernetStartup>EthernetStartup</A>(0,0);       /* reinit ethernet, without DHCP/BOOTP */
+#endif
+}
+
+void
+<A NAME="init2">init2</A>()
+{
+#if INCLUDE_FLASH
+    <A HREF=FILE:/TOP_DIRNAME/src/common/flash/flash_dirname/flashdev.c.html#FlashInit>FlashInit</A>();        /* Init flashop data structures.  This MUST be */
+                        /* done prior to turning on cache!!! */
+#endif
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#cacheInit>cacheInit</A>();        /* Initialize cache. */
+
+#if INCLUDE_ETHERNET
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enreset>enreset</A>();          /* Clear the ethernet interface. */
+#endif
+#if INCLUDE_TFS
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstartup>tfsstartup</A>();       /* Init tfs data structures. */
+#endif
+}
+
+void
+<A NAME="monrestart">monrestart</A>(int val)
+{
+    warmstart(val);
+}
+
+void
+<A NAME="intsrestore">intsrestore</A>(ulong msr)
+{
+    ppcMtmsr(msr);
+}
+
+ulong
+<A NAME="intsoff">intsoff</A>()
+{
+    ulong  msr;
+
+    msr = ppcMfmsr();
+    ppcMtmsr(msr & ~0x8000);
+    return(msr);
+}
+
+/* some stubs for now... */
+void
+<A NAME="ctxMON">ctxMON</A>()
+{
+}
+
+void
+<A NAME="ctxAPP">ctxAPP</A>()
+{
+}
+
+void
+<A NAME="appexit">appexit</A>(int val)
+{
+    extern  void <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#flush_console>flush_console</A>(void);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/flash.c.html#intsoff>intsoff</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#flush_console>flush_console</A>();
+    AppExitStatus = val;
+#if INCLUDE_DEBUG
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/at.c.html#removeatpoints>removeatpoints</A>();
+#endif
+    warmstart(APP_EXIT);
+}
+
+ulong
+<A NAME="monState">monState</A>()
+{
+    return(StateOfMonitor);
+}
+
+/* cacheInitForTarget():
+    Enable instruction cache only...
+*/
+void
+<A NAME="cacheInitForTarget">cacheInitForTarget</A>()
+{
+    asm(".equ   r3,3");
+    asm(".equ   IC_CST,560");
+
+    asm("   mfspr   r3,IC_CST");    
+    asm("   lis     r3,0x0200");
+    asm("   mtspr   IC_CST,r3");
+    asm("   isync");
+}
+
+/* extValidPassword():
+    Refer to validPassword() in common/password.c for notes.
+*/
+int
+<A NAME="extValidPassword">extValidPassword</A>(char *password, int ulvl)
+{
+    return(-1);
+}
+</HTML>
+</PRE>
+</BODY>

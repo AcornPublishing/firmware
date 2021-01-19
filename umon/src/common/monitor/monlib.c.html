@@ -1,0 +1,733 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/monlib.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* monlib.c:
+ *  This file is part of the monitor code, but it is actually linked into
+ *  the application.  It is built with (but not linked with) the monitor,
+ *  then the monlib.o file is linked with the application.
+ *  The only requirement on the application is that it know where the address
+ *  of the monCom function is in the monitor's space.  
+ *  The monCom function will be accessible in some "well-known" way (processor
+ *  and platform dependent) so that this will not be a problem.
+ *
+ *  This monlib.c file is a replacement for the older mechanism that was
+ *  a bit more error-prone...  A table of function pointers existed at some
+ *  well-known location in the monitor, and the content of that table was
+ *  assumed to also be "well-known".  This new version only assumes that the
+ *  pointer to monCom is well-known; everything else will work based on the
+ *  fact that the monitor and application will share the monlib.h header
+ *  file.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "monlib.h"
+
+static unsigned short   (*_xcrc16)(), (*_crc32)();
+static unsigned long    (*_intsoff)();
+static struct   tfshdr  *(*_tfsnext)(), *(*_tfsstat)();
+static long     (*_tfsctrl)(), (*_tfstell)();
+static int      (*_tfsseek)(), (*_tfsgetline)(), (*_tfsipmod)();
+static int      (*_tfsinit)(), (*_tfsadd)(), (*_tfsunlink)(), (*_tfsrun)();
+static int      (*_tfsread)(), (*_tfswrite)(), (*_tfsopen)(), (*_tfsclose)();
+static int      (*_printf)(), (*_cprintf)(), (*_sprintf)(), (*_monrestart)();
+static int      (*_rputchar)(), (*_getchar)(), (*_gotachar)(), (*_getbytes)();
+static int      (*_addcommand)(), (*_docommand)(), (*_pioget)(), (*_getline)();
+static int      (*_tfsfstat)(), (*_tfseof)(), (*_decompress)();
+static int      (*_tfstruncate)(), (*_heapextend)(), (*_tfslink)();
+static char     *(*_getenv)(), *(*_malloc)(), *(*_version)();
+static void     (*_intsrestore)(), (*_appexit)(), (*_free)();
+static void     (*_setenv)(), (*_getargv)(), (*_pioset)(), (*_pioclr)();
+static void     (*_profiler)(), (*_bbc)(), (*_memtrace)();
+
+static void (*_monlock)(), (*_monunlock)();
+static int (*_moncom)(int,void *,void *, void *);
+
+/* monConnect():
+ *  This must be the first call by the application code to talk to the
+ *  monitor.  It is expecting three incoming function pointers:
+ *
+ *  mon:    Points to the monitor's _moncom function;
+ *          This is a "well-known" address because the monitor and
+ *          application code (two separately linked binaries) must
+ *          know it.
+ *  lock:   Points to a function in the application code that will be
+ *          used by the monitor as a lock-out function (some kind of
+ *          semaphore in the application).  
+ *  unlock: Points to a function in the application code that will be
+ *          used by the monitor as an un-lock-out function (undo whatever
+ *          lock-out mechanism was done by lock).
+ */
+void
+<A NAME="monConnect">monConnect</A>(int (*mon)(), void (*lock)(), void (*unlock)())
+{
+    /* Assign incoming lock and unlock functions... */
+    _monlock = lock;
+    _monunlock = unlock;
+
+    /* If the mon pointer is non-zero, then make the mon_ connections... */
+    if (mon) {
+
+        _moncom = mon;
+
+        /* Make the connections between "mon_" functions that are           */
+        /* symbolically accessible by the application and the corresponding */
+        /* functions that exists in the monitor.                            */
+        _moncom(GETMONFUNC_PUTCHAR,&_rputchar,0,0);
+        _moncom(GETMONFUNC_GETCHAR,&_getchar,0,0);
+        _moncom(GETMONFUNC_GOTACHAR,&_gotachar,0,0);
+        _moncom(GETMONFUNC_GETBYTES,&_getbytes,0,0);
+        _moncom(GETMONFUNC_PRINTF,&_printf,0,0);
+        _moncom(GETMONFUNC_CPRINTF,&_cprintf,0,0);
+        _moncom(GETMONFUNC_SPRINTF,&_sprintf,0,0);
+        _moncom(GETMONFUNC_RESTART,&_monrestart,0,0);
+        _moncom(GETMONFUNC_GETENV,&_getenv,0,0);
+        _moncom(GETMONFUNC_SETENV,&_setenv,0,0);
+        _moncom(GETMONFUNC_TFSINIT,&_tfsinit,0,0);
+        _moncom(GETMONFUNC_TFSADD,&_tfsadd,0,0);
+        _moncom(GETMONFUNC_TFSUNLINK,&_tfsunlink,0,0);
+        _moncom(GETMONFUNC_TFSRUN,&_tfsrun,0,0);
+        _moncom(GETMONFUNC_TFSNEXT,&_tfsnext,0,0);
+        _moncom(GETMONFUNC_TFSSTAT,&_tfsstat,0,0);
+        _moncom(GETMONFUNC_TFSREAD,&_tfsread,0,0);
+        _moncom(GETMONFUNC_TFSWRITE,&_tfswrite,0,0);
+        _moncom(GETMONFUNC_TFSOPEN,&_tfsopen,0,0);
+        _moncom(GETMONFUNC_TFSCLOSE,&_tfsclose,0,0);
+        _moncom(GETMONFUNC_TFSSEEK,&_tfsseek,0,0);
+        _moncom(GETMONFUNC_TFSGETLINE,&_tfsgetline,0,0);
+        _moncom(GETMONFUNC_TFSIPMOD,&_tfsipmod,0,0);
+        _moncom(GETMONFUNC_TFSCTRL,&_tfsctrl,0,0);
+        _moncom(GETMONFUNC_ADDCOMMAND,&_addcommand,0,0);
+        _moncom(GETMONFUNC_DOCOMMAND,&_docommand,0,0);
+        _moncom(GETMONFUNC_GETARGV,&_getargv,0,0);
+        _moncom(GETMONFUNC_CRC16,&_xcrc16,0,0);
+        _moncom(GETMONFUNC_CRC32,&_crc32,0,0);
+        _moncom(GETMONFUNC_PIOGET,&_pioget,0,0);
+        _moncom(GETMONFUNC_PIOSET,&_pioset,0,0);
+        _moncom(GETMONFUNC_PIOCLR,&_pioclr,0,0);
+        _moncom(GETMONFUNC_INTSOFF,&_intsoff,0,0);
+        _moncom(GETMONFUNC_INTSRESTORE,&_intsrestore,0,0);
+        _moncom(GETMONFUNC_APPEXIT,&_appexit,0,0);
+        _moncom(GETMONFUNC_MALLOC,&_malloc,0,0);
+        _moncom(GETMONFUNC_FREE,&_free,0,0);
+        _moncom(GETMONFUNC_GETLINE,&_getline,0,0);
+        _moncom(GETMONFUNC_TFSFSTAT,&_tfsfstat,0,0);
+        _moncom(GETMONFUNC_TFSEOF,&_tfseof,0,0);
+        _moncom(GETMONFUNC_DECOMPRESS,&_decompress,0,0);
+        _moncom(GETMONFUNC_TFSTRUNCATE,&_tfstruncate,0,0);
+        _moncom(GETMONFUNC_HEAPXTEND,&_heapextend,0,0);
+        _moncom(GETMONFUNC_PROFILER,&_profiler,0,0);
+        _moncom(GETMONFUNC_TFSLINK,&_tfslink,0,0);
+        _moncom(GETMONFUNC_BBC,&_bbc,0,0);
+        _moncom(GETMONFUNC_MEMTRACE,&_memtrace,0,0);
+        _moncom(GETMONFUNC_TFSTELL,&_tfstell,0,0);
+        _moncom(GETMONFUNC_VERSION,&_version,0,0);
+    }
+}
+
+/* ignorelock:
+ * Used as a back-door to disable the monLock()/monUnlock() stuff.
+ * This is useful if the application CLI falls through to the monitor's
+ * CLI and you are using the "call" command in the monitor to execute some
+ * function that has a mon_xxx function in it.  In this case, the fact that
+ * the application has fallen through to the monitor means that the lock
+ * is already active, so when the function tries to call some other mon_xxx
+ * function it won't be able to because of the lock already being set.
+ *
+ * With these functions in the application space, the user can do the 
+ * following:
+ *  call %DisableLock
+ *  call %Func_with_monXXX_in_it
+ *  call %EnableLock
+ *
+ * Note that this is NOT to be used by application code, it is simply a
+ * back-door mechanism to allow "call" from the CLI to invoke functions
+ * that have mon_XXX functionality in them.
+ */
+static int ignorelock = 0;
+
+void
+<A NAME="DisableMonLock">DisableMonLock</A>(void)
+{
+    ignorelock = 2;
+}
+
+void
+<A NAME="EnableMonLock">EnableMonLock</A>(void)
+{
+    ignorelock = 0;
+}
+
+/* monLock() & monUnlock():
+ * Used by all of the wrapper functions below this point to call
+ * the function pointed to by _monlock & _monunlock function pointers
+ * (if set).
+ * These functions must test both the function pointer and the state
+ * of the ignorelock variable.  The function DisableMonLock() sets the
+ * ignorelock variable to 2 because it is being executed through "call"
+ * which means that the lock is active.  
+ */
+static void
+<A NAME="monLock">monLock</A>()
+{
+    if (_monlock) {
+        switch(ignorelock) {
+            case 1:
+                break;
+            case 2:
+                ignorelock--;
+                break;
+            default:
+                _monlock();
+                break;
+        }
+    }
+}
+
+static void
+<A NAME="monUnlock">monUnlock</A>()
+{
+    if (_monunlock) {
+        switch(ignorelock) {
+            case 1:
+                break;
+            case 2:
+                ignorelock--;
+            default:
+                _monunlock();
+                break;
+        }
+    }
+}
+
+int
+<A NAME="mon_com">mon_com</A>(int cmd, void *arg1, void *arg2, void *arg3)
+{
+    int ret;
+    
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _moncom(cmd,arg1,arg2,arg3);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_putchar">mon_putchar</A>(unsigned char c)
+{
+    int ret;
+    
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _rputchar(c);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_getchar">mon_getchar</A>(void)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _getchar();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_gotachar">mon_gotachar</A>(void)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _gotachar();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_getbytes">mon_getbytes</A>(char *buf,int cnt,int block)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _getbytes(buf,cnt,block);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_printf">mon_printf</A>(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12)
+char *fmt;
+int a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12;
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _printf(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_cprintf">mon_cprintf</A>(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12)
+char *fmt;
+int a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12;
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _cprintf(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_sprintf">mon_sprintf</A>(buf,fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12)
+char *fmt, *buf;
+int a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12;
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _sprintf(buf,fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_restart">mon_restart</A>(int val)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _monrestart(val);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+char *
+<A NAME="mon_getenv">mon_getenv</A>(char *name)
+{
+    char *ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _getenv(name);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_setenv">mon_setenv</A>(char *name,char *val)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _setenv(name,val);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+int
+<A NAME="mon_tfsinit">mon_tfsinit</A>(void)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsinit>_tfsinit</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsadd">mon_tfsadd</A>(char *name, char *info, char *flags, unsigned char *src, int size)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsadd(name,info,flags,src,size);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfslink">mon_tfslink</A>(char *src, char *target)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfslink(src,target);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsunlink">mon_tfsunlink</A>(char *name)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsunlink>_tfsunlink</A>(name);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsrun">mon_tfsrun</A>(char **name,int verbose)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsrun(name,verbose);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+struct tfshdr *
+<A NAME="mon_tfsnext">mon_tfsnext</A>(struct tfshdr *fp)
+{
+    struct tfshdr *ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsnext(fp);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfstruncate">mon_tfstruncate</A>(int tfd, long len)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfstruncate(tfd,len);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfseof">mon_tfseof</A>(int tfd)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfseof(tfd);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsfstat">mon_tfsfstat</A>(char *name, struct tfshdr *fp)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsfstat(name,fp);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+struct tfshdr *
+<A NAME="mon_tfsstat">mon_tfsstat</A>(char *name)
+{
+    struct tfshdr *ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#_tfsstat>_tfsstat</A>(name);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsread">mon_tfsread</A>(int fd, char *buf, int cnt)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsread(fd,buf,cnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfswrite">mon_tfswrite</A>(int fd, char *buf, int cnt)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfswrite(fd,buf,cnt);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsopen">mon_tfsopen</A>(char *file,long flagmode,char *buf)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsopen(file,flagmode,buf);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsclose">mon_tfsclose</A>(int fd,char *info)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsclose(fd,info);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsseek">mon_tfsseek</A>(int fd, int offset, int whence)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsseek(fd,offset,whence);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsgetline">mon_tfsgetline</A>(int fd,char *bp,int max)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsgetline(fd,bp,max);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_tfsipmod">mon_tfsipmod</A>(char *name,char *buf,int offset,int size)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsipmod(name,buf,offset,size);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+long
+<A NAME="mon_tfsctrl">mon_tfsctrl</A>(int rqst,long arg1,long arg2)
+{
+    long    ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfsctrl(rqst,arg1,arg2);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+long
+<A NAME="mon_tfstell">mon_tfstell</A>(int fd)
+{
+    long    ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _tfstell(fd);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_addcommand">mon_addcommand</A>(struct monCommand *cmd)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _addcommand(cmd);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_docommand">mon_docommand</A>(char *cmdline,int verbose)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _docommand(cmdline,verbose);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_getargv">mon_getargv</A>(int *argc,char ***argv)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _getargv(argc,argv);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+unsigned short
+<A NAME="mon_xcrc16">mon_xcrc16</A>(char *buf,long nbytes)
+{
+    unsigned short ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _xcrc16(buf,nbytes);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_pioget">mon_pioget</A>(char port,int bitnum)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _pioget(port,bitnum);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_pioset">mon_pioset</A>(char port,int bitnum)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _pioset(port,bitnum);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+void
+<A NAME="mon_pioclr">mon_pioclr</A>(char port,int bitnum)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _pioclr(port,bitnum);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+unsigned long
+<A NAME="mon_intsoff">mon_intsoff</A>(void)
+{
+    unsigned long ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _intsoff();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_intsrestore">mon_intsrestore</A>(unsigned long msr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _intsrestore(msr);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+void
+<A NAME="mon_appexit">mon_appexit</A>(int val)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _appexit(val);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+char *
+<A NAME="mon_malloc">mon_malloc</A>(int size)
+{
+    char *ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _malloc(size);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_free">mon_free</A>(char *cp)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    _free(cp);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+}
+
+int
+<A NAME="mon_getline">mon_getline</A>(char *buf,int max,int ledit)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#_getline>_getline</A>(buf,max,ledit);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_decompress">mon_decompress</A>(char *src,int srcsize,char *dest)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _decompress(src,srcsize,dest);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+int
+<A NAME="mon_heapxtend">mon_heapxtend</A>(char *base,int size)
+{
+    int ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _heapextend(base,size);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+
+void
+<A NAME="mon_bbc">mon_bbc</A>(char *filename, int lineno)
+{
+    _bbc(filename, lineno);
+}
+
+void
+<A NAME="mon_profiler">mon_profiler</A>(void *pdata)
+{
+    _profiler(pdata);
+}
+
+void
+<A NAME="mon_memtrace">mon_memtrace</A>(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12)
+char *fmt;
+int a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12;
+{
+    _memtrace(fmt,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12);
+}
+
+char *
+<A NAME="mon_version">mon_version</A>(void)
+{
+    char *ret;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monLock>monLock</A>();
+    ret = _version();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monlib.c.html#monUnlock>monUnlock</A>();
+    return(ret);
+}
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,387 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: DHCP</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>DHCP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">dhcp</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Dynamic Host Configuration Protocol
+discover request.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">dhcp -[bvV]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">The monitor implements a subset
+of the DHCP client protocol.&nbsp; Based on <a href="../rfcs/rfc2131.txt">RFC2131</a>
+spec, the "automatic allocation" mode (DHCP server assigns a permanent
+IP address, or infinite lease, to a client) is the only mode supported.&nbsp;
+The DHCP handshake can be started in one of three different ways:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">set the IPADD shell variable to "DHCP" in
+the monrc file;</font></li>
+
+<li>
+<font face="Arial,Helvetica">issue this dhcp command from some other auto-bootable
+script;</font></li>
+
+<li>
+<font face="Arial,Helvetica">if no monrc exists and the <a href="../src/targets/target_dirname/monitor/config.h.html">DEFAULT_IPADD</a>
+entry in config.h was set to DHCP when the monitor was built;</font></li>
+</ul>
+<font face="Arial,Helvetica">All dhcp startup mechanisms run the same client
+code; the only difference is that when DHCP is started through this command,
+there is no automatic retry and no TFTP server interaction; it is left
+to the script to handle that.&nbsp; This is done to allow the user to override
+the automatic sequence of events discussed below with some other startup
+method.&nbsp; Aside from that difference, all other aspects of the handshake
+are identical (refer to <a href="#dhcpdetails">discussion</a> below).</font>
+<br><font face="Arial,Helvetica">Sequence of events for this limited implementation
+of DHCP...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Client issues a DISCOVER: broadcast the fact
+that it is looking for a DHCP server.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Server responds with an OFFER: server has
+received a DISCOVER request from the client.&nbsp; The offer may contain
+all the information that the DHCP client needs to boot-up, but this is
+dependent on the configuration of the server.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Client issues a REQUEST: the client accepts
+the offer from the server and asks the server to send back the information
+it needs.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Server responds with an ACK: reply from the
+server with the information requested.</font></li>
+</ul>
+<font face="Arial,Helvetica">Refer to <a href="#dhcpdetails">discussion</a>
+below for a more detailed discussion on monitor startup.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">limited verbosity enabled;</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">extreme verbosity enabled;</font>
+<li>
+<font face="Arial,Helvetica">-b</font></li>
+
+<br><font face="Arial,Helvetica">run BOOTP;</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">The use of various shell variables metioned
+in this discussion provides an application with a lot of flexibility. It
+is beyond the purpose of this client to support all possible DHCP configurations,
+so some application-specific coding may be necessary.&nbsp; The monitor's
+DHCP code (<a href="../src/common/monitor/dhcpboot.c.html">dhcpboot.c</a>
+&amp;<a href="../src/common/monitor/dhcp_00.c.html">dhcp_00.c</a>) is set
+up to allow application-specific code to be added without touching the
+generic DHCP client code.</font></li>
+
+<li>
+<font face="Arial,Helvetica">The shell variable IPADD can also be set to
+DHCPV or DHCPv to enable different levels of verbosity during DHCP transactions...
+'V' is full DHCP verbosity and 'v' only prints the
+<a href="../src/common/monitor/dhcpboot.c.html#DhcpSetEnv">DhcpSetEnv()</a>
+calls.</font></li>
+
+<li>
+<font face="Arial,Helvetica">All of the above discussion applies to both
+BOOTP and DHCP.&nbsp; For BOOTP autostart, set the IPADD shell variable
+to BOOTP instead of DHCP (v &amp; V extensions apply).</font></li>
+
+<br>&nbsp;</blockquote>
+<a NAME="dhcpdetails"></a><b><font face="Arial,Helvetica"><font size=+1>DHCP/BOOTP
+Details:</font></font></b>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+If configured to do so, the target can issue a BOOTP/DHCP broadcast.&nbsp;
+Shell variables are used to configure the outgoing request and to store
+of some of the returned parameters from the server. Upon reception of the
+BOOTP/DHCP handshake with some server, the target expects the <i>yiaddr</i>
+field to be loaded with the target's IP address and it will be stored in
+the IPADD shell variable.&nbsp; In addition, it will store the content
+of the
+<i>siaddr</i> field into the BOOTSRVR shell variable, the
+<i>file</i>
+field into the BOOTFILE shell variable, the <i>giaddr</i> field into the
+RLYAGNT shell variable.&nbsp; Certain standard options are also transferred
+to shell variables...the router (option code 3) into the GIPADD shell variable
+and the subnet-mask (option code 1) will be stored into the NETMASK shell
+variable.&nbsp; Note that each of these additional fields will be loaded
+into their respective shell variable only if found to be non-zero. Note
+also that if after the DHCP/BOOTP transaction has completed, RLYAGNT is
+loaded, but GIPADD is not, then the content of RLYAGNT is copied to GIPADD.
+Finally, to satisfy other non-standard scenerios, the entire content of
+BOOTP vendor-specific-area or the DHCP options area will be copied (in
+ascii-coded-hex) to the DHCPVSA shell variable.</font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Following are the DHCP
+and BOOTP header formats including what entries in the received header
+are transferred to shell variables in the monitor...</font>
+<blockquote>
+<blockquote>&nbsp;
+<table BORDER=2 COLS=4 WIDTH="60%" >
+<tr ALIGN=CENTER>
+<td ALIGN=CENTER><b><font face="Arial,Helvetica">op (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">htype (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">hlen (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">hops (1)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">xid (4)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="2"><b><font face="Arial,Helvetica">secs (2)</font></b></td>
+
+<td ALIGN=CENTER COLSPAN="2"><b><font face="Arial,Helvetica">unused (2)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">ciaddr (4)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">yiaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to IPADD shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">siaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to BOOTSRVR shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">giaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to RLYAGNT shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">chaddr (16)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">sname (64)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">file (128)</font></b>
+<br><font face="Arial,Helvetica">Copied to BOOTFILE shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">vend (64)</font></b>
+<br><font face="Arial,Helvetica">Option #1 copied to NETMASK</font>
+<br><font face="Arial,Helvetica">Option #3 copied to GIPADD</font>
+<br><font face="Arial,Helvetica">Entire field copied to DHCPVSA</font></td>
+</tr>
+
+<caption ALIGN=BOTTOM><b><font face="Arial,Helvetica"><font size=+1>Format
+of a BOOTP Message</font></font></b></caption>
+</table>
+
+<br>&nbsp;
+<br>&nbsp;
+<table BORDER=2 COLS=4 WIDTH="60%" >
+<tr ALIGN=CENTER>
+<td ALIGN=CENTER><b><font face="Arial,Helvetica">op (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">htype (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">hlen (1)</font></b></td>
+
+<td><b><font face="Arial,Helvetica">hops (1)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">xid (4)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="2"><b><font face="Arial,Helvetica">secs (2)</font></b></td>
+
+<td ALIGN=CENTER COLSPAN="2"><b><font face="Arial,Helvetica">flags (2)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">ciaddr (4)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">yiaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to IPADD shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">siaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to BOOTSRVR shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">giaddr (4)</font></b>
+<br><font face="Arial,Helvetica">Copied to RLYAGNT shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">chaddr (16)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">sname (64)</font></b></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">file (128)</font></b>
+<br><font face="Arial,Helvetica">Copied to BOOTFILE shell variable</font></td>
+</tr>
+
+<tr>
+<td ALIGN=CENTER COLSPAN="4"><b><font face="Arial,Helvetica">options (312)</font></b>
+<br><font face="Arial,Helvetica">Option #1 copied to NETMASK</font>
+<br><font face="Arial,Helvetica">Option #3 copied to GIPADD</font>
+<br><font face="Arial,Helvetica">Option #51 copied to DHCPLEASETIME</font>
+<br><font face="Arial,Helvetica">Entire field copied to DHCPVSA</font></td>
+</tr>
+
+<caption ALIGN=BOTTOM><b><font face="Arial,Helvetica"><font size=+1>Format
+of a DHCP Message</font></font></b></caption>
+</table>
+</blockquote>
+</blockquote>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Upon completion of the
+BOOTP/DHCP handshake, if both the BOOTFILE and BOOTSRVR variables have
+been loaded, the target will attempt a TFTP transfer of the specified file
+from the specified server.&nbsp; Since the file (destined to reside in
+TFS) can be one of several different types, the target will look for a&nbsp;
+comma extension on the filename to be used as the file's TFS flags.&nbsp;
+For example, if the BOOTFILE variable contains abcde,eB, then the file
+will be stored into TFS with the name "abcde" and flags "eB" (refer to
+<a href="tftp.html#file_flags_info">discussion
+regarding TFTP destination syntax specification</a>).&nbsp; This filename
+extension will be processed as TFS flags only if each of the characters
+in that extension are legitimate
+<a href="../tfs.html#attributes">TFS flags</a>
+(or attributes).&nbsp; As a final step in the BOOTP/DHCP startup, if the
+file is successfully transferred from the TFTP server, the target will
+then execute it as a standard executable file under TFS.&nbsp; Note that
+execution is attempted, but will only be carried out if the flags have
+been properly set.</font>
+<br><font face="Arial,Helvetica"><b>&nbsp;&nbsp;&nbsp; Note1:</b>&nbsp;
+the incoming file is transferred to TFS using the API function
+<a href="../api/tfsadd.html">tfsadd()</a>.&nbsp;
+This means that if the file already exists in TFS and is 100% identical,
+there is no flash-write overhead.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; <b>Note2</b>: if there
+are no specified flags for the file that is downloaded, then it is assumed
+to be 'e', meaning that the file is treated as an executable script.</font>
+<br><a NAME="warning"></a><font face="Arial,Helvetica"><b>Warning:</b>
+this BOOTP (or DHCP) handshake is done in the background while the monitor
+is booting up; hence, any autobootable scripts can run while the handshake
+is in progress. The user must be careful here... Potentially, an autobootable
+script and the handshake will be occurring at the same time, so the script
+must be aware of this.&nbsp; The important thing to note is that if the
+file that is downloaded into TFS is autobootable, then it will run while
+the BOOTP/DHCP handshake is potentially loading in a new version of the
+same file.&nbsp; This will definitely confuse things; so ideally, if the
+file loaded in by BOOTP/DHCP is executable, then there should be no autobootable
+files in TFS.&nbsp; On the other hand, if the file loaded in is not executable,
+then some other autobootable file can be set up to be waiting for this
+to be loaded.</font>
+<h4>
+<font face="Arial,Helvetica"><font size=+1>DHCP Specifically...</font></font></h4>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; For DHCP, the monitor supports
+the 'automatic allocation' portion of the specification.&nbsp; There is
+no lease expiration (see note below), the IP address assigned at the time
+of the initial handshake is assumed to be owned by the target until it
+is reset.&nbsp; Basically this means that the DHCP supported by the monitor
+is an extension of BOOTP, providing a bit more flexibility with regard
+to the parameters that can be retrieved from the DHCP server and the way
+in which the client and server agree to handshake.&nbsp; The target&nbsp;
+issues a DHCP_DISCOVER broadcast.&nbsp; In that message, the flags, class
+identifier, client identifier and DHCP parameter-request-list may be loaded
+from the shell variables <a href="../shellvars.html#DHCPFLAGS">DHCPFLAGS</a>,
+<a href="../shellvars.html#DHCPCLASSID">DHCPCLASSID</a>
+,
+<a href="../shellvars.html#DHCPCLIENTID">DHCPCLIENTID</a>&nbsp; and <a href="../shellvars.html#DHCPRQSTLIST">DHCPRQSTLIST</a>
+respectively.&nbsp;&nbsp; The DHCP server may be equipped to expect that
+and based on its contents,&nbsp; the server should respond to the broadcast
+with a DHCP_OFFER.&nbsp; By default, the offer is accepted, but if the
+<a href="../shellvars.html#DHCPOFFRFLTR">DHCPOFFRFLTR</a>
+shell variable is set, some filtering is done to determine whether or not
+the client should proceed or just ignore the offer.&nbsp; If the client
+proceeds, then the target issues the DHCP_REQUEST and the server replies
+with a DHCP_ACK.&nbsp; The payload accompanying this final acknowledgement
+is what contains all of the target-specific parameters from DHCP.&nbsp;
+Similar to BOOTP above, upon completion of the DHCP handshake, if both
+BOOTFILE and BOOTSRVR are set,&nbsp; the file specified in BOOTFILE is
+retrieved from the server specified by BOOTSRVR and executed (if the appropriate
+flags are set).&nbsp; See <a href="#warning">warning</a> above.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; As mentioned above,
+the monitor does not support lease expiration; however, it does provide
+hooks to allow an overlaying OS to handle lease renewal.&nbsp; By default,
+the incoming lease time option is ignored and the client accepts the server's
+offer and assumes infinite lease time.&nbsp; If, in the monrc file, the
+shell variable <a href="../shellvars.html#DHCPLEASETIME">DHCPLEASETIME</a>
+is set, then the content of this variable is used as a minimum that the
+incoming lease time from the server is compared to.&nbsp; If the incoming
+lease time is greater than or equal to this value, then the offer is accepted
+and the DHCPLEASETIME shell variable is reloaded with the incoming lease
+time.&nbsp; If there is no incoming lease time specified by the server,
+then the DHCPLEASETIME shell variable is cleared.&nbsp; The OS can now
+look at this shell variable (if present) to see when to issue a lease renewal
+(if at all).</font></blockquote>
+
+</body>
+</html>

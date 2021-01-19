@@ -1,0 +1,356 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/dld.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* dld.c:
+ *  This code supports a download interface to COFFLINK, an in-house
+ *  developed source-level debugger (not used much anymore).
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_DEBUG
+#include "genlib.h"
+#include "stddefs.h"
+
+#define DLD_TIMEOUT 50000
+
+extern  ulong   bss_start, bss_end;
+
+ushort dcrc16();
+int dld_crc_disabled;   /* if 1, then crc is bypassed in download */
+
+ushort crctbl[] = {
+    0x0000,0xc0c1,0xc181,0x0140,0xc301,0x03c0,0x0280,0xc241,
+        0xc601,0x06c0,0x0780,0xc741,0x0500,0xc5c1,0xc481,0x0440,
+        0xcc01,0x0cc0,0x0d80,0xcd41,0x0f00,0xcfc1,0xce81,0x0e40,
+        0x0a00,0xcac1,0xcb81,0x0b40,0xc901,0x09c0,0x0880,0xc841,
+        0xd801,0x18c0,0x1980,0xd941,0x1b00,0xdbc1,0xda81,0x1a40,
+        0x1e00,0xdec1,0xdf81,0x1f40,0xdd01,0x1dc0,0x1c80,0xdc41,
+        0x1400,0xd4c1,0xd581,0x1540,0xd701,0x17c0,0x1680,0xd641,
+        0xd201,0x12c0,0x1380,0xd341,0x1100,0xd1c1,0xd081,0x1040,
+        0xf001,0x30c0,0x3180,0xf141,0x3300,0xf3c1,0xf281,0x3240,
+        0x3600,0xf6c1,0xf781,0x3740,0xf501,0x35c0,0x3480,0xf441,
+        0x3c00,0xfcc1,0xfd81,0x3d40,0xff01,0x3fc0,0x3e80,0xfe41,
+        0xfa01,0x3ac0,0x3b80,0xfb41,0x3900,0xf9c1,0xf881,0x3840,
+        0x2800,0xe8c1,0xe981,0x2940,0xeb01,0x2bc0,0x2a80,0xea41,
+        0xee01,0x2ec0,0x2f80,0xef41,0x2d00,0xedc1,0xec81,0x2c40,
+        0xe401,0x24c0,0x2580,0xe541,0x2700,0xe7c1,0xe681,0x2640,
+        0x2200,0xe2c1,0xe381,0x2340,0xe101,0x21c0,0x2080,0xe041,
+        0xa001,0x60c0,0x6180,0xa141,0x6300,0xa3c1,0xa281,0x6240,
+        0x6600,0xa6c1,0xa781,0x6740,0xa501,0x65c0,0x6480,0xa441,
+        0x6c00,0xacc1,0xad81,0x6d40,0xaf01,0x6fc0,0x6e80,0xae41,
+        0xaa01,0x6ac0,0x6b80,0xab41,0x6900,0xa9c1,0xa881,0x6840,
+        0x7800,0xb8c1,0xb981,0x7940,0xbb01,0x7bc0,0x7a80,0xba41,
+        0xbe01,0x7ec0,0x7f80,0xbf41,0x7d00,0xbdc1,0xbc81,0x7c40,
+        0xb401,0x74c0,0x7580,0xb541,0x7700,0xb7c1,0xb681,0x7640,
+        0x7200,0xb2c1,0xb381,0x7340,0xb101,0x71c0,0x7080,0xb041,
+        0x5000,0x90c1,0x9181,0x5140,0x9301,0x53c0,0x5280,0x9241,
+        0x9601,0x56c0,0x5780,0x9741,0x5500,0x95c1,0x9481,0x5440,
+        0x9c01,0x5cc0,0x5d80,0x9d41,0x5f00,0x9fc1,0x9e81,0x5e40,
+        0x5a00,0x9ac1,0x9b81,0x5b40,0x9901,0x59c0,0x5880,0x9841,
+        0x8801,0x48c0,0x4980,0x8941,0x4b00,0x8bc1,0x8a81,0x4a40,
+        0x4e00,0x8ec1,0x8f81,0x4f40,0x8d01,0x4dc0,0x4c80,0x8c41,
+        0x4400,0x84c1,0x8581,0x4540,0x8701,0x47c0,0x4680,0x8641,
+        0x8201,0x42c0, 0x4380,0x8341,0x4100,0x81c1,0x8081,0x4040
+};
+
+ushort
+<A NAME="dcrc16">dcrc16</A>(buffer,nbytes)
+register unsigned char *buffer;
+register unsigned long nbytes;
+{
+    register unsigned short crc_rslt, temp;
+
+    crc_rslt = 0;
+    while (nbytes)          /* perform CRC check */
+    {
+        temp = crc_rslt^(*buffer++ & 0xff);
+        crc_rslt = crctbl[temp & 0xff]^(crc_rslt&gt;&gt;8 & 0xff);
+        nbytes--;
+    }
+    return(crc_rslt);
+}
+
+/* download data:
+    BBBBAAAAAADDDDDD....CCcr
+
+    BBBB:       bytecount
+    AAAAAAAA:   address
+    DDDD...:    data
+    CC:     checksum
+
+    Note1: "dld" is ascii, everything else is binary.
+    Note2: done when BBBB = 0000.
+*/
+
+char *DldHelp[] = {
+    "Download command",
+    "-[cC]",
+    " -c   crc disabled",
+    " -C   crc enabled",
+    0,
+};
+
+struct dldline {
+    ushort  bcount;
+    ushort  crc;
+    uchar   *address;
+};
+
+<A NAME="Dld">Dld</A>(argc,argv)
+int argc;
+char    *argv[];
+{
+    int error, opt;
+
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"cC")) != -1) {
+        switch(opt) {
+        case 'c':
+            dld_crc_disabled = 1;
+            break;
+        case 'C':
+            dld_crc_disabled = 0;
+            break;
+        default:
+            return(0);
+        }
+    }
+
+    error = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldvfy>dldvfy</A>(0);
+    if (error)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dlderr>dlderr</A>(error);
+    return(0);
+}
+
+char *VfyHelp[] = {
+        "Verify target memory",
+        "",
+        0,
+};
+
+<A NAME="Vfy">Vfy</A>(argc,argv)
+int argc;
+char    *argv[];
+{
+    int error;
+
+    error = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldvfy>dldvfy</A>(1);
+    if (error)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dlderr>dlderr</A>(error);
+    return(0);
+}
+
+static  struct dldline  *dptr;
+
+<A NAME="dldvfy">dldvfy</A>(verify)
+int verify;
+{
+    int     i, ret;
+    ushort      crc;
+    ulong       longdata;
+    uchar       *data, csum, c;
+    static ulong    bytes[20/4];
+
+    while(1) {
+        ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldread>dldread</A>((char *)bytes,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct dldline));
+        if (ret == -1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('F');
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dlderr>dlderr</A>(1);
+            return(0);
+        }
+        dptr = (struct dldline *)bytes;
+        if (dptr-&gt;bcount == 0) {    /* Complete */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("CMP");
+            return(0);
+        }
+
+        if (!dld_crc_disabled) {
+            /* if crcs match, don't download */
+            crc = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dcrc16>dcrc16</A>(dptr-&gt;address,(ulong)dptr-&gt;bcount);
+            if (crc == dptr-&gt;crc) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('P');
+                continue;
+            }
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('F');
+
+        /* Make sure the download is NOT in the monitors RAM space */
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#inmyramspace>inmyramspace</A>(dptr-&gt;address,dptr-&gt;address+dptr-&gt;bcount))
+            return(5);
+
+        csum = 0;
+        for (i=0;i&lt;dptr-&gt;bcount;) {
+            data = (uchar *)&longdata;
+            if ((dptr-&gt;bcount-i) &gt;= 4)
+                ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldread>dldread</A>((char *)data,4);
+                else
+                ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldread>dldread</A>((char *)data,dptr-&gt;bcount-i);
+            if (ret == -1) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dlderr>dlderr</A>(1);
+                return(0);
+            }
+            i++;
+            csum += data[0];
+            if (i &gt;= dptr-&gt;bcount) {
+                data[1] = dptr-&gt;address[1];
+                data[2] = dptr-&gt;address[2];
+                data[3] = dptr-&gt;address[3];
+            }
+            else {
+                i++;
+                csum += data[1];
+                if (i &gt;= dptr-&gt;bcount) {
+                    data[2] = dptr-&gt;address[2];
+                    data[3] = dptr-&gt;address[3];
+                }
+                else {
+                    i++;
+                    csum += data[2];
+                    if (i &gt;= dptr-&gt;bcount) {
+                        data[3] = dptr-&gt;address[3];
+                    }
+                    else {
+                        i++;
+                        csum += data[3];
+                    }
+                }
+            }
+
+            if (!verify) {
+                dptr-&gt;address[0] = data[0];
+                dptr-&gt;address[1] = data[1];
+                dptr-&gt;address[2] = data[2];
+                dptr-&gt;address[3] = data[3];
+            }
+
+            if ((dptr-&gt;address[0] != data[0]) ||
+                (dptr-&gt;address[1] != data[1]) ||
+                (dptr-&gt;address[2] != data[2]) ||
+                (dptr-&gt;address[3] != data[3])) {
+                if (verify == 1)
+                    return(3);
+                    else
+                    return(4);
+            }
+            dptr-&gt;address+=4;
+        }
+        ret = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dldread>dldread</A>((char *)&c,1);    /* Read and test the checksum */
+        if (ret == -1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dld.c.html#dlderr>dlderr</A>(1);
+            return(0);
+        }
+        if (csum != c)
+            return(6);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("ACK");
+    }
+    /* should not get here */
+}
+
+/* dldread():
+    With blocking previously disabled, read the specified number
+    of characters and return the total; if timeout, return -1.
+*/
+<A NAME="dldread">dldread</A>(buf,size)
+int size;
+char    *buf;
+{
+    int tot, timeout, i;
+    char    *cp;
+
+    tot = 0;
+    timeout = 0;
+    cp = buf;
+    while ((tot &lt; size) && (timeout &lt; DLD_TIMEOUT)) {
+        i = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#getbytes>getbytes</A>(cp,size-tot,0);
+        if (i == 0) {
+            timeout++;
+            if (timeout &gt;= DLD_TIMEOUT)
+                return(-1);
+        }
+        else {
+            tot += i;
+            cp += i;
+            timeout = 0;
+        }
+    }
+    return(tot);
+}
+
+<A NAME="dlderr">dlderr</A>(error)
+int error;
+{
+    char    buf[32];
+
+    switch (error) {
+    case 1:     /* timeout waiting for character */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("TMT");
+        break;
+    case 3:     /* verification failure */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"VER %08x",dptr-&gt;address);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(buf);
+        break;
+    case 4:     /* write error */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"WER %08x",dptr-&gt;address);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(buf);
+        break;
+    case 5:     /* overwrite error */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"OVW %08x %08x",&bss_start,(long)&bss_end-(long)&bss_start);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(buf);
+        break;
+    case 6:     /* checksum error */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("CSM");
+        break;
+    case 7:     /* Flash write must be word aligned. */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("FWA");
+        break;
+    default:    /* shouldn't get here */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>("???");
+        break;
+    }
+    return(0);
+}
+
+/* inmyramspace()
+    Return 1 if the address range falls within this BOOTROM's own
+    RAM space.
+*/
+<A NAME="inmyramspace">inmyramspace</A>(start,end)
+register uchar  *start, *end;
+{
+    register uchar  *mystart, *myend;
+
+    mystart = (uchar *)&bss_start;
+    myend = (uchar *)&bss_end;
+
+    if ((mystart &gt;= start) && (mystart &lt; end))
+        return(1);
+    if ((myend &gt; start) && (myend &lt; end))
+        return(1);
+    if ((start &gt;= mystart) && (start &lt; myend))
+        return(1);
+    return(0);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

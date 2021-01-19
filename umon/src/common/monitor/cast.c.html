@@ -1,0 +1,412 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/cast.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* cast.c:
+ *  The cast command is used in the monitor to cast or overlay a structure
+ *  onto a block of memory to display that memory in the format specified 
+ *  by the structure.  The structure definition is found in the file
+ *  "structfile" in TFS.  Valid types within structfile are
+ *  char, char.c, char.x, short, short.x, long, long.x and struct name.
+ *  Default format is decimal.  The '.x' extension tells cast to print
+ *  in hex and the '.c' extension tells cast to print the actual character.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "ctype.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "cli.h"
+
+#if INCLUDE_CAST
+
+static  ulong memAddr;
+static  int castDepth;
+
+#define OPEN_BRACE  '{'
+#define CLOSE_BRACE '}'
+
+#define STRUCT_SEARCH   1
+#define STRUCT_DISPLAY  2
+#define STRUCT_ALLDONE  3
+#define STRUCT_ERROR    4
+
+#define STRUCT_SHOWPAD  (1&lt;&lt;0)
+#define STRUCT_SHOWADD  (1&lt;&lt;1)
+#define STRUCT_VERBOSE  (1&lt;&lt;2)
+
+
+#define STRUCTFILE "structfile"
+
+struct mbrinfo {
+    char *type;
+    char *format;
+    int size;
+    int mode;
+};
+
+struct mbrinfo mbrinfotbl[] = {
+    { "char",       "%d",       1 },        /* decimal */
+    { "char.x",     "0x%02x",   1 },        /* hex */
+    { "char.c",     "%c",       1 },        /* character */
+    { "short",      "%d",       2 },        /* decimal */
+    { "short.x",    "0x%04x",   2 },        /* hex */
+    { "long",       "%ld",      4 },        /* decimal */
+    { "long.x",     "0x%08lx",  4 },        /* hex */
+    { 0,0,0 }
+};
+
+/* castIndent():
+ *  Used to insert initial whitespace based on the depth of the
+ *  structure nesting.
+ */
+void
+<A NAME="castIndent">castIndent</A>(void)
+{
+    int i;
+
+    for(i=0;i&lt;castDepth;i++)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  ");
+}
+
+/* strAddr():
+ *  Called by showStruct().  It will populate the incoming buffer pointer
+ *  with either NULL or the ascii-hex representation of the current address
+ *  pointer.
+ */
+char *
+<A NAME="strAddr">strAddr</A>(long flags, char *buf)
+{
+    if (flags & STRUCT_SHOWADD)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"0x%08lx: ",memAddr);
+    else
+        buf[0] = 0;
+    return(buf);
+}
+
+/* showStruct():
+ *  The workhorse of cast.  This function parses the structfile looking for
+ *  the structure type; then it attempts to display the memory block that
+ *  begins at memAddr as if it was the structure.  Note that there is no
+ *  pre-processing done to verify valid syntax of the structure definition.
+ */
+int
+<A NAME="showStruct">showStruct</A>(int tfd,long flags,char *structtype,char *structname,char *linkname)
+{
+    struct mbrinfo *mptr;
+    ulong curpos, nextlink;
+    int i, state, snl, retval, tblsize;
+    char line[96], addrstr[16], format[64];
+    char *cp, *eol, *type, *eotype, *name, *bracket, *eoname, tmp;
+
+    type = (char *)0;
+    retval = nextlink = 0;
+    curpos = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_TELL,tfd,0);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsseek>tfsseek</A>(tfd,0,TFS_BEGIN);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#castIndent>castIndent</A>();
+    if (structname)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("struct %s %s:\n",structtype,structname);
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("struct %s @0x%lx:\n",structtype,memAddr);
+    castDepth++;
+
+    state = STRUCT_SEARCH;
+    snl = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(structtype);
+
+    while(1) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsgetline>tfsgetline</A>(tfd,line,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(line)-1) == 0) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Structure definition '%s' not found\n",structtype);
+            break;
+        }
+        if ((line[0] == '\r') || (line[0] == '\n')) /* empty line? */
+            continue;
+
+        eol = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(line,";#\r\n");
+        if (eol)
+            *eol = 0;
+
+        if (state == STRUCT_SEARCH) {
+            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(line,"struct",6)) {
+                cp = line+6;
+                while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*cp))
+                    cp++;
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(cp,structtype,snl)) {
+                    cp += snl;
+                    while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*cp))
+                        cp++;
+                    if (*cp == OPEN_BRACE) 
+                        state = STRUCT_DISPLAY;
+                    else {
+                        retval = -1;
+                        break;
+                    }
+                }
+            }
+        }
+        else if (state == STRUCT_DISPLAY) {
+            type = line;
+            while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*type))
+                type++;
+
+            if (*type == CLOSE_BRACE) {
+                state = STRUCT_ALLDONE;
+                break;
+            }
+
+            eotype = type;
+            while(!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*eotype))
+                eotype++;
+            *eotype = 0;
+            name = eotype+1;
+            while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*name))
+                name++;
+            bracket = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(name,'[');
+            if (bracket)
+                tblsize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(bracket+1);                      
+            else
+                tblsize = 1;
+
+            if (*name == '*') {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#castIndent>castIndent</A>();
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s%-8s %s: ",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),type,name);
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(type,"char.c"))
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\"%s\"\n",*(char **)memAddr);
+                else
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%lx\n",*(ulong *)memAddr);
+                memAddr += 4;
+                continue;
+            }
+            mptr = mbrinfotbl;          
+            while(mptr-&gt;type) {
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(type,mptr-&gt;type)) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#castIndent>castIndent</A>();
+                    eoname = name;
+                    while(!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*eoname))
+                        eoname++;
+                    tmp = *eoname;
+                    *eoname = 0;
+
+                    if (bracket) {
+                        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(type,"char.c")) {
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s%-8s %s: ",
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),mptr-&gt;type,name);
+                            cp = (char *)memAddr;
+                            for(i=0;i&lt;tblsize && <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isprint>isprint</A>(*cp);i++)
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%c",*cp++);
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+                        }
+                        else
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s%-8s %s\n",
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),mptr-&gt;type,name);
+                        memAddr += mptr-&gt;size * tblsize;
+                    }
+                    else {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(format,"%s%-8s %%s: %s\n",
+                            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),mptr-&gt;type,mptr-&gt;format);
+                        switch(mptr-&gt;size) {
+                            case 1:
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(format,name,*(uchar *)memAddr);
+                                break;
+                            case 2:
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(format,name,*(ushort *)memAddr);
+                                break;
+                            case 4:
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(format,name,*(ulong *)memAddr);
+                                break;
+                        }
+                        memAddr += mptr-&gt;size;
+                    }
+                    *eoname = tmp;
+                    break;
+                }
+                mptr++;
+            }
+            if (!(mptr-&gt;type)) {
+                int padsize;
+                char *subtype, *subname, *eossn;
+
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(type,"struct")) {
+                    subtype = eotype+1;
+                    while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*subtype))
+                        subtype++;
+                    subname = subtype;
+                    while(!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*subname))
+                        subname++;
+                    *subname = 0;
+                    
+                    subname++;
+                    while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*subname))
+                        subname++;
+                    eossn = subname;
+                    while(!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*eossn))
+                        eossn++;
+                    *eossn = 0;
+                    if (*subname == '*') {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#castIndent>castIndent</A>();
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s%s %s %s: 0x%08lx\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),
+                            type,subtype,subname,*(ulong *)memAddr);
+                        if (linkname) {
+                            if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(linkname,subname+1))
+                                nextlink = *(ulong *)memAddr;
+                        }
+                        memAddr += 4;
+                    }
+                    else {
+                        for (i=0;i&lt;tblsize;i++) {
+                            if (bracket)
+                                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(bracket+1,"%d]",i);
+                            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#showStruct>showStruct</A>(tfd,flags,subtype,subname,0) &lt; 0) {
+                                state = STRUCT_ALLDONE;
+                                goto done;
+                            }
+                        }
+                    }
+                }
+                else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncmp>strncmp</A>(type,"pad[",4)) {
+                    padsize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(type+4);
+                    if (flags & STRUCT_SHOWPAD) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#castIndent>castIndent</A>();
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%spad[%d]\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#strAddr>strAddr</A>(flags,addrstr),padsize);
+                    }
+                    memAddr += padsize;
+                }
+                else  {
+                    retval = -1;
+                    break;
+                }
+            }
+        }
+        else {
+            state = STRUCT_ERROR;
+            break;
+        }
+    }
+done:
+
+    switch(state) {
+        case STRUCT_SEARCH:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("struct %s not found\n",structtype);
+            retval = -1;
+            break;
+        case STRUCT_DISPLAY:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("invalid member type: %s\n",type);
+            retval = -1;
+            break;
+        case STRUCT_ERROR:
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("unknown error\n");
+            retval = -1;
+            break;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsseek>tfsseek</A>(tfd,curpos,TFS_BEGIN);
+    if (linkname)
+        memAddr = nextlink;
+    castDepth--;
+    return(retval);
+}
+
+char *CastHelp[] = {
+    "Cast a structure definition across data in memory.",
+    "-[apv] {struct type} {address}",
+    "Options:",
+    " -a   show addresses",
+    " -l{linkname}",
+    " -n{structname}",
+    " -p   show padding",
+    " -t{tablename}",
+    0,
+};
+
+int
+<A NAME="Cast">Cast</A>(int argc,char *argv[])
+{
+    long    flags;
+    int     opt, tfd, index;
+    char    *structtype, *structfile, *tablename, *linkname, *name;
+
+    flags = 0;
+    name = (char *)0;
+    linkname = (char *)0;
+    tablename = (char *)0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"apl:n:t:")) != -1) {
+        switch(opt) {
+        case 'a':
+            flags |= STRUCT_SHOWADD;
+            break;
+        case 'l':
+            linkname = optarg;
+            break;
+        case 'n':
+            name = optarg;
+            break;
+        case 'p':
+            flags |= STRUCT_SHOWPAD;
+            break;
+        case 't':
+            tablename = optarg;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (argc != optind + 2)
+        return(CMD_PARAM_ERROR);
+
+    structtype = argv[optind];
+    memAddr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind+1],0,0);
+
+    /* Start by detecting the presence of a structure definition file... */
+    structfile = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("STRUCTFILE");
+    if (!structfile)
+        structfile = STRUCTFILE;
+
+    tfd = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsopen>tfsopen</A>(structfile,TFS_RDONLY,0);
+    if (tfd &lt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Structure definition file '%s' not found\n",structfile);
+        return(CMD_FAILURE);
+    }
+
+    index = 0;
+    do {
+        castDepth = 0;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cast.c.html#showStruct>showStruct</A>(tfd,flags,structtype,name,linkname);
+        index++;
+        if (linkname)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Link #%d = 0x%lx\n",index,memAddr);
+        if (tablename || linkname) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#askuser>askuser</A>("next?"))  {
+                if (tablename)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s[%d]:\n",tablename,index);
+            }
+            else
+                tablename = linkname = (char *)0;
+        }
+    } while(tablename || linkname);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfsapi.c.html#tfsclose>tfsclose</A>(tfd,0);
+    return(CMD_SUCCESS);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

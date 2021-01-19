@@ -1,0 +1,447 @@
+<HTML>
+<HEADER>
+<TITLE>common/zlib/gzio.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* gzio.c -- IO on .gz files
+ * Copyright (C) 1995-1998 Jean-loup Gailly.
+ * For conditions of distribution and use, see copyright notice in zlib.h
+ *
+ * This has been seriously re-arranged for use within MicroMonitor.
+ * The majority of the rework is to strip out unnecessary parts because this
+ * will reside in flash space.  Also, there is no file system interface, all
+ * decompression is done from one point in memory to another point in memory.
+ */
+
+#include "config.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "genlib.h"
+#include "zutil.h"
+
+struct internal_state {int dummy;}; /* for buggy compilers */
+
+#ifndef Z_BUFSIZE
+#  ifdef MAXSEG_64K
+#    define Z_BUFSIZE 4096 /* minimize memory usage for 16-bit DOS */
+#  else
+#    define Z_BUFSIZE 16384
+#  endif
+#endif
+#ifndef Z_PRINTF_BUFSIZE
+#  define Z_PRINTF_BUFSIZE 4096
+#endif
+
+#define <A NAME="ALLOC">ALLOC</A>(size) <A NAME="malloc">malloc</A>(size)
+#define <A NAME="TRYFREE">TRYFREE</A>(p) {if (p) <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>((char *)p);}
+
+static int gz_magic[2] = {0x1f, 0x8b}; /* gzip magic header */
+
+/* gzip flag byte */
+#define ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
+#define HEAD_CRC     0x02 /* bit 1 set: header CRC present */
+#define EXTRA_FIELD  0x04 /* bit 2 set: extra field present */
+#define ORIG_NAME    0x08 /* bit 3 set: original file name present */
+#define COMMENT      0x10 /* bit 4 set: file comment present */
+#define RESERVED     0xE0 /* bits 5..7: reserved */
+
+typedef struct gz_stream {
+    z_stream stream;
+    int      z_err;         /* error code for last stream operation */
+    int      z_eof;         /* set if end of input file */
+    Byte     *outbuf;       /* output buffer */
+    uLong    crc;           /* crc32 of uncompressed data */
+    char     *msg;          /* error message */
+    int      transparent;    /* 1 if input file is not a .gz file */
+    char     mode;          /* 'w' or 'r' */
+} gz_stream;
+
+
+local int    get_byte     OF((gz_stream *s));
+local void   check_header OF((gz_stream *s));
+local int    destroy      OF((gz_stream *s));
+local uLong  getLong      OF((gz_stream *s));
+
+/* ===========================================================================
+    gzInit():
+    Rewritten (from gzopen()) to support only decompression of data in
+    memory.  The next_in member points directly to the compressed data and
+    avail_in is the number of bytes remaining.
+    Things get simpler because of the removal of the file system interface
+    as well as the "only decompression" mode.
+*/
+gz_stream *
+<A NAME="gzInit">gzInit</A>(compressed_data, size)
+int  size;
+unsigned char *compressed_data;
+{
+    int err;
+    gz_stream *s;
+
+    s = (gz_stream *)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#ALLOC>ALLOC</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(gz_stream));
+    if (!s)
+        return Z_NULL;
+
+    s-&gt;stream.zalloc = (alloc_func)0;
+    s-&gt;stream.zfree = (free_func)0;
+    s-&gt;stream.opaque = (voidpf)0;
+    s-&gt;stream.next_in = compressed_data;
+    s-&gt;stream.next_out = s-&gt;outbuf = Z_NULL;
+    s-&gt;stream.avail_in = size;
+    s-&gt;stream.avail_out = 0;
+    s-&gt;z_err = Z_OK;
+    s-&gt;z_eof = 0;
+    s-&gt;crc = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zcrc32.c.html#zcrc32>zcrc32</A>(0L, Z_NULL, 0);
+    s-&gt;msg = NULL;
+    s-&gt;transparent = 0;
+    s-&gt;mode = 'r';
+
+    err = inflateInit2(&(s-&gt;stream), -MAX_WBITS);
+    /* windowBits is passed  0 to tell that there is no zlib header.
+     * Note that in this case inflate *requires* an extra "dummy" byte
+     * after the compressed stream in order to complete decompression and
+     * return Z_STREAM_END. Here the gzip CRC32 ensures that 4 bytes are
+     * present after the compressed stream.
+     */&lt;
+    if (err != Z_OK) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#destroy>destroy</A>(s);
+        return((gz_stream *)Z_NULL);
+    }
+    
+    s-&gt;stream.avail_out = Z_BUFSIZE;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#check_header>check_header</A>(s); /* skip the .gz header */
+    return(s);
+}
+
+/* ===========================================================================
+    get_byte()
+    Simple now because we assume that avail_in is pointing to the number
+    of bytes in the source buffer that are remaining to be decompressed
+    and next_in is the pointer to the next byte to be retrieved from the
+    buffer.
+*/
+local int
+<A NAME="get_byte">get_byte</A>(s)
+gz_stream *s;
+{
+    if (s-&gt;z_eof) 
+        return EOF;
+    if (s-&gt;stream.avail_in == 0) {
+        s-&gt;z_eof = 1;
+        return EOF;
+    }
+    s-&gt;stream.avail_in--;
+    return *(s-&gt;stream.next_in)++;
+}
+
+/* ===========================================================================
+    check_header():
+    Check the gzip header of a gz_stream opened for reading. Set the stream
+    mode to transparent if the gzip magic header is not present; set s-err
+    to Z_DATA_ERROR if the magic header is present but the rest of the header
+    is incorrect.
+    IN assertion: the stream s has already been created sucessfully;
+       s-stream.avail_in is zero for the first time, but may be non-zero
+       for concatenated .gz files.
+*/&gt;&gt;
+local void
+<A NAME="check_header">check_header</A>(s)
+gz_stream *s;
+{
+    int method; /* method byte */
+    int flags;  /* flags byte */
+    uInt len;
+    int c;
+
+    /* Check the gzip magic header */
+    for (len = 0; len &lt; 2; len++) {
+        c = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+        if (c != gz_magic[len]) {
+            if (len != 0) {
+                s-&gt;stream.avail_in++;
+                s-&gt;stream.next_in--;
+            }
+            if (c != EOF) {
+                s-&gt;stream.avail_in++;
+                s-&gt;stream.next_in--;
+                s-&gt;transparent = 1;
+            }
+            s-&gt;z_err = s-&gt;stream.avail_in != 0 ? Z_OK : Z_STREAM_END;
+            return;
+        }
+    }
+    method = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+    flags = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+    if (method != Z_DEFLATED || (flags & RESERVED) != 0) {
+        s-&gt;z_err = Z_DATA_ERROR;
+        return;
+    }
+
+    /* Discard time, xflags and OS code: */
+    for (len = 0; len &lt; 6; len++)
+        (void)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+
+    if ((flags & EXTRA_FIELD) != 0) { /* skip the extra field */
+        len  =  (uInt)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+        len += ((uInt)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s))&lt;&lt;8;
+        /* len is garbage if EOF but the loop below will quit anyway */
+        while (len-- != 0 && <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s) != EOF) ;
+    }
+    if ((flags & ORIG_NAME) != 0) { /* skip the original file name */
+        while ((c = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s)) != 0 && c != EOF) ;
+    }
+    if ((flags & COMMENT) != 0) {   /* skip the .gz file comment */
+        while ((c = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s)) != 0 && c != EOF) ;
+    }
+    if ((flags & HEAD_CRC) != 0) {  /* skip the header crc */
+        for (len = 0; len &lt; 2; len++) (void)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+    }
+    s-&gt;z_err = s-&gt;z_eof ? Z_DATA_ERROR : Z_OK;
+}
+
+/* ===========================================================================
+    destroy():
+    Cleanup then free the given gz_stream. Return a zlib error code.
+    Try freeing in the reverse order of allocations.
+*/
+local int
+destroy (s)
+gz_stream *s;
+{
+    int err = Z_OK;
+
+    if (!s) return Z_STREAM_ERROR;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#TRYFREE>TRYFREE</A>(s-&gt;msg);
+
+    if (s-&gt;stream.state != NULL)
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateEnd>inflateEnd</A>(&(s-&gt;stream));
+    
+    if (s-&gt;z_err &lt; 0)
+        err = s-&gt;z_err;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#TRYFREE>TRYFREE</A>(s-&gt;outbuf);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#TRYFREE>TRYFREE</A>(s);
+    return err;
+}
+
+/* ===========================================================================
+    gzRead():
+    Reads the given number of uncompressed bytes from the compressed file.
+    gzRead returns the number of bytes actually read (0 for end of file).
+*/
+int ZEXPORT
+gzRead (file, buf, len)
+gzFile file;
+voidp buf;
+unsigned len;
+{
+    gz_stream *s = (gz_stream*)file;
+    Bytef *start = (Bytef*)buf; /* starting point for crc computation */
+    Byte  *next_out; /* == stream.next_out but not forced far (for MSDOS) */
+
+    if (s == NULL || s-&gt;mode != 'r') return Z_STREAM_ERROR;
+
+    if (s-&gt;z_err == Z_DATA_ERROR || s-&gt;z_err == Z_ERRNO) return -1;
+    if (s-&gt;z_err == Z_STREAM_END) return 0;  /* EOF */
+
+    next_out = (Byte*)buf;
+    s-&gt;stream.next_out = (Bytef*)buf;
+    s-&gt;stream.avail_out = len;
+
+    while (s-&gt;stream.avail_out != 0) {
+        if (s-&gt;transparent) {
+            /* Copy first the lookahead bytes: */
+            uInt n = s-&gt;stream.avail_in;
+            if (n &gt; s-&gt;stream.avail_out) n = s-&gt;stream.avail_out;
+            if (n &gt; 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zutil.c.html#zmemcpy>zmemcpy</A>(s-&gt;stream.next_out, s-&gt;stream.next_in, n);
+                next_out += n;
+                s-&gt;stream.next_out = next_out;
+                s-&gt;stream.next_in   += n;
+                s-&gt;stream.avail_out -= n;
+                s-&gt;stream.avail_in  -= n;
+            }
+            if (s-&gt;stream.avail_out &gt; 0) {
+                int     i, c;
+                Byte    *next;
+
+                next = next_out;
+                for(i=0;i&lt;(int)(s-&gt;stream.avail_out);i++) {
+                    c = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+                    if (c == EOF)
+                        break;
+                    *next_out++ = (Byte)c;
+                    s-&gt;stream.avail_out--;
+                }
+            }
+            len -= s-&gt;stream.avail_out;
+            s-&gt;stream.total_in  += (uLong)len;
+            s-&gt;stream.total_out += (uLong)len;
+            if (len == 0)
+                s-&gt;z_eof = 1;
+            return (int)len;
+        }
+        s-&gt;z_err = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflate>inflate</A>(&(s-&gt;stream), Z_NO_FLUSH);
+    
+        if (s-&gt;z_err == Z_STREAM_END) {
+            /* Check CRC and original size */
+            s-&gt;crc = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zcrc32.c.html#zcrc32>zcrc32</A>(s-&gt;crc, start, (uInt)(s-&gt;stream.next_out - start));
+            start = s-&gt;stream.next_out;
+    
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#getLong>getLong</A>(s) != s-&gt;crc) {
+            s-&gt;z_err = Z_DATA_ERROR;
+            } else {
+                (void)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#getLong>getLong</A>(s);
+                    /* The uncompressed length returned by above getlong() may
+                     * be different from s-stream.total_out) in case of
+             * concatenated .gz files. Check for such files:
+             */&gt;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#check_header>check_header</A>(s);
+            if (s-&gt;z_err == Z_OK) {
+                uLong total_in = s-&gt;stream.total_in;
+                uLong total_out = s-&gt;stream.total_out;
+    
+                <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/inflate.c.html#inflateReset>inflateReset</A>(&(s-&gt;stream));
+                s-&gt;stream.total_in = total_in;
+                s-&gt;stream.total_out = total_out;
+                s-&gt;crc = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zcrc32.c.html#zcrc32>zcrc32</A>(0L, Z_NULL, 0);
+            }
+            }
+        }
+        if (s-&gt;z_err != Z_OK || s-&gt;z_eof)
+            break;
+    }
+    s-&gt;crc = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/zcrc32.c.html#zcrc32>zcrc32</A>(s-&gt;crc, start, (uInt)(s-&gt;stream.next_out - start));
+    return (int)(len - s-&gt;stream.avail_out);
+}
+
+/* ===========================================================================
+    getLong():
+    Reads a long in LSB order from the given gz_stream. Sets z_err in case
+    of error.
+*/
+local uLong
+getLong (s)
+gz_stream *s;
+{
+    uLong x = (uLong)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+    int c;
+
+    x += ((uLong)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s))&lt;&lt;8;
+    x += ((uLong)<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s))&lt;&lt;16;
+    c = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#get_byte>get_byte</A>(s);
+    if (c == EOF) s-&gt;z_err = Z_DATA_ERROR;
+    x += ((uLong)c)&lt;&lt;24;
+    return x;
+}
+
+/* ===========================================================================
+    unZip():
+    This is the front end to the whole zlib decompressor.
+    It is a chop-up of the original minigzip.c code that came with
+    the zlib source.
+*/
+int
+<A NAME="unZip">unZip</A>(char *src, int srclen, char *dest, int destlen)
+{
+    int len;
+    gz_stream   *s;
+
+    if ((s = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#gzInit>gzInit</A>(src,srclen)) == Z_NULL) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("gzInit(0x%lx,%d) failed!\n",(ulong)src,srclen);
+        return(-1);
+    }
+    len = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#gzRead>gzRead</A>(s,dest,destlen);
+    if (len &lt; 0)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("gzRead() returned %d\n",len);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#destroy>destroy</A>(s);
+    return(len);
+}
+
+char *UnzipHelp[] = {
+    "Decompress block of memory to some other block of memory.",
+    "-[s:d:]",
+    " -s {source}         filename or 'addr,len' (required option)",
+    " -d {destination}    'addr[,len]' (default=APPRAMBASE,99999999)",
+    "",
+    "Works in conjunction with zlib's minigzip on host.",
+    0,
+};
+
+/* Unzip():
+    Access ZLIB decompressor from monitor command line.
+*/
+int
+<A NAME="Unzip">Unzip</A>(int argc,char *argv[])
+{
+    extern  ulong APPLICATION_RAMSTART;
+    extern  char *optarg;
+    char    *asc_src, *asc_dst, *comma, *src, *dest;
+    int     opt, tot;
+    ulong   srclen, destlen;
+
+    destlen = 99999999;
+    dest = (char *)APPLICATION_RAMSTART;
+    asc_src = asc_dst = (char *)0;
+
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"d:s:")) != -1) {
+        switch(opt) {
+        case 's':
+            asc_src = optarg;
+            break;
+        case 'd':
+            asc_dst = optarg;
+            break;
+        default:
+            return(0);
+        }
+    }
+    if (!asc_src)
+        return(-1);
+
+    comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(asc_src,',');
+    if (comma) {
+        *comma = 0;
+        src = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(asc_src,(char **)0,0);
+        srclen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(comma+1,(char **)0,0);
+    }
+    else {
+        TFILE *tfp;
+        tfp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(asc_src);
+        if (!tfp)
+            return(-1);
+        src = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(tfp);
+        srclen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(tfp);
+    }
+
+    if (asc_dst) {
+        comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(asc_dst,',');
+        if (comma) {
+            *comma = 0;
+            destlen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(comma+1,(char **)0,0);
+        }
+        dest = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(asc_dst,(char **)0,0);
+    }
+
+    tot = <A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#unZip>unZip</A>(src,srclen,dest,destlen);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Decompressed %lu bytes from 0x%lx to %d bytes at 0x%lx.\n",
+        srclen,(ulong)src,tot,(ulong)dest);
+    return(0);
+}
+
+/* Front end to the rest of the unZip() stuff...
+    Return the size of the decompressed data or -1 if failure.
+    The same front API end is available if unpack is used instead of unzip.
+*/
+int
+<A NAME="decompress">decompress</A>(char *src,int srclen, char *dest)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/zlib/gzio.c.html#unZip>unZip</A>(src,srclen,dest,99999999));
+}
+</HTML>
+</PRE>
+</BODY>

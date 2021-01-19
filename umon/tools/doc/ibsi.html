@@ -1,0 +1,184 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: monsym</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>IBSI</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">ibsi</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Insert the necessary boot sector
+information into the binary image that is destined to exist as a monitor
+after the boot-sector saftey code runs.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">ibsi [-c:i:lo:v] {filename}</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool is used to insert the
+necessary data into a monitor binary image so that the boot-sector safety
+code can determine if the image is valid.&nbsp; The structure for this
+data is</font>
+<br>&nbsp;
+<center><table BORDER COLS=2 WIDTH="60%" >
+<tr>
+<td WIDTH="15%"><font face="Arial,Helvetica">ulong crcstart</font></td>
+
+<td><font face="Arial,Helvetica">starting point of the crc32 calculation</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">ulong crcsize</font></td>
+
+<td><font face="Arial,Helvetica">size of the crc32 calculation</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">ulong crcvalue</font></td>
+
+<td><font face="Arial,Helvetica">expected result of the crc32 calculation</font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">ulong entrypoint</font></td>
+
+<td><font face="Arial,Helvetica">entrypoint into the image if crc32 passes</font></td>
+</tr>
+</table></center>
+
+<p><font face="Arial,Helvetica">The tool simply calculates a crc32 on a
+portion of the space within the binary image and places that information
+back into the image.&nbsp; The boot-sector safety code can then assume
+that this data exists at some fixed point within the image and use it to
+see if the image is safe to jump into.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-b {###}</font></li>
+
+<br><font face="Arial,Helvetica">base address at which the .bsi monitor
+is to exist</font>
+<li>
+<font face="Arial,Helvetica">-c {###}</font></li>
+
+<br><font face="Arial,Helvetica">offset into the file at which the CRC
+calculation begins (default = 0);</font>
+<li>
+<font face="Arial,Helvetica">-i {###}</font></li>
+
+<br><font face="Arial,Helvetica">offset into the file at which the CRC
+is inserted (default = 0);</font>
+<li>
+<font face="Arial,Helvetica">-l</font></li>
+
+<br><font face="Arial,Helvetica">target is little endian (default = big
+endian);</font>
+<li>
+<font face="Arial,Helvetica">-o {filename}</font></li>
+
+<br><font face="Arial,Helvetica">name of output file (default is infile.bsi);</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">print the time/date the tool was built</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">This tool is only used on a monitor binary
+if it is being inserted into a system that is using the
+<a href="../../appnotes/bootblock.html">boot-sector
+saftey</a></font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">ibsi -b 0x4000 -i 0x50 -c 0x60 -o monitor.bsi
+monitor.bin</font></li>
+
+<br><font face="Arial,Helvetica">The monitor.bin file has been built to
+exist starting at location 0x4000.&nbsp; The point of insertion into the
+file is 0x50 bytes from the start and the point at which to start the CRC
+calculation is 0x60 bytes from the start of the file.&nbsp; The new file
+is called monitor.bsi.</font>
+<ul>
+<ul>
+<ul>
+<ul>
+<ul>&nbsp;</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../win95/ibsi.exe">PC Win95</a></font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/ibsi">Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+</ul>
+
+</body>
+</html>

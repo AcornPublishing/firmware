@@ -1,0 +1,1241 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/dhcpboot.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* dhcpboot.c:
+ *  This code implements a subset of the DHCP client protocol.
+ *  Based on RFC2131 spec, the "automatic allocation" mode, in which DHCP
+ *  assigns a permanent IP address to a client, is the only mode supported.
+ *
+ *  The idea is that the monitor boots up, and if IPADD is set to DHCP, then
+ *  DHCP is used to populate shell variables with a server-supplied IP
+ *  address, NetMask and Gateway IP address. Then, when the application
+ *  is launched (probably via TFS), it can retrieve the content of those
+ *  shell variables for use by the application.
+ *
+ *  Sequence of events for this limited implementation of DHCP...
+ *  Client issues a DHCP_DISCOVER, server responds with a DHCP_OFFER,
+ *  client issues a DHCP_REQUEST and server responds with a DHCP_ACK.
+ *  DISCOVER: request by the client to broadcast the fact that it is looking
+ *  for a DHCP server.
+ *  OFFER: reply from the server when it receives a DISCOVER request from 
+ *      a client.  The offer may contain all the information that the DHCP
+ *      client needs to bootup, but this is dependent on the configuration of
+ *      the server.
+ *  REQUEST: request by the client for the server (now known because an OFFER
+ *      was received) to send it the information it needs.
+ *  ACK: reply from the server with the information requested.
+ *
+ *  NOTE: this file contains a generic DHCP client supporting "automatic
+ *  allocation mode" (infinite lease time).  There are several different
+ *  application-specific enhancements that can be added and hopefully
+ *  they have been isolated through the use of the dhcp_00.c file.
+ *  I've attempted to isolate as much of the non-generic code to
+ *  the file dhcp_XX.c (where dhcp_00.c is the default code).  If non-default
+ *  code is necessary, then limit the changes to a new dhcp_XX.c file.  This
+ *  will allow the code in this file to stay generic; hence, the user of this
+ *  code will be able to accept monitor upgrades without the need to touch
+ *  this file.  The makefile must link in some additional dhcp_XX.c file
+ *  (default is dhcp_00.c).  Bottom line... there should be no need to modify
+ *  this file for application-specific stuff; if there is, please let me know.
+ *
+ *  NOTE1: the shell variable IPADD can also be set to DHCPV or DHCPv to 
+ *  enable different levels of verbosity during DHCP transactions... 'V'
+ *  is full DHCP verbosity and 'v' only prints the DhcpSetEnv() calls.
+ *
+ *  NOTE2: this file supports DHCP and BOOTP.  Most of the function names
+ *  refer to DHCP even though their functionality is shared by both DHCP 
+ *  and BOOTP.  This is because I wrote this originally for DHCP, then added
+ *  the hooks for BOOTP... Bottom line: don't let the names confuse you!
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+
+#include "config.h"
+#include "endian.h"
+#include "cpuio.h"
+#include "ether.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "cli.h"
+
+int DHCPStartup(short), BOOTPStartup(short);
+int DhcpSetEnv(char *,char *);
+int SendDHCPDiscover(int,short);
+void dhcpDumpVsa(void), printDhcpOptions(uchar *);
+
+unsigned short  DHCPState;
+
+#if INCLUDE_DHCPBOOT
+
+static int      DHCPCommandIssued;
+static ulong    DHCPTransactionId;
+
+/* Variables used for DHCP Class ID specification: */
+static char *DHCPClassId;
+static int  DHCPClassIdSize;
+
+/* Variables used for DHCP Client ID specification: */
+static char DHCPClientId[32];
+static int  DHCPClientIdSize, DHCPClientIdType;
+
+/* Variables used for setting up a DHCP Parameter Request List: */
+static uchar    DHCPRequestList[32];
+static int      DHCPRqstListSize;
+
+/* Variable to keep track of elapsed seconds since DHCP started: */
+static short    DHCPElapsedSecs;
+
+char *DhcpHelp[] = {
+    "Issue a DHCP discover",
+    "-[bvV] [vsa]",
+    "Options...",
+    " -b      use bootp",
+    " -v|V    verbosity",
+        0,
+};
+
+int
+<A NAME="Dhcp">Dhcp</A>(int argc,char *argv[])
+{
+    int opt, bootp;
+
+    bootp = 0;
+    DHCPCommandIssued = 1;
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"bvV")) != -1) {
+        switch(opt) {
+        case 'b':
+            bootp = 1;
+            break;
+        case 'v':
+            EtherVerbose = SHOW_DHCP;
+            break;
+        case 'V':
+            EtherVerbose = DHCP_VERBOSE;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc == optind+1)  {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind],"vsa")) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#dhcpDumpVsa>dhcpDumpVsa</A>();
+            return(CMD_SUCCESS);
+        }
+        else
+            return(CMD_PARAM_ERROR);
+    }
+    else if (argc != optind)
+        return(CMD_PARAM_ERROR);
+
+    /* Initialize the retransmission delay calculator: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_DHCP);
+
+    if (bootp) {
+        DHCPState = BOOTPSTATE_INITIALIZE;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#BOOTPStartup>BOOTPStartup</A>(0);
+    }
+    else {
+        DHCPState = DHCPSTATE_INITIALIZE;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPStartup>DHCPStartup</A>(0);
+    }
+    return(CMD_SUCCESS);
+}
+
+/* dhcpDumpVsa():
+ *  Simply dump the content of the VSA shell variable in DHCP format.
+ *  The variable content is stored in ascii and must be converted to binary
+ *  prior to calling printDhcpOptions().
+ */
+void
+<A NAME="dhcpDumpVsa">dhcpDumpVsa</A>(void)
+{
+    int     i;
+    char    tmp[3],  *vsa_b, *vsa_a, len;
+
+    vsa_a = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPVSA");
+    if (!vsa_a)
+        return;
+    len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(vsa_a);
+    vsa_b = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(len);
+    if (!vsa_b)
+        return;
+
+    len &gt;&gt;= 1;
+    tmp[2] = 0;
+    for(i=0;i&lt;len;i++) {
+        tmp[0] = *vsa_a++;  
+        tmp[1] = *vsa_a++;  
+        vsa_b[i] = (char)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(tmp,0,16);
+    }
+    /* First 4 bytes of DHCPVSA is the cookie, so skip over that. */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#printDhcpOptions>printDhcpOptions</A>(vsa_b+4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(vsa_b);
+}
+
+void
+<A NAME="dhcpDisable">dhcpDisable</A>()
+{
+    DHCPState = DHCPSTATE_NOTUSED;
+}
+
+/* DHCPStartup():
+ *  This function is called at the point in which the ethernet interface is
+ *  started if, and only if, the IPADD shell variable is set to DHCP.
+ *  In older version of DHCP, the default was to use  "LUCENT.PPA.1.1" as
+ *  the default vcid.  Now it is only used if specified in the shell variable
+ *  DHCPCLASSID.  The same strategy applies to DHCPCLIENTID.
+*/
+int
+<A NAME="DHCPStartup">DHCPStartup</A>(short seconds)
+{
+    char    *id, *colon, *rlist;
+
+#if !INCLUDE_TFTP
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("WARNING: DHCP can't load bootfile, TFTP not built into monitor.\n");
+#endif
+
+    /* The format of DHCPCLASSID is simply a string of characters. */
+    id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPCLASSID");
+    if (id)
+        DHCPClassId = id;
+    else
+        DHCPClassId = "";
+    DHCPClassIdSize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(DHCPClassId);
+
+    /* The format of DHCPCLIENTID is "TYPE:ClientID" where 'TYPE is a
+     * decimal number ranging from 1-255 used as the "type" portion of
+     * the option, and ClientID is a string of ascii-coded hex pairs
+     * that are converted to binary and used as the client identifier.
+     */
+    id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPCLIENTID");
+    if (id) {
+        colon = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(id,':');
+        if ((colon) && (!(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(colon+1) & 1))) {
+            DHCPClientIdType = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(id);
+            colon++;
+            for(DHCPClientIdSize=0;*colon;DHCPClientIdSize++) {
+                uchar tmp;
+
+                tmp = colon[2];
+                colon[2] = 0;
+                DHCPClientId[DHCPClientIdSize] = (uchar)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(colon,0,16);
+                colon[2] = tmp;
+                colon+=2;
+            }
+        }
+    }
+    else
+        DHCPClientIdSize = 0;
+
+    /* The format of DHCPRQSTLIST is #:#:#:#:# where each '#' is a decimal
+     * number representing a parameter to be requested via the Parameter
+     * Request List option...
+     */
+    rlist = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPRQSTLIST");
+    if (rlist) {
+        DHCPRqstListSize = 0;
+        colon = rlist;
+        while(*colon) {
+            if (*colon++ == ':')
+                DHCPRqstListSize++;
+        }
+        if (DHCPRqstListSize &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(DHCPRequestList)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("DHCPRQSTLIST too big.\n");
+            DHCPRqstListSize = 0;
+        }
+        else {
+            char *rqst;
+
+            DHCPRqstListSize = 0;
+            rqst = rlist;
+            while(1) {
+                DHCPRequestList[DHCPRqstListSize++] = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(rqst,&colon,0);
+                if (*colon != ':')
+                    break;
+                rqst = colon+1;
+            }
+            DHCPRequestList[DHCPRqstListSize] = 0;
+        }
+    }
+    else
+        DHCPRqstListSize = 0;
+
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#SendDHCPDiscover>SendDHCPDiscover</A>(0,seconds));
+}
+
+int
+<A NAME="BOOTPStartup">BOOTPStartup</A>(short seconds)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#SendDHCPDiscover>SendDHCPDiscover</A>(1,seconds));
+}
+
+uchar *
+<A NAME="dhcpLoadShellVarOpts">dhcpLoadShellVarOpts</A>(uchar *options)
+{
+    if (DHCPClassIdSize) {
+        *options++ = DHCPOPT_CLASSID;
+        *options++ = DHCPClassIdSize;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(options,DHCPClassId,DHCPClassIdSize);
+        options += DHCPClassIdSize;
+    }
+    if (DHCPClientIdSize) {
+        *options++ = DHCPOPT_CLIENTID;
+        *options++ = DHCPClientIdSize+1;
+        *options++ = DHCPClientIdType;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(options,DHCPClientId,DHCPClientIdSize);
+        options += DHCPClientIdSize;
+    }
+    if (DHCPRqstListSize) {
+        *options++ = DHCPOPT_PARMRQSTLIST;
+        *options++ = DHCPRqstListSize;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(options,DHCPRequestList,DHCPRqstListSize);
+        options += DHCPRqstListSize;
+    }
+    return(options);
+}
+
+/* SendDHCPDiscover()
+ *  The DHCPDISCOVER is issued as an ethernet broadcast.  IF the bootp
+ *  flag is non-zero then just do a bootp request (a subset of the 
+ *  DHCPDISCOVER stuff).
+ */
+int
+<A NAME="SendDHCPDiscover">SendDHCPDiscover</A>(int bootp,short seconds)
+{
+    struct  dhcphdr *dhcpdata;
+    struct  bootphdr *bootpdata;
+    struct  ether_header *te;
+    struct  ip *ti;
+    struct  Udphdr *tu;
+    ushort  uh_ulen;
+    int     optlen;
+    char    *dhcpflags;
+    ulong   cookie;
+    uchar   *dhcpOptions, *dhcpOptionsBase;
+
+    /* Retrieve an ethernet buffer from the driver and populate the
+     * ethernet level of packet:
+     */
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_shost,BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_dhost,BroadcastAddr,6);
+    te-&gt;ether_type = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_IP);
+
+    /* Move to the IP portion of the packet and populate it appropriately: */
+    ti = (struct ip *) (te + 1);
+    ti-&gt;ip_vhl = IP_HDR_VER_LEN;
+    ti-&gt;ip_tos = 0;
+    ti-&gt;ip_id = 0;
+    ti-&gt;ip_off = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(0x4000);   /* No fragmentation allowed */
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&ti-&gt;ip_src.s_addr,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&ti-&gt;ip_dst.s_addr,0xff,4);
+
+    /* Now udp... */
+    tu = (struct Udphdr *) (ti + 1);
+    tu-&gt;uh_sport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(DhcpClientPort);
+    tu-&gt;uh_dport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(DhcpServerPort);
+
+    /* First the stuff that is the same for BOOTP or DHCP... */
+    bootpdata = (struct bootphdr *)(tu+1);
+    dhcpdata = (struct dhcphdr *)(tu+1);
+    dhcpdata-&gt;op = DHCPBOOTP_REQUEST;
+    dhcpdata-&gt;htype = 1;
+    dhcpdata-&gt;hlen = 6;
+    dhcpdata-&gt;hops = 0;
+    dhcpdata-&gt;seconds = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(seconds);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(dhcpdata-&gt;bootfile,0,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(dhcpdata-&gt;bootfile));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(dhcpdata-&gt;server_hostname,0,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(dhcpdata-&gt;server_hostname));
+
+    /* For the first DHCPDISCOVER issued, establish a transaction id based
+     * on a crc32 of the mac address.  For each DHCPDISCOVER after that,
+     * just increment.
+     */
+    if (!DHCPTransactionId)
+        DHCPTransactionId = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#crc32>crc32</A>(BinEnetAddr,6);
+    else
+        DHCPTransactionId++;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&dhcpdata-&gt;transaction_id,(char *)&DHCPTransactionId,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;client_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;your_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;server_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;router_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(dhcpdata-&gt;client_macaddr,BinEnetAddr,6);
+    dhcpflags = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPFLAGS");
+    if (dhcpflags)      /* 0x8000 is the only bit used currently. */
+        dhcpdata-&gt;flags = (ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(dhcpflags,0,0);
+    else
+        dhcpdata-&gt;flags = 0;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(dhcpdata-&gt;flags);
+
+    /* Finally, the DHCP or BOOTP specific stuff...
+     * Based on RFC1534 (Interoperation Between DHCP and BOOTP), any message
+     * received by a DHCP server that contains a 'DHCP_MESSAGETYPE' option
+     * is assumed to have been sent by a DHCP client.  A message without the
+     * DHCP_MESSAGETYPE option is assumed to have been sent by a BOOTP
+     * client.
+     */
+    uh_ulen = optlen = 0;
+    if (bootp) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(bootpdata-&gt;vsa,0,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(bootpdata-&gt;vsa));
+        uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct bootphdr);
+        tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uh_ulen);
+    }
+    else {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#buildDhcpHdr>buildDhcpHdr</A>(dhcpdata)) {
+            /* The cookie should only be loaded at the start of the
+             * vendor specific area if vendor-specific options are present.
+             */
+            cookie = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecl>ecl</A>(STANDARD_MAGIC_COOKIE);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&dhcpdata-&gt;magic_cookie,(char *)&cookie,4);
+            dhcpOptionsBase = (uchar *)(dhcpdata+1);
+            dhcpOptions = dhcpOptionsBase;
+            *dhcpOptions++ = DHCPOPT_MESSAGETYPE;
+            *dhcpOptions++ = 1;
+            *dhcpOptions++ = DHCPDISCOVER;
+            dhcpOptions = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#dhcpLoadShellVarOpts>dhcpLoadShellVarOpts</A>(dhcpOptions);
+            *dhcpOptions++ = 0xff;
+    
+            /* Calculate ip and udp lengths after all DHCP options are loaded
+             * so that the size is easily computed based on the value of the
+             * dhcpOptions pointer.  Apparently, the minimum size of the
+             * options space is 64 bytes, we determined this simply because
+             * the DHCP server we are using complains if the size is smaller.
+             * Also, NULL out the space that is added to get a minimum option
+             * size of 64 bytes, 
+             */
+            optlen = dhcpOptions - dhcpOptionsBase;
+            if (optlen &lt; 64) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(dhcpOptions,0,64-optlen);
+                optlen = 64;
+            }
+            uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr)+<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct dhcphdr)+optlen;
+            tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uh_ulen);
+        }
+    }
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) + uh_ulen);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipChksum>ipChksum</A>(ti);   /* Compute checksum of ip hdr */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#udpChksum>udpChksum</A>(ti);  /* Compute UDP checksum */
+
+    if (bootp) {
+        DHCPState = BOOTPSTATE_REQUEST;
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(BOOTPSIZE);
+    }
+    else {
+        DHCPState = DHCPSTATE_SELECT;
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(DHCPSIZE+optlen);
+    }
+    if (EtherVerbose & SHOW_DHCP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  %s startup (%d elapsed secs)\n",
+            bootp ? "BOOTP" : "DHCP",seconds);
+    return(0);
+}
+
+/* SendDHCPRequest()
+ *  The DHCP request is broadcast back with the "server identifier" option
+ *  set to indicate which server has been selected (in case more than one
+ *  has offered).
+ */
+int
+<A NAME="SendDHCPRequest">SendDHCPRequest</A>(dhdr)
+struct  dhcphdr *dhdr;
+{
+    uchar   *op;
+    struct  dhcphdr *dhcpdata;
+    struct  ether_header *te;
+    struct  ip *ti;
+    struct  Udphdr *tu;
+    int     optlen;
+    uchar   *dhcpOptions, *dhcpOptionsBase;
+    ushort  uh_ulen;
+    ulong   cookie;
+
+    if (EtherVerbose & SHOW_DHCP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  DHCP request\n");
+
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_shost,BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_dhost,BroadcastAddr,6);
+    te-&gt;ether_type = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_IP);
+
+    ti = (struct ip *) (te + 1);
+    ti-&gt;ip_vhl = IP_HDR_VER_LEN;
+    ti-&gt;ip_tos = 0;
+    ti-&gt;ip_id = 0;
+    ti-&gt;ip_off = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(0x4000);   /* No fragmentation allowed */
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&ti-&gt;ip_src.s_addr,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&ti-&gt;ip_dst.s_addr,0xff,4);
+
+    tu = (struct Udphdr *) (ti + 1);
+    tu-&gt;uh_sport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(DhcpClientPort);
+    tu-&gt;uh_dport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(DhcpServerPort);
+
+    dhcpdata = (struct dhcphdr *)(tu+1);
+    dhcpdata-&gt;op = DHCPBOOTP_REQUEST;
+    dhcpdata-&gt;htype = 1;
+    dhcpdata-&gt;hlen = 6;
+    dhcpdata-&gt;hops = 0;
+    DHCPElapsedSecs += 1;   /* Not accurate */
+    dhcpdata-&gt;seconds = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(DHCPElapsedSecs);
+    /* Use the same xid for the request as was used for the discover...
+     * (rfc2131 section 4.4.1)
+     */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&dhcpdata-&gt;transaction_id,(char *)&dhdr-&gt;transaction_id,4);
+
+    dhcpdata-&gt;flags = dhdr-&gt;flags;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;client_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&dhcpdata-&gt;your_ip,(char *)&dhdr-&gt;your_ip,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;server_ip,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&dhcpdata-&gt;router_ip,0,4);
+    cookie = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecl>ecl</A>(STANDARD_MAGIC_COOKIE);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&dhcpdata-&gt;magic_cookie,(char *)&cookie,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(dhcpdata-&gt;client_macaddr,BinEnetAddr,6);
+
+    dhcpOptionsBase = (uchar *)(dhcpdata+1);
+    dhcpOptions = dhcpOptionsBase;
+    *dhcpOptions++ = DHCPOPT_MESSAGETYPE;
+    *dhcpOptions++ = 1;
+    *dhcpOptions++ = DHCPREQUEST;
+
+    *dhcpOptions++ = DHCPOPT_SERVERID;      /* Server id ID */
+    *dhcpOptions++ = 4;
+    op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_SERVERID,dhdr+1);
+    if (op)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(dhcpOptions,op+2,4);
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>(dhcpOptions,0,4);
+    dhcpOptions+=4;
+
+    *dhcpOptions++ = DHCPOPT_REQUESTEDIP;       /* Requested IP */
+    *dhcpOptions++ = 4;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(dhcpOptions,(char *)&dhdr-&gt;your_ip,4);
+    dhcpOptions += 4;
+    dhcpOptions = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#dhcpLoadShellVarOpts>dhcpLoadShellVarOpts</A>(dhcpOptions);
+    *dhcpOptions++ = 0xff;
+
+    /* See note in SendDHCPDiscover() regarding the computation of the
+     * ip and udp lengths.
+     */
+    optlen = dhcpOptions - dhcpOptionsBase;
+    if (optlen &lt; 64)
+        optlen = 64;
+    uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct dhcphdr) + optlen;
+    tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uh_ulen);
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) + uh_ulen);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipChksum>ipChksum</A>(ti);       /* Compute checksum of ip hdr */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#udpChksum>udpChksum</A>(ti);      /* Compute UDP checksum */
+
+    DHCPState = DHCPSTATE_REQUEST;
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(DHCPSIZE+optlen);
+    return(0);
+}
+
+/* randomDhcpStartupDelay():
+ *  Randomize the startup for DHCP/BOOTP (see RFC2131 Sec 4.4.1)...
+ *  Return a value between 1 and 10 based on the last 4 bits of the 
+ *  board's MAC address.
+ */
+int
+<A NAME="randomDhcpStartupDelay">randomDhcpStartupDelay</A>()
+{
+    int randomsec;
+
+    randomsec = (BinEnetAddr[5] & 0xf);
+    if (randomsec &gt; 10)
+        randomsec -= 7;
+    else if (randomsec == 0)
+        randomsec = 10;
+    return(randomsec);
+}
+
+/* dhcpStateCheck():
+ *  Called by pollethernet() to monitor the progress of DHCPState.
+ *  The retry rate is "almost" what is specified in the RFC...
+ *  Refer to the RetransmitDelay() function for details.
+ *
+ *  Regarding timing...
+ *  The DHCP startup may be running without an accurate measure of elapsed
+ *  time.  The value of LoopsPerSecond is used as an approximation of
+ *  the number of times this function must be called for one second to 
+ *  pass (dependent on network traffic, etc...).  RetransmitDelay() is
+ *  called to retrieve the number of seconds that must elapse prior to 
+ *  retransmitting the last DHCP message.  The static variables in this
+ *  function are used to keep track of that timeout.
+ */
+void
+<A NAME="dhcpStateCheck">dhcpStateCheck</A>(void)
+{
+    static int dhcpretry, delayloops, delaysecs;
+
+    /* If the DHCP command has been issued, it is assumed that the script
+     * is handling retries...
+     */
+    if (DHCPCommandIssued)
+        return;
+
+    /* Return, restart or fall through; depending on DHCPState... */
+    switch(DHCPState) {
+        case DHCPSTATE_NOTUSED:
+        case BOOTPSTATE_COMPLETE:
+        case DHCPSTATE_BOUND:
+            delayloops = 0;
+            return;
+        case DHCPSTATE_RESTART:
+            delayloops = 0;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPStartup>DHCPStartup</A>(0);
+            return;
+        case BOOTPSTATE_RESTART:
+            delayloops = 0;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#BOOTPStartup>BOOTPStartup</A>(0);
+            return;
+        case DHCPSTATE_INITIALIZE:      /* Randomized delay prior to startup */
+        case BOOTPSTATE_INITIALIZE:     /* of the BOOTP/DHCP transaction. */
+            if (!delayloops) {
+                dhcpretry = 0;
+                delaysecs = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#randomDhcpStartupDelay>randomDhcpStartupDelay</A>();
+                delayloops = delaysecs * LoopsPerSecond;
+                if (EtherVerbose & SHOW_DHCP)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nDHCP/BOOTP %d sec startup delay...\n",delaysecs);
+            }
+            else if ((++dhcpretry &gt; delayloops) || (<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#gotachar>gotachar</A>())) {
+                DHCPElapsedSecs = 0;
+                if (DHCPState & BOOTP_MODE)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#BOOTPStartup>BOOTPStartup</A>(0);
+                else
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPStartup>DHCPStartup</A>(0);
+                dhcpretry = 0;
+                delayloops = 0;
+            }
+            return;
+        default:
+            break;
+    }
+
+    /* If the DHCP or BOOTP transaction hasn't completed by the time
+     * the static variable dhcpretry reaches the current retransmit-delay
+     * point, then restart the transaction.
+     * Note that we only do the multiplication if delayloops is zero.  This
+     * just avoids the wasted processing time.
+     */
+    if (!delayloops) {
+        delaysecs = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_RETURN);
+        delayloops = delaysecs*LoopsPerSecond;
+        dhcpretry = 0;
+    }
+
+    if (++dhcpretry &gt; delayloops) {
+        DHCPElapsedSecs += delaysecs;
+        if (DHCPState & BOOTP_MODE)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#BOOTPStartup>BOOTPStartup</A>(DHCPElapsedSecs);
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPStartup>DHCPStartup</A>(DHCPElapsedSecs);
+        if (EtherVerbose & SHOW_DHCP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  DHCP/BOOTP retry (%d secs)\n",delaysecs);
+        dhcpretry = 0;
+        delayloops = 0;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INCREMENT);
+    }
+}
+
+/* xidCheck():
+ *  Common function used for DHCP and BOOTP to verify incoming transaction
+ *  id...
+ */
+int
+<A NAME="xidCheck">xidCheck</A>(char *id,int bootp)
+{
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(id,(char *)&DHCPTransactionId,4)) {
+        if (EtherVerbose & SHOW_DHCP) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s ignored: unexpected transaction id.\n",
+                bootp ? "BOOTP":"DHCP");
+        }
+        return(-1);
+    }
+    return(0);
+}
+
+int
+<A NAME="loadBootFile">loadBootFile</A>(int bootp)
+{
+#if INCLUDE_TFTP
+    char    bfile[TFSNAMESIZE+TFSINFOSIZE+32];
+    char    *flags, *info, *icomma, *fcomma, *argv[2];
+    char    *bootfile, *tftpsrvr;
+    ulong   addr;
+
+    /* If both bootfile and server-ip are specified, then boot it.
+     * The name of the file must contain information that tells the monitor
+     * what type of file it is, so the first 'comma' extension is used as
+     * the flag field (if it is a valid flag set) and the second 'comma'
+     * extension is used as the info field.
+     */
+    bootfile = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("BOOTFILE");
+    tftpsrvr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("BOOTSRVR");
+
+    if (bootfile && tftpsrvr) {
+        int tftpworked;
+
+        addr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>();
+        info = "";
+        flags = "e";
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(bfile,bootfile,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(bfile));
+        fcomma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(bfile,',');
+        if (fcomma) {
+            icomma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(fcomma+1,',');
+            if (icomma) {
+                *icomma = 0;
+                info = icomma+1;
+            }
+            *fcomma = 0;
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_FATOB,(long)(fcomma+1),0) != 0)
+                flags = fcomma+1;
+        }
+
+        /* Since we are about to transition to TFTP, match TFTP's
+         * verbosity to the verbosity currently set for DHCP...
+         */
+        if (EtherVerbose & SHOW_DHCP)
+            EtherVerbose |= SHOW_TFTP;
+
+        /* If the TFTP transfer succeeds, attempt to run the boot file;
+         * if the TFTP transfer fails, then re-initialize the tftp state
+         * and set the DHCP state such that dhcpStateCheck() will
+         * cause the handshake to start over again...
+         */
+        tftpworked = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGet>tftpGet</A>(addr,tftpsrvr,"octet",bfile,bfile,flags,info);
+        if (tftpworked) {
+            EtherVerbose = 0;
+            argv[0] = bfile;
+            argv[1] = 0;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsrun>tfsrun</A>(argv,0);
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#tftpInit>tftpInit</A>();
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_DHCP);
+            EtherVerbose &= ~SHOW_TFTP;
+            if (bootp)
+                DHCPState = BOOTPSTATE_RESTART;
+            else
+                DHCPState = DHCPSTATE_RESTART;
+        }
+    }
+    else
+        EtherVerbose &= ~(SHOW_DHCP|DHCP_VERBOSE);
+#endif
+    return(0);
+}
+
+/* processBOOTP():
+ *  A subset of processDHCP().
+ *  We get here from processDHCP, because it detects that the current
+ *  value of DHCPState is BOOTPSTATE_REQUEST.
+ */
+int
+<A NAME="processBOOTP">processBOOTP</A>(ehdr,size)
+struct ether_header *ehdr;
+ushort size;
+{
+    struct  ip *ihdr;
+    struct  Udphdr *uhdr;
+    struct  bootphdr *bhdr;
+    ulong   ip, temp_ip, cookie;
+    uchar   buf[16], *op;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#printMem>printMem</A>((uchar *)ehdr,size);
+
+    ihdr = (struct ip *)(ehdr + 1);
+    uhdr = (struct Udphdr *)((char *)ihdr + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ether.h.html#IP_HLEN>IP_HLEN</A>(ihdr));
+    bhdr = (struct bootphdr *)(uhdr+1);
+
+    /* Verify incoming transaction id matches the previous outgoing value: */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#xidCheck>xidCheck</A>((char *)&bhdr-&gt;transaction_id,1) &lt; 0)
+        return(-1);
+
+    /* If bootfile is nonzero, store it into BOOTFILE shell var: */
+    if (bhdr-&gt;bootfile[0])
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("BOOTFILE",bhdr-&gt;bootfile);
+
+    /* Assign IP "server_ip" to the BOOTSRVR shell var (if non-zero): */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&bhdr-&gt;server_ip,4);
+    if (temp_ip)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("BOOTSRVR",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+    /* Assign IP "router_ip" to the RLYAGNT shell var (if non-zero): */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&bhdr-&gt;router_ip,4);
+    if (temp_ip)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("RLYAGNT",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+    /* Assign IP address loaded in "your_ip" to the IPADD shell var: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(BinIpAddr,(char *)&bhdr-&gt;your_ip,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&bhdr-&gt;your_ip,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("IPADD",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+    /* If STANDARD_MAGIC_COOKIE exists, then process options... */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&cookie,(char *)bhdr-&gt;vsa,4);
+    if (cookie == <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecl>ecl</A>(STANDARD_MAGIC_COOKIE)) {
+        /* Assign subnet mask option to NETMASK shell var (if found): */
+        op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_SUBNETMASK,&bhdr-&gt;vsa[4]);
+        if (op) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ip,op+2,4);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("NETMASK",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(ip,buf));
+        }
+        /* Assign first router option to GIPADD shell var (if found): */
+        /* (the router option can have multiple entries, and they are */
+        /* supposed to be in order of preference, so use the first one) */
+        op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_ROUTER,&bhdr-&gt;vsa[4]);
+        if (op) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ip,op+2,4);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("GIPADD",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(ip,buf));
+        }
+    }
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#DhcpBootpDone>DhcpBootpDone</A>(1,(struct dhcphdr *)bhdr,
+        size - ((int)((int)&bhdr-&gt;vsa - (int)ehdr)));
+
+    DHCPState = BOOTPSTATE_COMPLETE;
+
+    /* Call loadBootFile() which will then kick off a tftp client
+     * transfer if both BOOTFILE and BOOTSRVR shell variables are
+     * loaded; otherwise, we are done.
+     */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#loadBootFile>loadBootFile</A>(1);
+
+    return(0);
+}
+
+int
+<A NAME="processDHCP">processDHCP</A>(struct ether_header *ehdr,ushort size)
+{
+    struct  ip *ihdr;
+    struct  Udphdr *uhdr;
+    struct  dhcphdr *dhdr;
+    uchar   buf[16], *op, msgtype;
+    ulong   ip, temp_ip, leasetime;
+
+    if (DHCPState == BOOTPSTATE_REQUEST)
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#processBOOTP>processBOOTP</A>(ehdr,size));
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#printMem>printMem</A>((uchar *)ehdr,size);
+
+    ihdr = (struct ip *)(ehdr + 1);
+    uhdr = (struct Udphdr *)((char *)ihdr + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ether.h.html#IP_HLEN>IP_HLEN</A>(ihdr));
+    dhdr = (struct dhcphdr *)(uhdr+1);
+
+    /* Verify incoming transaction id matches the previous outgoing value: */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#xidCheck>xidCheck</A>((char *)&dhdr-&gt;transaction_id,0) &lt; 0)
+        return(-1);
+
+    op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_MESSAGETYPE,dhdr+1);
+    if (op)
+        msgtype = *(op+2);
+    else
+        msgtype = DHCPUNKNOWN;
+
+    if ((DHCPState == DHCPSTATE_SELECT) && (msgtype == DHCPOFFER)) {
+        /* Target issued the DISCOVER, the incoming packet is the server's
+         * OFFER reply.  The function "ValidDHCPOffer() will return
+         * non-zero if the request is to be sent.
+         */
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#ValidDHCPOffer>ValidDHCPOffer</A>(dhdr))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#SendDHCPRequest>SendDHCPRequest</A>(dhdr);
+        else if (EtherVerbose & SHOW_DHCP) {
+            ulong src;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&src,(char *)&ihdr-&gt;ip_src,4);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  DHCP offer from %I ignored\n",src);
+        }
+    }
+    else if ((DHCPState == DHCPSTATE_REQUEST) && (msgtype == DHCPACK)) {
+        ulong   cookie;
+
+        /* Target issued the REQUEST, the incoming packet is the server's
+         * ACK reply.  We're done so load the environment now.
+         */
+
+        /* If bootfile is nonzero, store it into BOOTFILE shell var: */
+        if (dhdr-&gt;bootfile[0])
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("BOOTFILE",dhdr-&gt;bootfile);
+
+        /* Assign IP "server_ip" to the BOOTSRVR shell var (if non-zero): */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&dhdr-&gt;server_ip,4);
+        if (temp_ip)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("BOOTSRVR",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+        /* Assign IP "router_ip" to the RLYAGNT shell var (if non-zero): */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&dhdr-&gt;router_ip,4);
+        if (temp_ip)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("RLYAGNT",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+        /* Assign IP address loaded in "your_ip" to the IPADD shell var: */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(BinIpAddr,(char *)&dhdr-&gt;your_ip,4);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&temp_ip,(char *)&dhdr-&gt;your_ip,4);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("IPADD",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(temp_ip,buf));
+
+        /* If STANDARD_MAGIC_COOKIE exists, process options... */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&cookie,(char *)&dhdr-&gt;magic_cookie,4);
+        if (cookie == <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecl>ecl</A>(STANDARD_MAGIC_COOKIE)) {
+            /* Assign subnet mask to NETMASK shell var (if found): */
+            op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_SUBNETMASK,dhdr+1);
+            if (op) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ip,op+2,4);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("NETMASK",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(ip,buf));
+            }
+
+            /* Assign gateway IP to GIPADD shell var (if found):
+             * (the router option can have multiple entries, and they are
+             * supposed to be in order of preference, so use the first one).
+             */
+            op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_ROUTER,dhdr+1);
+            if (op) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ip,op+2,4);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpSetEnv>DhcpSetEnv</A>("GIPADD",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToString>IpToString</A>(ip,buf));
+            }
+            /* Process DHCPOPT_LEASETIME option as follows...
+             * If not set, assume infinite and clear DHCPLEASETIME shellvar.
+             * If set, then look for the presence of the DHCPLEASETIME shell
+             * variable and use it as a minimum.  If the incoming value is
+             * = what is in the shell variable, accept it and load the shell
+             * variable with this value. If incoming lease time is less than
+             * what is stored in DHCPLEASETIME, ignore the request.
+             * If DHCPLEASETIME is not set, then just load the incoming lease
+             * into the DHCPLEASETIME shell variable and accept the offer.
+             */&gt;
+            op = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DhcpGetOption>DhcpGetOption</A>(DHCPOPT_LEASETIME,dhdr+1);
+            if (op) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&leasetime,op+2,4);
+                if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPLEASETIME")) {
+                    ulong   minleasetime;
+                    minleasetime = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>("DHCPLEASETIME"),0,0);
+                    if (leasetime &lt; minleasetime) {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("DHCP: incoming lease time 0x%lx too small.\n",
+                            leasetime);
+                        return(-1);
+                    }
+                }
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"0x%lx",leasetime);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("DHCPLEASETIME",buf);
+            }
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("DHCPLEASETIME",0);
+        }
+
+        /* Check for vendor specific stuff... */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#DhcpVendorSpecific>DhcpVendorSpecific</A>(dhdr);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#DhcpBootpDone>DhcpBootpDone</A>(0,dhdr,
+            size - ((int)((int)&dhdr-&gt;magic_cookie - (int)ehdr)));
+
+        DHCPState = DHCPSTATE_BOUND;
+
+        /* Call loadBootFile() which will then kick off a tftp client
+         * transfer if both BOOTFILE and BOOTSRVR shell variables are
+         * loaded; otherwise, we are done.
+         */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#loadBootFile>loadBootFile</A>(0);
+    }
+    return(0);
+}
+
+char *
+<A NAME="DHCPop">DHCPop</A>(op)
+int op;
+{
+    switch(op) {
+    case DHCPBOOTP_REQUEST:
+        return("REQUEST");
+    case DHCPBOOTP_REPLY:
+        return("REPLY");
+    default:
+        return("???");
+    }
+}
+
+char *
+<A NAME="DHCPopt">DHCPopt</A>(op)
+int op;
+{
+    switch(op) {
+    case DHCPDISCOVER:
+        return("DISCOVER");
+    case DHCPOFFER:
+        return("OFFER");
+    case DHCPREQUEST:
+        return("REQUEST");
+    case DHCPDECLINE:
+        return("DECLINE");
+    case DHCPACK:
+        return("ACK");
+    case DHCPNACK:
+        return("NACK");
+    case DHCPRELEASE:
+        return("RELEASE");
+    default:
+        return("???");
+
+    }
+}
+
+/* printDhcpOptions():
+ *  Verbosely display the DHCP options pointed to by the incoming
+ *  options pointer.
+ */
+void
+<A NAME="printDhcpOptions">printDhcpOptions</A>(uchar *options)
+{
+    int i, safety, opt, optlen;
+
+    safety = 0;
+    while(*options != 0xff) {
+        if (safety++ &gt; 10000) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Aborting, overflow likely\n");
+            break;
+        }
+        opt = (int)*options++;
+        if (opt == 0)   /* padding */
+            continue;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    option %3d: ",opt);
+        optlen = (int)*options++;
+        if (opt==DHCPOPT_MESSAGETYPE) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("DHCP%s",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPopt>DHCPopt</A>(*options++));
+        }
+        /* Vendor specific information:
+         * Note that the data within this option is vendor specific.
+         * The RFC2132 says that the encapsulated data with this option
+         * SHOULD follow the same format as the outer-layer options, but
+         * is not mandatory.
+         */
+        else if (opt==DHCPOPT_VENDORSPECIFICINFO) {
+            int vsopt, vsoptlen;
+
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+            while(*options != 0xff) {
+                vsopt = (int)*options++;
+                vsoptlen = (int)*options++;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("       vso %3d: ",vsopt);
+                if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcp_00.c.html#printDhcpVSopt>printDhcpVSopt</A>(vsopt,vsoptlen,options)) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x");
+                    for(i=0;i&lt;vsoptlen;i++)
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%02x",*options++);
+                }
+                if (*options != 0xff)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+            }
+            options++;      /* Skip over the 0xff within this option sub-set */
+        }
+        else if ((opt &lt; DHCPOPT_HOSTNAME) ||
+            (opt == DHCPOPT_BROADCASTADDRESS) ||
+            (opt == DHCPOPT_REQUESTEDIP) ||
+            (opt == DHCPOPT_SERVERID) ||
+            (opt == DHCPOPT_NISSERVER)) {
+            for(i=0;i&lt;optlen;i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d ",*options++);
+        }
+        else if ((opt == DHCPOPT_NISDOMAINNAME) || (opt == DHCPOPT_CLASSID)) {
+            for(i=0;i&lt;optlen;i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%c",*options++);
+        }
+        else if (opt == DHCPOPT_CLIENTID) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%d 0x",(int)*options++);
+            for(i=1;i&lt;optlen;i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%02x",*options++);
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x");
+            for(i=0;i&lt;optlen;i++)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%02x",*options++);
+        }
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+    }
+}
+
+/* printDhcp():
+ *  Try to format the DHCP stuff...
+ */
+void
+<A NAME="printDhcp">printDhcp</A>(struct Udphdr *p)
+{
+    struct  dhcphdr *d;
+    char    *client_ip, *your_ip, *server_ip, *router_ip;
+    ulong   cookie, xid;
+
+    d = (struct dhcphdr *)(p+1);
+
+    client_ip = (uchar *)&(d-&gt;client_ip);
+    your_ip = (uchar *)&(d-&gt;your_ip);
+    server_ip = (uchar *)&(d-&gt;server_ip);
+    router_ip = (uchar *)&(d-&gt;router_ip);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&xid,(char *)&d-&gt;transaction_id,4);
+    /* xid = ecl(xid) */
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  DHCP: sport dport ulen  sum\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("        %4d  %4d %4d %4d\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(p-&gt;uh_sport), <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(p-&gt;uh_dport), <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(p-&gt;uh_ulen),<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(p-&gt;uh_sum));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    op = %s, htype = %d, hlen = %d, hops = %d\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#DHCPop>DHCPop</A>(d-&gt;op),d-&gt;htype,d-&gt;hlen,d-&gt;hops);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    seconds = %d, flags = 0x%x, xid= 0x%lx\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(d-&gt;seconds),<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(d-&gt;flags),xid);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    client_macaddr = %02x:%02x:%02x:%02x:%02x:%02x\n",
+        d-&gt;client_macaddr[0], d-&gt;client_macaddr[1],
+        d-&gt;client_macaddr[2], d-&gt;client_macaddr[3],
+        d-&gt;client_macaddr[4], d-&gt;client_macaddr[5]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    client_ip = %d.%d.%d.%d\n",
+        client_ip[0],client_ip[1],client_ip[2],client_ip[3]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    your_ip =   %d.%d.%d.%d\n",
+        your_ip[0],your_ip[1],your_ip[2],your_ip[3]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    server_ip = %d.%d.%d.%d\n",
+        server_ip[0],server_ip[1],server_ip[2],server_ip[3]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    router_ip = %d.%d.%d.%d\n",
+        router_ip[0],router_ip[1],router_ip[2],router_ip[3]);
+    if (d-&gt;bootfile[0])
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    bootfile: %s\n", d-&gt;bootfile);
+    if (d-&gt;server_hostname[0])
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("    server_hostname: %s\n", d-&gt;server_hostname);
+
+    /* If STANDARD_MAGIC_COOKIE doesn't exist, then don't process options... */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&cookie,(char *)&d-&gt;magic_cookie,4);
+    if (cookie != <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecl>ecl</A>(STANDARD_MAGIC_COOKIE))
+        return;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#printDhcpOptions>printDhcpOptions</A>((uchar *)(d+1));
+}
+
+/* DhcpGetOption():
+ *  Based on the incoming option pointer and a specified option value,
+ *  search through the options list for the value and return a pointer
+ *  to that option.
+ */
+uchar *
+<A NAME="DhcpGetOption">DhcpGetOption</A>(optval,options)
+uchar   optval, *options;
+{
+    int     safety;
+
+    safety = 0;
+    while(*options != 0xff) {
+        if (safety++ &gt; 1000)
+            break;
+        if (*options == 0) {    /* Skip over padding. */
+            options++;
+            continue;
+        }
+        if (*options == optval)
+            return(options);
+        options += ((*(options+1)) + 2);
+    }
+    return((char *)0);
+}
+
+int
+<A NAME="DhcpSetEnv">DhcpSetEnv</A>(char *name,char *value)
+{
+    if (EtherVerbose & SHOW_DHCP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Dhcp/Bootp SetEnv: %s = %s\n",name,value);
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(name,value));
+}
+
+int
+<A NAME="DhcpIPCheck">DhcpIPCheck</A>(char *ipadd)
+{
+    char    verbose;
+
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(ipadd,"DHCP",4)) {
+        verbose = ipadd[4];
+        DHCPState = DHCPSTATE_INITIALIZE;
+    }
+    else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memcmp>memcmp</A>(ipadd,"BOOTP",5)) {
+        verbose = ipadd[5];
+        DHCPState = BOOTPSTATE_INITIALIZE;
+    }
+    else {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(ipadd,BinIpAddr) &lt; 0) {
+            verbose = 0;
+            DHCPState = BOOTPSTATE_INITIALIZE;
+        }
+        else {
+            DHCPState = DHCPSTATE_NOTUSED;
+            return(0);
+        }
+    }
+
+    BinIpAddr[0] = 0; 
+    BinIpAddr[1] = 0;
+    BinIpAddr[2] = 0; 
+    BinIpAddr[3] = 0;
+    if (verbose == 'V')
+        EtherVerbose = DHCP_VERBOSE;
+    else if (verbose == 'v')
+        EtherVerbose = SHOW_DHCP;
+    return(0);
+}
+
+char *
+<A NAME="dhcpStringState">dhcpStringState</A>(int state)
+{
+    switch(state) {
+        case DHCPSTATE_INITIALIZE:
+            return("DHCP_INITIALIZE");
+        case DHCPSTATE_SELECT:
+            return("DHCP_SELECT");
+        case DHCPSTATE_REQUEST:
+            return("DHCP_REQUEST");
+        case DHCPSTATE_BOUND:
+            return("DHCP_BOUND");
+        case DHCPSTATE_RENEW:
+            return("DHCP_RENEW");
+        case DHCPSTATE_REBIND:
+            return("DHCP_REBIND");
+        case DHCPSTATE_NOTUSED:
+            return("DHCP_NOTUSED");
+        case DHCPSTATE_RESTART:
+            return("DHCP_RESTART");
+        case BOOTPSTATE_INITIALIZE:
+            return("BOOTP_INITIALIZE");
+        case BOOTPSTATE_REQUEST:
+            return("BOOTP_REQUEST");
+        case BOOTPSTATE_RESTART:
+            return("BOOTP_RESTART");
+        case BOOTPSTATE_COMPLETE:
+            return("BOOTP_COMPLETE");
+        default:
+            return("???");
+    }
+}
+
+void
+<A NAME="ShowDhcpStats">ShowDhcpStats</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Current DHCP State: %s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/dhcpboot.c.html#dhcpStringState>dhcpStringState</A>(DHCPState));
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

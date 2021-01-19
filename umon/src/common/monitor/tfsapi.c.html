@@ -1,0 +1,535 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tfsapi.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tfsapi.c:
+ *  This file contains the portion of TFS that provides the function-level
+ *  API to the application.  If this is not being used by the application
+ *  then it can be omitted from the monitor build.
+ *  Note that not all of the api-specific code is here; some of it is in
+ *  tfs.c.  This is because the the MicroMonitor uses some of the api itself,
+ *  so it cannot be omitted from the TFS package without screwing up some 
+ *  other monitor functionality that needs it.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpu.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#if INCLUDE_TFSAPI
+
+/* tfstruncate():
+ *  To support the ability to truncate a file (make it smaller); this
+ *  function allows the user to adjust the high-water point of the currently
+ *  opened (and assumed to be opened for modification) file and replaces
+ *  that with the incoming argument.  This replacement is only done if the
+ *  current high-water point is higher than the incoming length.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfstruncate">tfstruncate</A>(int fd, long len)
+{
+    struct tfsdat *tdat;
+
+    /* Verify valid range of incoming file descriptor. */
+    if ((fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADFD);
+
+    tdat = &tfsSlots[fd];
+
+    /* Make sure the file pointed to by the incoming descriptor is active
+     * and that the incoming length is greater than the current high-water
+     * point...
+     */
+    if (tdat-&gt;offset == -1)
+        return(TFSERR_BADFD);
+    if (len &gt; tdat-&gt;hwp)
+        return(TFSERR_BADARG);
+
+    /* Make the adjustment... */
+    tdat-&gt;hwp = len;
+    return(TFS_OKAY);
+}
+
+/* tfseof():
+ *  Return 1 if at the end of the file, else 0 if not at end; else negative
+ *  if error.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfseof">tfseof</A>(int fd)
+{
+    struct tfsdat *tdat;
+
+    /* Verify valid range of incoming file descriptor. */
+    if ((fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+
+    /* Make sure the file pointed to by the incoming descriptor is active. */
+    if (tdat-&gt;offset == -1)
+        return(TFSERR_BADFD);
+
+    if (tdat-&gt;offset &gt;= tdat-&gt;hdr.filsize)
+        return(1);
+    else
+        return(0);
+}
+
+/* tfsread():
+ *  Similar to a standard read call to a file.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsread">tfsread</A>(int fd, char *buf, int cnt)
+{
+    struct tfsdat *tdat;
+    uchar *from;
+
+    if (tfsTrace &gt; 1)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsread(%d,0x%lx,%d)\n",fd,(ulong)buf,cnt);
+
+    /* Verify valid range of incoming file descriptor. */
+    if ((cnt &lt; 1) || (fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+
+    /* Make sure the file pointed to by the incoming descriptor is active. */
+    if (tdat-&gt;offset == -1)
+        return(TFSERR_BADFD);
+
+    if (tdat-&gt;offset &gt;= tdat-&gt;hdr.filsize)
+        return(TFSERR_EOF);
+
+    from = (uchar *) tdat-&gt;base + tdat-&gt;offset;
+
+    /* If request size is within the range of the file and current
+     * then copy the data to the requestors buffer, increment offset 
+     * and return the count.
+     */
+    if ((tdat-&gt;offset + cnt) &lt;= tdat-&gt;hdr.filsize) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(buf, from, cnt,0,0) != 0)
+            return(TFSERR_MEMFAIL);
+    }
+    /* If request size goes beyond the size of the file, then copy
+     * to the end of the file and return that smaller count.
+     */
+    else {
+        cnt = tdat-&gt;hdr.filsize - tdat-&gt;offset;
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(buf, from, cnt, 0, 0) != 0)
+            return(TFSERR_MEMFAIL);
+    }
+    tdat-&gt;offset += cnt;
+    return(cnt);
+}
+
+/* tfswrite():
+ *  Similar to a standard write call to a file.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfswrite">tfswrite</A>(int fd, char *buf, int cnt)
+{
+    struct tfsdat *tdat;
+
+    if (tfsTrace &gt; 1)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfswrite(%d,0x%lx,%d)\n", fd,(ulong)buf,cnt);
+
+    /* Verify valid range of incoming file descriptor. */
+    if ((cnt &lt; 1) || (fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    /* Make sure the file pointed to by the incoming descriptor is active. */
+    if (tfsSlots[fd].offset == -1)
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+
+    /* Make sure file is not opened as read-only */
+    if (tdat-&gt;flagmode & TFS_RDONLY)
+        return(TFSERR_RDONLY);
+
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(tdat-&gt;base+tdat-&gt;offset,buf,cnt,0,0) != 0)
+        return(TFSERR_MEMFAIL);
+
+    tdat-&gt;offset += cnt;
+
+    /* If new offset is greater than current high-water point, then
+     * adjust the high water point so that it is always reflecting the
+     * highest offset into which the file has had some data written.
+     */
+    if (tdat-&gt;offset &gt; tdat-&gt;hwp)
+        tdat-&gt;hwp = tdat-&gt;offset;
+
+    return(TFS_OKAY);
+}
+
+/* tfsseek():
+ *  Adjust the current pointer into the specified file.
+ *  If file is read-only, then the offset cannot exceed the file size;
+ *  otherwise, the only check made to the offset is that it is positive.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsseek">tfsseek</A>(int fd, int offset, int whence)
+{
+    int o_offset;
+    struct tfsdat *tdat;
+
+    if ((fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+    o_offset = tdat-&gt;offset;
+
+    switch (whence) {
+        case TFS_BEGIN:
+            tdat-&gt;offset = offset;
+            break;
+        case TFS_CURRENT:
+            tdat-&gt;offset += offset;
+            break;
+        default:
+            return(TFSERR_BADARG);
+    }
+
+    /* If new offset is less than zero or if the file is read-only and the
+     * new offset is greater than the file size, return EOF...
+     */
+    if ((tdat-&gt;offset &lt; 0) ||
+        ((tdat-&gt;flagmode & TFS_RDONLY) && (tdat-&gt;offset &gt; tdat-&gt;hdr.filsize))){
+        tdat-&gt;offset = o_offset;
+        return(TFSERR_EOF);
+    }
+    return(tdat-&gt;offset);
+}
+
+/* tfsgetline():
+ *  Read into the buffer a block of characters upto the next CR or LF in
+ *  the file.  After the CR/LF, or after max-1 chars are loaded, terminate
+ *  with a NULL.  Return the number of characters loaded.
+ *  At end of file return 0.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsgetline">tfsgetline</A>(int fd,char *buf,int max)
+{
+    int     cnt;
+    uchar   *from, *fromtmp;
+    struct  tfsdat *tdat;
+
+    max--;
+
+    if (tfsTrace &gt; 1)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsgetline(%d,0x%lx,%d)\n",fd,(ulong)buf,max);
+
+    /* Verify valid range of incoming file descriptor. */
+    if ((max &lt; 1) || (fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    /* Make sure the file pointed to by the incoming descriptor is active. */
+    if (tfsSlots[fd].offset == -1)
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+
+    if (tdat-&gt;offset == -1)
+        return(TFSERR_BADFD);
+
+    if (tdat-&gt;offset &gt;= tdat-&gt;hdr.filsize)
+        return(0);
+
+    from = (uchar *) tdat-&gt;base + tdat-&gt;offset;
+
+    /* Determine the count based on the presence (or lack thereof) of a
+     * carriage return or line feed...
+     */
+    for(fromtmp=from,cnt=0;cnt&lt;max && *fromtmp;cnt++,fromtmp++) {
+        if ((*fromtmp == '\r') || (*fromtmp == '\n')) {
+            cnt++;
+            break;
+        }
+    }
+
+    /* If request size is within the range of the file and current
+     * then copy the data to the requestors buffer, increment offset
+     * and return the count.
+     */
+    if ((tdat-&gt;offset + cnt) &lt;= tdat-&gt;hdr.filsize) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(buf, from, cnt,0,0) != 0)
+            return(TFSERR_MEMFAIL);
+    }
+    /* If request size goes beyond the size of the file, then copy
+     * to the end of the file and return that smaller count.
+     */
+    else {
+        cnt = tdat-&gt;hdr.filsize - tdat-&gt;offset;
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(buf, from, cnt, 0, 0) != 0)
+            return(TFSERR_MEMFAIL);
+    }
+    buf[cnt] = 0;
+    tdat-&gt;offset += cnt;
+    return(cnt);
+}
+
+/* tfsipmod():
+ *  Modify "in-place" a portion of a file in TFS.
+ *  This is a cheap and dirty way to modify a file...
+ *  The idea is that a file is created with a lot of writeable flash space
+ *  (data = 0xff).  This function can then be called to immediately modify
+ *  blocks of space in that flash.  It will not do any tfsunlink/tfsadd, and
+ *  it doesn't even require a tfsopen() tfsclose() wrapper.  Its a fast and
+ *  efficient way to modify flash in the file system.
+ *  Arguments:
+ *  name    =   name of the file to be in-place-modified;
+ *  buf     =   new data to be written to flash;
+ *  offset  =   offset into file into which new data is to be written;
+ *  size    =   size of new data (in bytes).
+ *  
+ *  With offset of -1, set offset to location containing first 0xff value.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsipmod">tfsipmod</A>(char *name,char *buf,int offset,int size)
+{
+    TFILE   *fp;
+    uchar   *cp;
+
+    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(name);
+    if (!fp)
+        return (TFSERR_NOFILE);
+    if (!(fp-&gt;flags & TFS_IPMOD))
+        return(TFSERR_NOTIPMOD);
+    
+    if (offset == -1) {
+        cp = (uchar *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+        for (offset=0;offset&lt;fp-&gt;filsize;offset++,cp++) {
+            if (*cp == 0xff)
+                break;
+        }
+    }
+    else if (offset &lt; -1)
+        return(TFSERR_BADARG);
+    
+    if ((offset + size) &gt; fp-&gt;filsize)
+        return(TFSERR_WRITEMAX);
+    
+    /* BUG fixed: 2/21/2001:
+     * The (ulong *) cast was done prior to adding offset to the base.
+     * This caused the offset to be quadrupled.
+     */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsflashwrite>tfsflashwrite</A>((ulong *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp)+offset),(ulong *)buf,size) == -1)
+        return (TFSERR_FLASHFAILURE);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfslog.c.html#tfslog>tfslog</A>(TFSLOG_IPM,name);
+    return(TFS_OKAY);
+}
+
+/* tfsopen():
+ *  Open a file for reading or creation.  If file is opened for writing,
+ *  then the caller must provide a RAM buffer  pointer to be used for
+ *  the file storage until it is transferred to flash by tfsclose().
+ *  Note that the "buf" pointer is only needed for opening a file for
+ *  creation or append (writing).
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsopen">tfsopen</A>(char *file,long flagmode,char *buf)
+{
+    register int i;
+    int     errno, retval;
+    long    fmode;
+    TFILE   *fp;
+    struct  tfsdat *slot;
+
+    errno = TFS_OKAY;
+
+    fmode = flagmode & (TFS_RDONLY | TFS_APPEND | TFS_CREATE);
+
+    /* See if file exists... */
+    fp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(file);
+
+    /* If file exists, do a crc32 on the data.
+     * If the file is in-place-modifiable, then the only legal flagmode
+     * is TFS_RDONLY.  Plus, in this case, the crc32 test is skipped.
+     */
+    if (fp) {
+        if (!((fmode == TFS_RDONLY) && (fp-&gt;flags & TFS_IPMOD))) {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#crc32>crc32</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp),fp-&gt;filsize) != fp-&gt;filcrc) {
+                retval = TFSERR_BADCRC;
+                goto done;
+            }
+        }
+    }
+
+    /* This switch verifies...
+     * - that the file exists if TFS_RDONLY or TFS_APPEND
+     * - that the file does not exist if TFS_CREATE
+     */
+    switch(fmode) {
+    case TFS_RDONLY:    /* Read existing file only, no change to file at all. */
+        if (!fp)
+            errno = TFSERR_NOFILE;
+        else {
+            if ((fp-&gt;flags & TFS_UNREAD) && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>()))
+                errno = TFSERR_USERDENIED;
+        }
+        break;
+    case TFS_APPEND:    /* Append to the end of the current file. */
+        if (!fp)
+            errno = TFSERR_NOFILE;
+        else {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())
+                errno = TFSERR_USERDENIED;
+        }
+        break;
+    case TFS_CREATERM:  /* Create a new file, allow tfsadd() to remove it */
+        break;          /* if it exists. */
+    case TFS_CREATE:    /* Create a new file, error if it exists. */
+        if (fp)
+            errno = TFSERR_FILEEXISTS;
+        break;
+    case (TFS_APPEND|TFS_CREATE):   /* If both mode bits are set, clear one */
+        if (fp) {                   /* based on the presence of the file. */
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_USRLVL>TFS_USRLVL</A>(fp) &gt; <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misccmds.c.html#getUsrLvl>getUsrLvl</A>())
+                errno = TFSERR_USERDENIED;
+            fmode = TFS_APPEND;
+        }
+        else {
+            fmode = TFS_CREATE;
+        }
+        break;
+    default:
+        errno = TFSERR_BADARG;
+        break;
+    }
+
+    if (errno != TFS_OKAY) {
+        retval = errno;
+        goto done;
+    }
+
+    /* Find an empty slot...
+     */
+    slot = tfsSlots;
+    for (i=0;i&lt;TFS_MAXOPEN;i++,slot++) {
+        if (slot-&gt;offset == -1)
+            break;
+    }
+
+    /* Populate the slot structure if a slot is found to be
+     * available...
+     */
+    if (i &lt; TFS_MAXOPEN) {
+        retval = i;
+        slot-&gt;hwp = 0;
+        slot-&gt;offset = 0;
+        slot-&gt;flagmode = fmode;
+        if (fmode & TFS_CREATE) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(slot-&gt;hdr.name,file,TFSNAMESIZE);
+            slot-&gt;flagmode |= (flagmode & TFS_FLAGMASK);
+            slot-&gt;base = (uchar *)buf;
+        }
+        else if (fmode & TFS_APPEND) {
+            slot-&gt;hdr = *fp;
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsmemcpy>tfsmemcpy</A>(buf,(uchar *)(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp)),
+                fp-&gt;filsize,0,0) != 0) {
+                retval = TFSERR_MEMFAIL;
+                goto done;
+            }
+            slot-&gt;flagmode = fp-&gt;flags;
+            slot-&gt;flagmode |= TFS_APPEND;
+            slot-&gt;base = (uchar *)buf;
+            slot-&gt;hwp = fp-&gt;filsize;
+            slot-&gt;offset = fp-&gt;filsize;
+        }
+        else {
+            slot-&gt;base = (uchar *) (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(fp));
+            slot-&gt;hdr = *fp;
+        }
+    }
+    else {
+        retval = TFSERR_NOSLOT;
+    }
+
+done:       
+    if (tfsTrace &gt; 0)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsopen(%s,0x%lx,0x%lx)=%d\n",file,flagmode,(ulong)buf,retval);
+
+    return(retval);
+}
+
+/* tfsclose():
+ *  If the file was opened for reading only, then just close out the 
+ *  entry in the tfsSlots table.  If the file was opened for creation,
+ *  then add it to the tfs list.  Note the additional argument is
+ *  only needed for tfsclose() of a newly created file.
+ *  info  = additional text describing the file.
+ *  MONLIB NOTICE: this function is accessible through monlib.c.
+ */
+int
+<A NAME="tfsclose">tfsclose</A>(int fd,char *info)
+{
+    int     err;
+    struct tfsdat *tdat;
+
+    if (!info) info = "";
+
+    if (tfsTrace &gt; 0)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tfsclose(%d,%s)\n",fd,info);
+
+    if ((fd &lt; 0) || (fd &gt;= TFS_MAXOPEN))
+        return(TFSERR_BADARG);
+
+    tdat = &tfsSlots[fd];
+
+    if (tdat-&gt;offset == -1)
+        return(TFSERR_BADFD);
+
+    /* Mark the file as closed by setting the offset to -1.
+     * Note that this is done prior to potentially calling tfsadd() so
+     * that tfsadd() will not think the file is opened and reject the add...
+     */
+    tdat-&gt;offset = -1;
+
+    /* If the file was opened for creation or append, then add it now. */
+    if (tdat-&gt;flagmode & (TFS_CREATE | TFS_APPEND)) {
+        char    buf[16];
+
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(tdat-&gt;hdr.name, info, <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsflagsbtoa>tfsflagsbtoa</A>(tdat-&gt;flagmode,buf),
+            tdat-&gt;base, tdat-&gt;hwp);
+        if (err != TFS_OKAY) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",tdat-&gt;hdr.name,<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfserrmsg>tfserrmsg</A>(err));
+            return(err);
+        }
+    }
+    return(TFS_OKAY);
+}
+
+#endif /* INCLUDE_TFSAPI */
+</HTML>
+</PRE>
+</BODY>

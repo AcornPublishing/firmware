@@ -1,0 +1,54 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/cpu.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* cpu.h:
+    General notice:
+    This code is part of a boot-monitor package developed as a generic base
+    platform for embedded system designs.  As such, it is likely to be
+    distributed to various projects beyond the control of the original
+    author.  Please notify the author of any enhancements made or bugs found
+    so that all may benefit from the changes.  In addition, notification back
+    to the author will allow the new user to pick up changes that may have
+    been made by other users after this version of the code was distributed.
+
+    Author: Ed Sutter
+    email:  esutter@lucent.com      (home: lesutter@worldnet.att.net)
+    phone:  908-582-2351            (home: 908-889-5161)
+*/
+#define MONARGV0    "monppc"
+
+#define <A NAME="VECTOR">VECTOR</A>(v)   (*(ulong *)(<A NAME="getvbr">getvbr</A>()+((v)*4)))
+
+#define <A NAME="JUMPTOSTART">JUMPTOSTART</A>()   <A NAME="coldstart">coldstart</A>()
+
+/* Standard restart (warmstart) definitions used by monitor... */
+#define EXCEPTION   (1&lt;&lt;4)
+#define BREAKPOINT  (2&lt;&lt;4)
+#define INITIALIZE  (3&lt;&lt;4)
+#define SSTEP       (4&lt;&lt;4)
+#define APPLICATION (5&lt;&lt;4)
+#define MORESTART   (6&lt;&lt;4)
+#define BAILOUT     (7&lt;&lt;4)
+#define MISC        (8&lt;&lt;4)
+#define APP_EXIT    (9&lt;&lt;4)
+
+#define MONITOR_STATUS      0x1002
+
+/* This size is dependent on the amount of memory on the board... */
+#define APPLICATION_STACK   0x107fff0
+
+#define RESET                   (FLASH_BANK0_BASE_ADDR+0x100)
+#define <A NAME="RESETFUNC">RESETFUNC</A>()             ((<A NAME="void">void</A>(*)())RESET)
+
+/* TRAP stuff used by at.c: */
+#define TRAPNUM     32      
+#define TRAPU       0xc3
+#define TRAPL       TRAPNUM
+#define ATVECTOR    32
+</HTML>
+</PRE>
+</BODY>

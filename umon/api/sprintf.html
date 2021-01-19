@@ -1,0 +1,89 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: sprintf</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_sprintf()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_sprintf()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Similar to sprintf() but limited
+in the formatting capability.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_sprintf(char
+*buffer, char *format,arg1, arg2, ...);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Provides the application with
+a small and simple sprintf() with limited formatting capability.&nbsp;
+Both cprintf() and printf() call this function with a buffer of 128 bytes,
+so make sure you don't build a string that will exceed that.</font>
+<br><font face="Arial,Helvetica">A maximum of 12 args can be passed into
+mon_sprintf (arg1 thru arg12).&nbsp; The %s, %x, %c, and %d formats are
+supported to some degree.</font>
+<br><font face="Arial,Helvetica">Also, non-standard&nbsp; format conversions
+for MAC and IP address formats are supported...&nbsp;&nbsp; %I assumes
+the argument is a long and it is converted to a string in IP format (1.2.3.4);
+%M assumes the argument is a pointer to an array of 6 bytes and it is converted
+to a string in the MAC address format (xx:xx:xx:xx:xx:xx).</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *buffer</font></li>
+
+<br><font face="Arial,Helvetica">buffer into which the format conversion
+is to be placed</font>
+<li>
+<font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *format</font></li>
+
+<br><font face="Arial,Helvetica">pointer to a format buffer</font>
+<li>
+<font face="Arial,Helvetica">argN</font></li>
+
+<br><font face="Arial,Helvetica">arguments referred to (if any) by format
+buffer).</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The size of the final
+string printed out the console port.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/mprintf.c.html#sprintf">mprintf.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

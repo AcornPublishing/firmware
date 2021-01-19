@@ -1,0 +1,112 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: CALL</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>CALL</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">call</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Execute an embedded function somewhere
+in the memory image.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">call -[aqv:] {address} [arg1]
+... [argN]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the monitor
+to call a function at a raw memory address.&nbsp; A maximum of 7 arguments
+can be specified.&nbsp; By default the function is called with the arguments
+converted to hex.&nbsp; For example call 0x12345 45 99 would be used to
+interface to a function whose prototype is func(int val1, int val2).&nbsp;
+The -a option allows call to work with functions whose prototype is (int
+argc,char **argv).&nbsp; Refer to <a href="../appnotes/debugging.html">symbolic
+debugging</a> for information on how to pass the function name as an argument
+to call instead of the hex address.</font>
+<br><font face="Arial,Helvetica">If the -a option is not specified, and
+if any argument is preceded by an ampersand, then the function will be
+passed a pointer to the string immediately following the ampersand.&nbsp;
+This makes it convenient to pass a character string to a function.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a</font></li>
+
+<br><font face="Arial,Helvetica">Pass parameters to embedded function as
+(int argc,char **argv)</font>
+<li>
+<font face="Arial,Helvetica">-q</font></li>
+
+<br><font face="Arial,Helvetica">Do not print the "Returned XX" string
+at the end of the command.</font>
+<li>
+<font face="Arial,Helvetica">-v {varname}</font></li>
+
+<br><font face="Arial,Helvetica">Place the hex return value of the function
+call into the shell variable "varname".</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">call 0xa0041000 0x100 45 0x999</font></li>
+
+<br><font face="Arial,Helvetica">Pass control to a function located in
+memory at address 0xa0041000 and it will receive (0x100,45,0x999) as its
+parameter list.</font>
+<li>
+<font face="Arial,Helvetica">call 0x94001040 "&amp;hi mom!"</font></li>
+
+<br><font face="Arial,Helvetica">Pass control to a function located in
+memory at address 0x94001040 and feed it a pointer to the string "hi mom!".</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">There is no attempt to verify that the address
+specified has valid code.&nbsp; It is up to the user to make sure the address
+is correct and the function resides there.</font></li>
+</blockquote>
+
+</body>
+</html>

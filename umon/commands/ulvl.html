@@ -1,0 +1,107 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: ULVL</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ULVL</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">ulvl</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">User level.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">ulvl -[phc:] [usrlvl | min | max]
+[password]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command is used to set or
+configure the monitor's user level.&nbsp; The user level of the monitor
+determines what commands it can execute and what files are accessible.&nbsp;
+This command is hard coded to require only user-level 0 to execute.&nbsp;
+All other commands are configurable through the config.h file.&nbsp; For
+a thorough description of the user level functionality in the monitor refer
+to the <a href="../userlevels.html">user-level description</a>.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-c {cmd,lvl}</font></li>
+
+<br><font face="Arial,Helvetica">modify the user level of command "cmd"
+to level "lvl".&nbsp; The value of lvl must be between 0 and 3 and if the
+level is being lowered, then the current user level that the monitor is
+running at must be at least as high as the command that is being adjusted.</font>
+<li>
+<font face="Arial,Helvetica">-p</font></li>
+
+<br><font face="Arial,Helvetica">go into an interactive mode to build the
+password storage file.&nbsp; This file will contain 3 lines, each of which
+will be the password for levels 1 through 3.&nbsp; This file is stored
+with flags "u3" for highest security.</font>
+<li>
+<font face="Arial,Helvetica">-h</font></li>
+
+<br><font face="Arial,Helvetica">since the backdoor entry into the monitor
+requires that the user know the MAC address of the system, this option
+simply dumps the header that contains that information.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">ulvl -c version,2</font></li>
+
+<br><font face="Arial,Helvetica">change the user level of the "version"
+command to 2.</font>
+<li>
+<font face="Arial,Helvetica">ulvl -c version,2 -c help,1 -c dm,4</font></li>
+
+<br><font face="Arial,Helvetica">change user level of version to 2, help
+to 1, and dm to 4.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">The user level of the "ulvl" command cannot
+be adjusted.&nbsp; It must be able to run at user level zero.</font></li>
+</ul>
+
+</body>
+</html>

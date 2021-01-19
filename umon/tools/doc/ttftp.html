@@ -1,0 +1,166 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: ttftp</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>TTFTP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">ttftp</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Run a tftp client or server.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">ttftp [-ad:qr:t:T:vV] {target
+ip_address} {get | put | srvr} [source] [destination]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool is similar to many other
+tftp clients.&nbsp; It runs standard TFTP, but with a few added features
+that make it more useful.&nbsp; For example, the status of the download
+is available so that the user can determine if it is in progress, or hung.&nbsp;
+Also, a single-user server is built into the same executable.</font>
+<br><font face="Arial,Helvetica">Note that the Sun-Solaris version of this
+does not currently support the 'srvr' capability.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a</font></li>
+
+<br><font face="Arial,Helvetica">use netascii mode for 'put'; default is
+octet (binary);</font>
+<li>
+<font face="Arial,Helvetica">-d {per-packet-delay}</font></li>
+
+<br><font face="Arial,Helvetica">per-packet-delay (milliseconds) inserted
+between each client-based outgoing packet .</font>
+<li>
+<font face="Arial,Helvetica">-q</font></li>
+
+<br><font face="Arial,Helvetica">quiet mode (without this, ttftp will print
+one dot per block transferred);</font>
+<li>
+<font face="Arial,Helvetica">-r {rfc2349_tsize_off} use this to disable
+the client's use of the TSIZE extension as is specified in RFC 2349.&nbsp;
+This is applicable to "put" only.</font></li>
+
+<li>
+<font face="Arial,Helvetica">-t {timeout}</font></li>
+
+<br><font face="Arial,Helvetica">inactivity timeout used by server; default
+is 60 seconds after which any transaction in progress is aborted.</font>
+<li>
+<font face="Arial,Helvetica">-T {test_setup_string} Used for debugging
+tftp clients/servers.</font></li>
+
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode (display details of each
+TFTP packet)</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">display the version (build date) of the
+tool</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">ttftp srvr</font></li>
+
+<br><font face="Arial,Helvetica">Run as a single-user server with the current
+working directory being relative to the directory in which the server was
+started.&nbsp; Note that this server will definitely get confused if mutliple
+clients are thrown at it.&nbsp; Its purpose is of single-system lab testing
+only.&nbsp; Also note that this server option is not available on the SUN
+version of ttftp.</font>
+<li>
+<font face="Arial,Helvetica">ttftp -t 120 srvr</font></li>
+
+<br><font face="Arial,Helvetica">Run as a single-user server with the current
+working directory being relative to the directory in which the server was
+started.&nbsp; Allow for up to 120 seconds of inactivity before timing
+out.&nbsp; Inactivity refers to an active transaction (WRQ or RRQ) but
+no data transfer.</font>
+<li>
+<font face="Arial,Helvetica">ttftp -a 135.3.94.136 put monrc monrc,e</font></li>
+
+<br><font face="Arial,Helvetica">Copy the file named monrc (currently on
+the host) to TFS on the target at IP address 135.3.94.136.&nbsp; The file
+flags on the destination will be 'e' (executable), meaning that it is an
+executable script.</font>
+<li>
+<font face="Arial,Helvetica">ttftp -r rfc2349_tsize_off -a 135.3.94.136
+put monrc monrc,e</font></li>
+
+<br><font face="Arial,Helvetica">Same as above, but without the "tsize"
+extension.</font>
+<li>
+<font face="Arial,Helvetica">ttftp 135.3.94.136 get afile</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve the file 'afile' from the target
+and place it on the host with the same name.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<li>
+<font face="Arial,Helvetica">1 if error</font></li>
+</ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/ttftp">SUN Solaris</a>&nbsp;&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../win95/ttftp.exe">PC Win95</a></font></li>
+</ul>
+
+</body>
+</html>

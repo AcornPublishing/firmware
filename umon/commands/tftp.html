@@ -1,0 +1,320 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: TFTP</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>TFTP</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">tftp</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Trivial File Transfer Protocol
+client/server.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">tftp -[aF;f:i:vV] {on|off|IP}
+{get fname [addr] }</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>TFTP CLIENT DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">The tftp command is primarily
+for use by the client side of the TFTP implementation of MicroMonitor.&nbsp;
+One exception to this is that the arguments <i>on</i> and <i>off</i> are
+used to enable and disable (or shutdown) the tftp server (refer to the
+<a href="#tftp_server">server</a>
+discussion below for more details).&nbsp; This client allows the user to
+transfer a file from some remote TFTP server into either RAM/DRAM space
+or into a file in TFS.&nbsp; Specification of the -F option is what tells
+the client that the file (after being transferred to RAM) is to be transferred
+into TFS.&nbsp; By default, the file is transferred to the address specified
+by the <a href="../shellvars.html#APPRAMBASE">$APPRAMBASE</a> shell variable,
+but addition of the addr field overrides that default.&nbsp; Upon successful
+completion of the tftp get command, the shell variable <a href="../shellvars.html#TFTPGET">$TFTPGET</a>
+will be loaded with the amount of data transferred.</font>
+<p><b><font face="Arial,Helvetica">Packet Retransmission and Timeout Process...</font></b>
+<br><font face="Arial,Helvetica">Both the client and server will, under
+certain circumstances, have to re-transmit a packet that may have been
+lost.&nbsp; The retry mechanism is based on <a href="rfcs/rfc2131.txt">RFC2131</a>
+(DHCP, section 4.1).&nbsp; The initial retry value (retransmit_delay) is
+doubled until some maximum value (retransmit_delay_max) is reached.&nbsp;
+At that point the delay is no longer doubled, but some final number of
+retries (giveup_count) are perfomed at the rate of that last delay.&nbsp;
+These three values (retransmit_delay, retransmit_delay_max and giveup_count)
+have defaults but can be tuned if the shell variable <a href="../shellvars.html#TFTPRETRYTUNE">$TFTPRETRYTUNE</a>
+is set.&nbsp; Note that this timeout/retry mechanism is used by DHCP, TFTP
+and ARP.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-a</font></li>
+
+<br><font face="Arial,Helvetica">transfer from host in netascii mode (default
+is "octet");</font>
+<li>
+<font face="Arial,Helvetica">-F {file}</font></li>
+
+<br><font face="Arial,Helvetica">name of TFS file to copy to</font>
+<li>
+<font face="Arial,Helvetica">-f&nbsp; {flags}</font></li>
+
+<br><font face="Arial,Helvetica">flags assigned to TFS file after copy;</font>
+<li>
+<font face="Arial,Helvetica">-i&nbsp; {info}</font></li>
+
+<br><font face="Arial,Helvetica">file info assigned to TFS file after copy</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">low verbosity, show TFTP opcodes</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">high verbosity, show TFTP opcodes, plus
+complete IP/UDP packet header</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLE:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">tftp -F appfile -f eC -i 11/18/1999 135.3.130.1
+get dir1/hostfile</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve a file from a TFTP server running
+on a system whose IP address is <i>135.3.130.1</i>.&nbsp; The file on the
+host (relative to the top-level directory of the TFTP server) is called
+<i>dir1/hostfile</i>
+and it is transferred to the file <i>appfile</i> on the target with flags
+<i>eC</i>
+(executable COFF)&nbsp; and an info field of <i>11/18/1999</i>.</font>
+<li>
+<font face="Arial,Helvetica">tftp 135.3.130.1 get dir2/another_file</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve the file dir2/another_file from
+a host TFTP server at 135.3.130.1 and place it in the location stored in
+the shell variable <a href="../shellvars.html#APPRAMBASE">$APPRAMBASE</a>.</font>
+<li>
+<font face="Arial,Helvetica">tftp 135.3.130.1 get dir3/yanotherfile 0x10000000</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve the file dir3/yanotherfile from
+a host TFTP server at 135.3.130.1 and store it at location 0x10000000.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">As a client, tftp <i>put</i> is not supported
+(use the server, and a host based client).</font></li>
+</ul>
+
+<h1>
+<a NAME="tftp_server"></a><font face="Arial,Helvetica"><font size=+1>TFTP
+SERVER DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">First of all...</font>
+<br><font face="Arial,Helvetica">For the sake of this discussion, realize
+that we are referring to a situation where the server is the MicroMonitor-based
+target and the client is some PC or workstation; hence, all of the "tftp"
+commands mentioned in this section are done on a remote PC or workstation.&nbsp;
+For transfers from target to host (<i>tftp get</i>), the source file is
+on the target and the destination file is on the host; likewise, for transfers
+from host to target (<i>tftp put</i>), the source file is on the host and
+the destination file is on the target.</font>
+<br><font face="Arial,Helvetica">Also...</font>
+<br><font face="Arial,Helvetica">When the monitor first starts up, if the
+ethernet interface is active, it automatically starts up a TFTP server
+and the monitor will respond to incoming TFTP requests by default.&nbsp;
+The TFTP server in the monitor looks much like any other TFTP server.&nbsp;
+Differences are due to the fact that the server allows the client to transfer
+files several different ways.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">From host file to target file:</font></b></li>
+
+<br><font face="Arial,Helvetica">The client specifies a destination that
+consists of the destination file name, the flags that are to be associated
+with the file and the information field that is part of the TFS header
+for keeping a description of the file.&nbsp; The syntax of this destination
+is comma delimited:</font>
+<ul>
+<ol>
+<ol>
+<ol>
+<ol><font face="Arial,Helvetica">filename,flags,information_field</font></ol>
+</ol>
+</ol>
+</ol>
+</ul>
+<font face="Arial,Helvetica">All text up to the first comma is considered
+the filename; text between the first comma and second comma is used as
+the file flags or <a href="../tfs.html#attributes">attributes</a>, and
+all text after the second comma is taken as the information field for the
+TFS file.</font>
+<br><font face="Arial,Helvetica">Notes:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">the flags field can be empty (2 commas back-to-back)
+and the information_field need not be specified; or both the flags and
+information_field can be omitted.&nbsp; Here are a few variations of the
+above syntax:</font></li>
+
+<li>
+<font face="Arial,Helvetica"></font></li>
+
+<ul>
+<ul>
+<ul>
+<ul><font face="Arial,Helvetica">filename,,information_field</font>
+<br><font face="Arial,Helvetica">filename,flags</font>
+<br><font face="Arial,Helvetica">filename</font>
+<br><font face="Arial,Helvetica"></font>&nbsp;</ul>
+</ul>
+</ul>
+</ul>
+
+<li>
+<font face="Arial,Helvetica">when this transfer is actually in progress,
+the file is first transferred to the location stored in the
+<a href="../shellvars.html#APPRAMBASE">$APPRAMBASE</a>
+shell variable; after data transfer completes, it is then copied to TFS
+flash space.</font></li>
+
+<li>
+<font face="Arial,Helvetica">if the file already exists in TFS, then it
+will be deleted and if necessary, a defragmentation will be done.</font></li>
+
+<li>
+<font face="Arial,Helvetica">if the file is ascii, then the TFTP server
+will properly handle "netascii" mode for transferring to the target; the
+default mode is "octet"</font></li>
+</ul>
+<font face="Arial,Helvetica">.</font>
+<li>
+<b><font face="Arial,Helvetica">From host file to target RAM:</font></b></li>
+
+<br><font face="Arial,Helvetica">If the destination file name starts with
+"0x", then a file on the host can be transferred to the hex address that
+follows.&nbsp; This memory space is assumed to be standard writeable RAM
+or DRAM.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">From host file to destination assumed to
+be in a shell variable:</font></b></li>
+
+<br><font face="Arial,Helvetica">If the destination file name starts with
+a dollar sign '$' and the string following the '$' is a valid shell variable
+in the monitor context, then the destination will be taken as whatever
+is the content of the shell variable.&nbsp; If the shell variable does
+not exist, then the destination will be that string (a filename that starts
+with a '$').</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">From target file to host file:</font></b></li>
+
+<br><font face="Arial,Helvetica">This is a standard transfer.&nbsp; The
+file must exist in TFS, and it will be transferred to the host; otherwise,
+a TFTP error message is sent to the client.</font>
+<br>&nbsp;
+<li>
+<b><font face="Arial,Helvetica">From target memory to host file:</font></b></li>
+
+<br><font face="Arial,Helvetica">This satisfies the case where a block
+of memory not necessarily part of TFS needs to transferred up to a host.&nbsp;
+The source file specification is of the following syntax:</font>
+<ul>
+<ul>
+<ul>
+<ul>
+<ul><font face="Arial,Helvetica">hex_address,length</font></ul>
+</ul>
+</ul>
+</ul>
+</ul>
+<font face="Arial,Helvetica">This will cause the server to transfer 'length'
+bytes of data starting at 'hex_address' to the host.&nbsp; The server detects
+this by seeing "0x" as the first two characters in the source filename,
+and a comma somewhere later in the string.</font>
+<br><font face="Arial,Helvetica"></font>&nbsp;<font face="Arial,Helvetica"></font>
+<p><b><font face="Arial,Helvetica">Command line examples when using a host-based
+client to talk to the MicroMonitor TFTP server:</font></b>
+<br><b><font face="Arial,Helvetica"></font></b>&nbsp;
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 put srcfile tfsfile,eC,Mar_30,1999@11:18</font></li>
+
+<br><font face="Arial,Helvetica">Send the file "srcfile" to a target at
+IP address 135.3.94.136.&nbsp; The destination filename on TFS will be
+"tfsfile" with the flags eC indicating executable COFF, and the information
+field will contain the string Mar_30,1999@11:18.</font>
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 put srcfile 0x10400000</font></li>
+
+<br><font face="Arial,Helvetica">Send the file "srcfile" to the target
+at IP address 135.3.94.135.&nbsp; The destination is an address that must
+be in RAM space of the target.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 put srcfile \$APPRAMBASE</font></li>
+
+<br><font face="Arial,Helvetica">Send the file "srcfile" to the target
+at IP address 135.3.94.135.&nbsp; The destination is the content of the
+shell variable $APPRAMBASE.&nbsp; Note that the '$' is preceded by a backslash.&nbsp;
+This is because we want the host shell to ignore the '$' and pass it to
+the target as is.&nbsp; Obviously this, then, depends on the shell running
+on the host at the time.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 put srcfile</font></li>
+
+<br><font face="Arial,Helvetica">Send the file "srcfile" to the target
+at IP address 135.3.94.135.&nbsp; The destination is the same filename
+in TFS flash space.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 get srcfile</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve the file "srcfile" from the target
+at IP address 135.3.94.135.&nbsp; Once on the host it will have the same
+name.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">tftp 135.3.94.136 get 0x10800400,900 bdata</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve 900 bytes starting at location
+0x10800400 and place them in the file bdata.</font></blockquote>
+
+</body>
+</html>

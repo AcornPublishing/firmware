@@ -1,0 +1,1330 @@
+<HTML>
+<HEADER>
+<TITLE>common/cpu/dis_ppc.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* Power PC (403-GA) disassembler.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ */
+#include "config.h"
+#include "genlib.h"
+#include "stddefs.h"
+
+#if INCLUDE_DISASSEMBLER
+
+#ifndef USE_SPRDCR_NAMES
+#define USE_SPRDCR_NAMES 0
+#endif
+
+void prdata();
+
+/* Instruction fields taken from  chapter 10: */
+#define AA              0x00000002
+#define BA              0x001F0000
+#define BB              0x0000F800
+#define BD              0x0000FFFC
+#define BD_NEGATIVE     0x00008000
+#define BF              0x03800000
+#define BFA             0x001C0000
+#define BI              0x001F0000
+#define BO              0x03E00000
+#define BO_0            0x02000000
+#define BO_1            0x01000000
+#define BO_2            0x00800000
+#define BO_3            0x00400000
+#define BO_4            0x00200000
+#define BT              0x03E00000
+#define D               0x0000FFFF
+#define DCRN            0x001FF800
+#define FXM             0x000FF000
+#define IM              0x0000FFFF
+#define LI              0x03FFFFFC
+#define LI_NEGATIVE     0x02000000
+#define LK              0x00000001
+#define MB              0x000007C0
+#define ME              0x0000003E
+#define NB              0x0000F800
+#define OPCD            0xFC000000
+#define OE              0x00000400
+#define RA              0x001F0000
+#define RB              0x0000F800
+#define RC              0x00000001
+#define RSRT            0x03E00000
+#define SH              0x0000F800
+#define SPRF            0x001FF800
+#define TO              0x03E00000
+#define XO_OE           0x000007FE
+#define XO_NOOE         0x000003FE
+#define XO_SC           0x00000002
+#define XO_STWCX        0x00000001
+
+#define SYNC            0x7c0004ac
+#define ISYNC           0x4c00012c
+
+#define rs  rsrt
+#define rt  rsrt
+
+int opcodeXX(), opcode03(), opcode07();
+int opcode08(), opcode10(), opcode11();
+int opcode12(), opcode13(), opcode14(), opcode15();
+int opcode16(), opcode17(), opcode18(), opcode19();
+int opcode20(), opcode21(), opcode23();
+int opcode24(), opcode25(), opcode26(), opcode27();
+int opcode28(), opcode29(), opcode31();
+int opcode32(), opcode33(), opcode34(), opcode35();
+int opcode36(), opcode37(), opcode38(), opcode39();
+int opcode40(), opcode41(), opcode42(), opcode43();
+int opcode44(), opcode45(), opcode46(), opcode47();
+
+int (*opfuncs[])() = {
+    opcodeXX, opcodeXX, opcodeXX, opcode03,
+    opcodeXX, opcodeXX, opcodeXX, opcode07,
+    opcode08, opcodeXX, opcode10, opcode11,
+    opcode12, opcode13, opcode14, opcode15,
+    opcode16, opcode17, opcode18, opcode19,
+    opcode20, opcode21, opcodeXX, opcode23,
+    opcode24, opcode25, opcode26, opcode27,
+    opcode28, opcode29, opcodeXX, opcode31,
+    opcode32, opcode33, opcode34, opcode35,
+    opcode36, opcode37, opcode38, opcode39,
+    opcode40, opcode41, opcode42, opcode43,
+    opcode44, opcode45, opcode46, opcode47,
+    opcodeXX, opcodeXX, opcodeXX, opcodeXX,
+    opcodeXX, opcodeXX, opcodeXX, opcodeXX,
+    opcodeXX, opcodeXX, opcodeXX, opcodeXX,
+    opcodeXX, opcodeXX, opcodeXX, opcodeXX,
+};
+
+#if USE_SPRDCR_NAMES
+struct sprdat {
+    ushort  val;
+    char    *name;
+} sprtbl[] = {
+    { 0x03d7,       "cdbcr" },
+    { 0x0009,       "ctr" },
+    { 0x03f6,       "dac1" },
+    { 0x03f7,       "dac2" },
+    { 0x03f2,       "dbcr" },
+    { 0x03f0,       "dbsr" },
+    { 0x03fa,       "dccr" },
+    { 0x03d5,       "dear" },
+    { 0x03d4,       "esr" },
+    { 0x03d6,       "evpr" },
+    { 0x03f4,       "iac1" },
+    { 0x03f5,       "iac2" },
+    { 0x03fb,       "iccr" },
+    { 0x03d3,       "icdbdr" },
+    { 0x0008,       "lr" },
+    { 0x03fc,       "pbl1" },
+    { 0x03fe,       "pbl2" },
+    { 0x03fd,       "pbu1" },
+    { 0x03ff,       "pbu2" },
+    { 0x03db,       "pit" },
+    { 0x011f,       "pvr" },
+    { 0x0110,       "sprg0" },
+    { 0x0111,       "sprg1" },
+    { 0x0112,       "sprg2" },
+    { 0x0113,       "sprg3" },
+    { 0x001a,       "srr0" },
+    { 0x001b,       "srr1" },
+    { 0x03de,       "srr2" },
+    { 0x03df,       "srr3" },
+    { 0x03dc,       "tbhi" },
+    { 0x03dd,       "tblo" },
+    { 0x03da,       "tcr" },
+    { 0x03d8,       "tsr" },
+    { 0x0001,       "xer" },
+    { 0x03b9,       "sgr" },        /* 403-GC only */
+    { 0x03ba,       "dcwr" },       /* 403-GC only */
+    { 0x0000,       "rsvd0" },
+    { 0x0010,       "rsvd1" },
+    { 0x03d0,       "rsvd2" },
+    { 0x03d1,       "rsvd3" },
+    { 0x03d2,       "rsvd4" },
+    { 0x03d9,       "rsvd5" },
+    { 0x03f1,       "rsvd6" },
+    { 0x03f3,       "rsvd7" },
+    { 0x03f8,       "rsvd8" },
+    { 0x03f9,       "rsvd9" },
+};
+
+struct dcrdat {
+    ushort  val;
+    char    *name;
+} dcrtbl[] = {
+    { 0x0090,       "bear" },
+    { 0x0091,       "besr" },
+    { 0x0080,       "br0" },
+    { 0x0081,       "br1" },
+    { 0x0082,       "br2" },
+    { 0x0083,       "br3" },
+    { 0x0084,       "br4" },
+    { 0x0085,       "br5" },
+    { 0x0086,       "br6" },
+    { 0x0087,       "br7" },
+    { 0x00c4,       "dmacc0" },
+    { 0x00cc,       "dmacc1" },
+    { 0x00d4,       "dmacc2" },
+    { 0x00dc,       "dmacc3" },
+    { 0x00c0,       "dmacr0" },
+    { 0x00c8,       "dmacr1" },
+    { 0x00d0,       "dmacr2" },
+    { 0x00d8,       "dmacr3" },
+    { 0x00c1,       "dmact0" },
+    { 0x00c9,       "dmact1" },
+    { 0x00d1,       "dmact2" },
+    { 0x00d9,       "dmact3" },
+    { 0x00c2,       "dmada0" },
+    { 0x00ca,       "dmada1" },
+    { 0x00d2,       "dmada2" },
+    { 0x00da,       "dmada3" },
+    { 0x00c3,       "dmasa0" },
+    { 0x00cb,       "dmasa1" },
+    { 0x00d3,       "dmasa2" },
+    { 0x00db,       "dmasa3" },
+    { 0x00e0,       "dmasr" },
+    { 0x0042,       "exier" },
+    { 0x0040,       "exisr" },
+    { 0x00a0,       "iocr" },
+    { 0x0041,       "rsvd" },
+    { 0x00e1,       "rsvd" },
+};
+#endif
+
+char *crfld[] = {
+    "CRf00", "CRf01", "CRf02", "CRf03",
+    "CRf04", "CRf05", "CRf06", "CRf07",
+};
+
+char *crbit[] = {
+    "CRb00", "CRb01", "CRb02", "CRb03",
+    "CRb04", "CRb05", "CRb06", "CRb07",
+    "CRb08", "CRb09", "CRb10", "CRb11",
+    "CRb12", "CRb13", "CRb14", "CRb15",
+    "CRb16", "CRb17", "CRb18", "CRb19",
+    "CRb20", "CRb21", "CRb22", "CRb23",
+    "CRb24", "CRb25", "CRb26", "CRb27",
+    "CRb28", "CRb29", "CRb30", "CRb31",
+};
+
+char *Regs[] = {
+    "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7",
+    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
+    "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23",
+    "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31",
+};
+
+char    *tbl1[] = { "add", "add.", "addo", "addo." };
+char    *tbl2[] = { "addc", "addc.", "addco", "addco." };
+char    *tbl3[] = { "adde", "adde.", "addeo", "addeo." };
+char    *tbl4[] = { "addme", "addme.", "addmeo", "addmeo." };
+char    *tbl5[] = { "addze", "addze.", "addzeo", "addzeo." };
+char    *tbl6[] = { "b", "bl", "ba", "bla" };
+char    *tbl7[] = { "bc", "bca", "bcl", "bcla" };
+char    *tbl8[] = { "divw", "divw.", "divwo", "divwo." };
+char    *tbl9[] = { "divwu", "divwu.", "divwuo", "divwuo." };
+char    *tbl10[] = { "mullw", "mullw.", "mullwo", "mullwo." };
+char    *tbl11[] = { "neg", "neg.", "nego", "nego." };
+char    *tbl12[] = { "subf", "subf.", "subfo", "subfo." };
+char    *tbl13[] = { "subfc", "subfc.", "subfco", "subfco." };
+char    *tbl14[] = { "subfe", "subfe.", "subfeo", "subfeo." };
+char    *tbl15[] = { "subfme", "subfme.", "subfmeo", "subfmeo." };
+char    *tbl16[] = { "subfze", "subfze.", "subfzeo", "subfzeo." };
+char    *tbl17[] = { "bdnz", "bdnza", "bdnzl", "bdnzla" };
+char    *tbl18[] = { "bdnzf", "bdnzfa", "bdnzfl", "bdnzfla" };
+char    *tbl19[] = { "bdnzt", "bdnzta", "bdnztl", "bdnztla" };
+char    *tbl20[] = { "bdz", "bdza", "bdzl", "bdzla" };
+char    *tbl21[] = { "bdzf", "bdzfa", "bdzfl", "bdzfla" };
+char    *tbl22[] = { "bdzt", "bdzta", "bdztl", "bdztla" };
+
+char *DisHelp[] = {
+    "Disassemble memory",
+    "-[m] {address} [linecount]",
+    0,
+};
+
+/* DisAddr:
+ * This variable can be used by the opcodeXX() functions if there is
+ * good reason to know the address of the disassembly.
+ */
+static ulong    *DisAddr;
+
+/* disppc.c:
+ * Disassembler for POWER-PC
+ *
+ * Dis():
+ * Use the upper 6 bits of the opcode as an offset into a table of 
+ * function pointers.  Opon entry into the function, break down the
+ * remaining fields and print the mnemonic.  Note that the program is
+ * intentionally left un-optimized.  There's absolutely nothing tricky
+ * about it so it should be trivial to add other POWER-PC instructions
+ * to this disassembler.  
+ * NOTE: The branch instructions need work.
+ */
+int
+<A NAME="Dis">Dis</A>(argc,argv)
+int argc;
+char    *argv[];
+{
+    extern  int optind;
+    int     opt, i, count, more;
+    uchar   *cp;
+
+    more = 0;
+    while ((opt = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"m")) != -1) {
+        switch(opt) {
+        case 'm':
+            more = 1;
+            break;
+        default:
+            return(0);
+        }
+    }
+
+    if (argc == optind+1)
+        count = 1;
+    else if (argc == optind+2)
+        count = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind+1],0,0);
+    else
+        return(-1);
+
+    DisAddr = (ulong *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(argv[optind],0,0);
+
+again:
+    for(i=0;i&lt;count;i++) {
+        cp = (uchar *)DisAddr;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%08lx: %02x%02x%02x%02x ",
+            (ulong)DisAddr,cp[0],cp[1],cp[2],cp[3]);
+        opfuncs[((cp[0] & 0xfc) &gt;&gt; 2)](*DisAddr);
+        DisAddr++;
+    }
+    if (more) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#More>More</A>())
+            goto again;
+    }
+    
+    return(0);
+}
+
+int
+<A NAME="aalk">aalk</A>(ulong instr)
+{
+    switch (instr & (AA | LK)) {
+    case (AA | LK):
+        return(3);
+    case (AA):
+        return(2);
+    case (LK):
+        return(1);
+    default:
+        return(0);
+    }
+}
+
+short
+<A NAME="d">d</A>(ulong instr)  /* 16 bit 2's compliment */
+{
+    return(instr & D);
+}
+
+/* sprf():
+ * This function attempts to replace the SPR number with some
+ * name.  Since this is somewhat CPU dependent, I have turned
+ * this off for now..
+ */
+char *
+<A NAME="sprf">sprf</A>(ulong instr)
+{
+    static uchar    buf[16];
+    ushort  hi, lo, sprval;
+
+    hi = lo = (ushort)((instr & DCRN) &gt;&gt; 11);
+    hi &= 0x03e0;
+    lo &= 0x001f;
+    hi &gt;&gt;= 5;
+    lo &lt;&lt;= 5;
+    sprval = hi | lo;
+#if USE_SPRDCR_NAMES    /* see above note */
+    for(int i=0;i&lt;sizeof sprtbl/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct sprdat);i++) {
+        if (sprval == sprtbl[i].val) 
+            return(sprtbl[i].name);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"spr    %d",sprval);
+#else
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%d",sprval);
+#endif
+    return(buf);
+}
+
+char *
+<A NAME="dcrn">dcrn</A>(ulong instr)
+{
+    static uchar    buf[16];
+    ushort  hi, lo, dcrnval;
+
+    hi = lo = (ushort)((instr & DCRN) &gt;&gt; 11);
+    hi &= 0x03e0;
+    lo &= 0x001f;
+    hi &gt;&gt;= 5;
+    lo &lt;&lt;= 5;
+    dcrnval = hi | lo;
+#if USE_SPRDCR_NAMES
+    for(int i=0;i&lt;sizeof dcrtbl/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct dcrdat);i++) {
+        if (dcrnval == dcrtbl[i].val) 
+            return(dcrtbl[i].name);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"dcrn=0x%x",dcrnval);
+#else
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%d",dcrnval);
+#endif
+    return(buf);
+}
+
+ushort
+<A NAME="nb">nb</A>(ulong instr)
+{
+    return((instr & NB) &gt;&gt; 11);
+}
+
+int
+<A NAME="oerc">oerc</A>(ulong instr)
+{
+    switch (instr & (OE | RC)) {
+    case (OE | RC):
+        return(3);
+    case (OE):
+        return(2);
+    case (RC):
+        return(1);
+    default:
+        return(0);
+    }
+}
+
+ushort
+<A NAME="xo_nooe">xo_nooe</A>(ulong instr)
+{
+    return((ushort)((instr & XO_NOOE) &gt;&gt; 1));
+}
+
+ushort
+<A NAME="xo_oe">xo_oe</A>(ulong instr)
+{
+    return((ushort)((instr & XO_OE) &gt;&gt; 1));
+}
+
+short
+<A NAME="mb">mb</A>(ulong instr)
+{
+    return((instr & MB) &gt;&gt; 6);
+}
+
+short
+<A NAME="me">me</A>(ulong instr)
+{
+    return((instr & ME) &gt;&gt; 1);
+}
+
+short
+<A NAME="to">to</A>(ulong instr)
+{
+    return((instr & TO) &gt;&gt; 21);
+}
+
+short
+<A NAME="sh">sh</A>(ulong instr)
+{
+    return((instr & SH) &gt;&gt; 11);
+}
+
+ushort
+<A NAME="fxm">fxm</A>(ulong instr)
+{
+    return((instr & FXM) &gt;&gt; 12);
+}
+
+char *
+<A NAME="ra">ra</A>(ulong instr)     /* GPR used as source or target */
+{
+    return(Regs[(uchar)((instr & RA) &gt;&gt; 16)]);
+}
+
+char *
+<A NAME="rb">rb</A>(ulong instr)     /* GPR used as source */
+{
+    return(Regs[(uchar)((instr & RB) &gt;&gt; 11)]);
+}
+
+char *
+<A NAME="ba">ba</A>(ulong instr)
+{
+    return(crbit[(uchar)(((instr & BA) &gt;&gt; 16) & 0x1f)]);
+}
+
+char *
+<A NAME="bb">bb</A>(ulong instr)
+{
+    return(crbit[(uchar)(((instr & BB) &gt;&gt; 11) & 0x1f)]);
+}
+
+char *
+<A NAME="bt">bt</A>(ulong instr)
+{
+    return(crbit[(uchar)(((instr & BT) &gt;&gt; 21) & 0x1f)]);
+}
+
+char *
+<A NAME="bo">bo</A>(ulong instr)
+{
+    static char bostr[32];
+
+    bostr[0] = 0;
+    if ((instr & BO_0) == 0) {
+        if (instr & BO_1)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcat>strcat</A>(bostr,"if crbit=1 ");
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcat>strcat</A>(bostr,"if crbit!=1 ");
+    }
+    if ((instr & BO_2) == 0) {
+        if (instr & BO_3)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcat>strcat</A>(bostr,"if --ctr=0 ");
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcat>strcat</A>(bostr,"if --ctr!=0 ");
+    }
+    if (instr & BO_4)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcat>strcat</A>(bostr,"bpr");
+
+    return(bostr);
+}
+
+char *
+<A NAME="bfa">bfa</A>(ulong instr)
+{
+    return(crfld[(uchar)(((instr & BFA) &gt;&gt; 18) & 0x3)]);
+}
+
+char *
+<A NAME="bf">bf</A>(ulong instr)
+{
+    return(crfld[(uchar)(((instr & BF) &gt;&gt; 23) & 0x3)]);
+}
+
+char *
+<A NAME="bi">bi</A>(ulong instr)
+{
+    return(crbit[(uchar)(((instr & BI) &gt;&gt; 16) & 0x1f)]);
+}
+
+char *
+<A NAME="rsrt">rsrt</A>(ulong instr)   /* GPR used as source (rs) or destination (rt) */
+{
+    return(Regs[(uchar)(((instr & RSRT) &gt;&gt; 21) & 0x1f)]);
+}
+
+/* prnem():
+ * Print the mnemonic and append the number of spaces needed
+ * so that the total length is 8 characters.
+ */
+void
+<A NAME="prnem">prnem</A>(char *mnem)
+{
+    int spacecount;
+
+    spacecount = 8 - <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(mnem);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(mnem);
+    while(spacecount &gt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(' ');
+        spacecount--;
+    }
+}
+
+void
+<A NAME="prnemdot">prnemdot</A>(char *mnem, int dot)
+{
+    int spacecount;
+
+    spacecount = 8 - <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(mnem);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#puts>puts</A>(mnem);
+    if (dot) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('.');
+        spacecount--;
+    }
+    while(spacecount &gt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>(' ');
+        spacecount--;
+    }
+}
+
+int
+<A NAME="bf_ra">bf_ra</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0,%s,0x%04X\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf>bf</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),(ushort)(instr&IM));
+    return(0);
+}
+
+int
+<A NAME="rt_ra_x">rt_ra_x</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X\n",rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),(ushort)(instr&IM));
+    return(0);
+}
+
+int
+<A NAME="rt_d_ra">rt_d_ra</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%d(%s)\n",rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#d>d</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="rs_d_ra">rs_d_ra</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%d(%s)\n",rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#d>d</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="bt_ba_bb">bt_ba_bb</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt>bt</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ba>ba</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bb>bb</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="ra_rs_sh_mb_me">ra_rs_sh_mb_me</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>(mnemonic,instr & RC);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X,0x%04X,0x%04X\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sh>sh</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#mb>mb</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#me>me</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="ra_rs">ra_rs</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),(ushort)(instr&IM));
+    return(0);
+}
+
+int
+<A NAME="rt_ra_rb">rt_ra_rb</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="rs_ra_rb">rs_ra_rb</A>(char *mnemonic,ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n",rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="ra_rb">ra_rb</A>(char *mnemonic,ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="rt_ra">rt_ra</A>(char *mnemonic, ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(mnemonic);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n", rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="opcodeXX">opcodeXX</A>(ulong instr)
+{
+    uchar   *cp;
+
+    cp = (uchar *)&instr;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("data    %02x%02x%02x%02x\n",cp[0],cp[1],cp[2],cp[3]);
+    return(0);
+}
+
+int
+<A NAME="opcode03">opcode03</A>(ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("twi %x,%s,0x%04X\n",<A HREF=FILE:/TOP_DIRNAME/src/common/flash/flash_dirname/flashdev.h.html#to>to</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),(ushort)(instr&IM));
+    return(0);
+}
+
+int
+<A NAME="opcode07">opcode07</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("mulli",instr));
+}
+
+int
+<A NAME="opcode08">opcode08</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("subfic",instr));
+}
+
+int
+<A NAME="opcode10">opcode10</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf_ra>bf_ra</A>("cmpli",instr));
+}
+
+int
+<A NAME="opcode11">opcode11</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf_ra>bf_ra</A>("cmpi",instr));
+}
+
+
+int
+<A NAME="opcode12">opcode12</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("addic",instr));
+}
+
+int
+<A NAME="opcode13">opcode13</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("addic.",instr));
+}
+
+int
+<A NAME="opcode14">opcode14</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("addi",instr));
+}
+
+int
+<A NAME="opcode15">opcode15</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_x>rt_ra_x</A>("addis",instr));
+}
+
+int
+<A NAME="opcode16">opcode16</A>(ulong instr)
+{
+    ulong   mask;
+
+    if (instr & BD_NEGATIVE) 
+        mask = 0xffff0000;
+    else
+        mask = 0;
+
+    switch((instr & BO) &gt;&gt; 21) {
+    case 16:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl17[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%lx\n", (instr & BD) | mask);
+        return(0);
+    case 0:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl18[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0x%lx\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr), (instr & BD) | mask);
+        return(0);
+    case 8:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl19[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0x%lx\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr), (instr & BD) | mask);
+        return(0);
+    case 18:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl20[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%lx\n", (instr & BD) | mask);
+        return(0);
+    case 2:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl21[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0x%lx\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr), (instr & BD) | mask);
+        return(0);
+    case 10:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl22[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0x%lx\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr), (instr & BD) | mask);
+        return(0);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl7[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%ld,%ld,0x%lx\n", ((instr & BO) &gt;&gt; 21),((instr & BI) &gt;&gt; 16),
+        (instr & BD) | mask);
+    return(0);
+}
+
+int
+<A NAME="opcode17">opcode17</A>(ulong instr)
+{
+    if (instr & 0x2)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("sc\n");
+    else
+        return(-1);
+    return(0);
+}
+
+int
+<A NAME="opcode18">opcode18</A>(ulong instr)
+{
+    ulong   mask, delta, dest, offset;
+    char    func[32];
+
+    if (instr & LI_NEGATIVE) 
+        mask = 0xfe000000;
+    else
+        mask = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>(tbl6[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#aalk>aalk</A>(instr)]);
+    delta = (instr & LI) | mask;
+    dest = (ulong)DisAddr + delta;
+#if INCLUDE_TFSSYMTBL
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/symtbl.c.html#AddrToSym>AddrToSym</A>(-1,dest,func,&offset)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%lx (%s",delta,func);
+        if (offset) 
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(": 0x%lx",dest);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(")\n");
+    }
+    else
+#endif
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%lx (addr=0x%lx)\n",delta,dest);
+    return(0);
+}
+
+int
+<A NAME="opcode19">opcode19</A>(ulong instr)
+{
+    if (instr == ISYNC) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("isync\n");
+        return(0);
+    }
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#xo_oe>xo_oe</A>(instr)) {
+    case 0:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mcrf");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf>bf</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bfa>bfa</A>(instr));
+        break;
+    case 16:
+        if ((instr & (BO_0 | BO_2)) != (BO_0 | BO_2)) {
+            if (instr & LK)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("bclrl");
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("bclr");
+        }
+        else {
+            if (instr & LK)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("blrl");
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("blr");
+        }
+        if ((instr & (BO_0 | BO_2)) != (BO_0 | BO_2))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bo>bo</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr));
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+        return(0);
+    case 33:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crnor",instr));
+    case 50:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("rfi\n");
+        return(0);
+    case 51:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("rfci\n");
+        return(0);
+    case 129:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crandc",instr));
+    case 193:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crxor",instr));
+    case 225:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crnand",instr));
+    case 257:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crand",instr));
+    case 289:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("creqv",instr));
+    case 417:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("crorc",instr));
+    case 449:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bt_ba_bb>bt_ba_bb</A>("cror",instr));
+    case 528:
+        if ((instr & (BO_0 | BO_2)) != (BO_0 | BO_2))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("bcctr");
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("bctr");
+        if (instr & LK)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("l");
+        if ((instr & (BO_0 | BO_2)) != (BO_0 | BO_2))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bo>bo</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bi>bi</A>(instr));
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+        return(0);
+    }
+    return(-1);
+}
+
+int
+<A NAME="opcode20">opcode20</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs_sh_mb_me>ra_rs_sh_mb_me</A>("rlwimi",instr));
+}
+
+int
+<A NAME="opcode21">opcode21</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs_sh_mb_me>ra_rs_sh_mb_me</A>("rlwinm",instr));
+}
+
+int
+<A NAME="opcode23">opcode23</A>(ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("rlwnm",instr & RC);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s,0x%04X,0x%04X\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#mb>mb</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#me>me</A>(instr));
+    return(0);
+}
+
+int
+<A NAME="opcode24">opcode24</A>(ulong instr)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("ori");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X%s",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),(ushort)(instr&IM),
+        instr==0x60000000 ? " (nop)\n" : "\n");
+    return(0);
+}
+
+int
+<A NAME="opcode25">opcode25</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs>ra_rs</A>("oris",instr));
+}
+
+int
+<A NAME="opcode26">opcode26</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs>ra_rs</A>("xori",instr));
+}
+
+int
+<A NAME="opcode27">opcode27</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs>ra_rs</A>("xoris",instr));
+}
+
+int
+<A NAME="opcode28">opcode28</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs>ra_rs</A>("addi.",instr));
+}
+
+int
+<A NAME="opcode29">opcode29</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rs>ra_rs</A>("addis.",instr));
+}
+
+int
+<A NAME="opcode31">opcode31</A>(ulong instr)
+{
+    if (instr == SYNC) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("sync\n");
+        return(0);
+    }
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#xo_oe>xo_oe</A>(instr)) {
+    case 8:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl13[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 10:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl2[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 20:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lwarx",instr));
+    case 23:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lwzx",instr));
+    case 40:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl12[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 55:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lwzux",instr));
+    case 87:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lbzx",instr));
+    case 104:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra>rt_ra</A>(tbl11[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 119:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lbzux",instr));
+    case 136:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl14[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 138:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl3[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 151:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stwx",instr));
+    case 183:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stwux",instr));
+    case 200:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra>rt_ra</A>(tbl16[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 202:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra>rt_ra</A>(tbl5[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 215:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stbx",instr));
+    case 232:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra>rt_ra</A>(tbl15[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 234:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra>rt_ra</A>(tbl4[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 235:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl10[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 266:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl1[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 279:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lhzx",instr));
+    case 311:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lhzux",instr));
+    case 459:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl9[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 491:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>(tbl8[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#oerc>oerc</A>(instr)],instr));
+    case 534:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lwbrx",instr));
+    case 662:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stwbrx",instr));
+    case 512:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mcrxr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf>bf</A>(instr));
+        return(0);
+    case 533:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lswx",instr));
+    case 536:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("srw",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 597:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("lswi");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X\n",rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#nb>nb</A>(instr));
+        return(0);
+    case 661:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stswx",instr));
+    case 725:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("stswi");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X\n",rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#nb>nb</A>(instr));
+        return(0);
+    case 790:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("lhbrx",instr));
+    case 792:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("sraw",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 824:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("srawi",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,0x%04X\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sh>sh</A>(instr));
+        return(0);
+    case 854:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("eieio\n");  /* yep, that's really an instruction */
+        return(0);
+    case 918:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("sthbrx",instr));
+    case 922:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("extsh",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 954:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("extsb",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 966:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rb>ra_rb</A>("icci",instr));
+    case 982:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rb>ra_rb</A>("icbi",instr));
+    case 998:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rb>ra_rb</A>("icread",instr));
+    case 1014:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra_rb>ra_rb</A>("dcbz",instr));
+    }
+    switch(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#xo_nooe>xo_nooe</A>(instr)) {
+    case 0:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("cmp");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0,%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf>bf</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 4:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("tw");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%04X,%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/flash/flash_dirname/flashdev.h.html#to>to</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 11:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("mulhwu",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 19:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mfcr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",rt(instr));
+        return(0);
+    case 24:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("slw",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 26:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("cntizw",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 28:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("andc",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 32:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("cmpl");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,0,%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#bf>bf</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 54:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcbst");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 60:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("and",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 75:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("mulhw",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 83:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mfmsr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",rt(instr));
+        return(0);
+    case 86:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcbf");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 124:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("nor",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 131:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("wrtee");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",rs(instr));
+        return(0);
+    case 144:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mtcrf");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0x%x,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#fxm>fxm</A>(instr),rs(instr));
+        return(0);
+    case 146:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mtmsr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",rs(instr));
+        return(0);
+    case 150:
+        if (instr & 1)
+            return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("stwcx.",instr));
+        else
+            return(-1);
+    case 163:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("wrteei");
+        if (instr & 0x8000)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("1\n");
+        else
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("0\n");
+        return(0);
+    case 246:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcbtst");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 247:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("stbux");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr));
+        return(0);
+    case 262:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("icbt");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 278:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcbt");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 284:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("eqv",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 316:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("xor",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 323:
+#if USE_SPRDCR_NAMES
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("mf%s    %s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#dcrn>dcrn</A>(instr),rt(instr));
+#else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mfdcr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#dcrn>dcrn</A>(instr),rt(instr));
+#endif
+        return(0);
+    case 339:
+#if USE_SPRDCR_NAMES
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("mf%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sprf>sprf</A>(instr),rt(instr));
+#else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mfspr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sprf>sprf</A>(instr),rt(instr));
+#endif
+        return(0);
+    case 343:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("lhax");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n",rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 370:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("tlbia");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+        return(0);
+    case 375:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("lhaux");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n",rt(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 407:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("sthx",instr));
+    case 412:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("orc",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 439:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_ra_rb>rs_ra_rb</A>("sthux",instr));
+    case 444:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("or",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 451:
+#if USE_SPRDCR_NAMES
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("mt%s    %s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#dcrn>dcrn</A>(instr),rs(instr));
+#else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mtdcr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#dcrn>dcrn</A>(instr),rs(instr));
+#endif
+        return(0);
+    case 454:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcci");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 467:
+#if USE_SPRDCR_NAMES
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("mt%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sprf>sprf</A>(instr),rs(instr));
+#else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("mtspr");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#sprf>sprf</A>(instr),rs(instr));
+#endif
+        return(0);
+    case 470:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnem>prnem</A>("dcbi");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 476:
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#prnemdot>prnemdot</A>("nand",instr & RC);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s,%s,%s\n", <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#ra>ra</A>(instr),rs(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rb>rb</A>(instr));
+        return(0);
+    case 486:
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_ra_rb>rt_ra_rb</A>("dcread",instr));
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("opcode31 error: 0x%02x%02x%02x%02x\n",
+        ((uchar *)&instr)[0], ((uchar *)&instr)[1],
+        ((uchar *)&instr)[2], ((uchar *)&instr)[3]);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("xo_oe() = 0x%04X, xo_nooe() = 0x%04X\n",
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#xo_oe>xo_oe</A>(instr),<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#xo_nooe>xo_nooe</A>(instr));
+    return(-1);
+}
+
+int
+<A NAME="opcode32">opcode32</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lwz",instr));
+}
+
+int
+<A NAME="opcode33">opcode33</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lwzu",instr));
+}
+
+int
+<A NAME="opcode34">opcode34</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lbz",instr));
+}
+
+int
+<A NAME="opcode35">opcode35</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lbzu",instr));
+}
+
+int
+<A NAME="opcode36">opcode36</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_d_ra>rs_d_ra</A>("stw",instr));
+}
+
+int
+<A NAME="opcode37">opcode37</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_d_ra>rs_d_ra</A>("stwu",instr));
+}
+
+int
+<A NAME="opcode38">opcode38</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("stb",instr));
+}
+
+int
+<A NAME="opcode39">opcode39</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("stbu",instr));
+}
+
+int
+<A NAME="opcode40">opcode40</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lhz",instr));
+}
+
+int
+<A NAME="opcode41">opcode41</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lhzu",instr));
+}
+
+int
+<A NAME="opcode42">opcode42</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lha",instr));
+}
+
+int
+<A NAME="opcode43">opcode43</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lhau",instr));
+}
+
+int
+<A NAME="opcode44">opcode44</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("sth",instr));
+}
+
+int
+<A NAME="opcode45">opcode45</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_d_ra>rs_d_ra</A>("sthu",instr));
+}
+
+int
+<A NAME="opcode46">opcode46</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rt_d_ra>rt_d_ra</A>("lmw",instr));
+}
+
+int
+<A NAME="opcode47">opcode47</A>(ulong instr)
+{
+    return(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/dis_ppc.c.html#rs_d_ra>rs_d_ra</A>("stmw",instr));
+}
+
+#endif  /* INCLUDE_DISASSEMBLER */
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,556 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/malloc.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* malloc():
+ *  A simple memory allocator useful for embedded systems to provide 
+ *  some level of debug, plus the ability to increase heap space into
+ *  additional memory that is not contiguous with the intial statically
+ *  allocated array of memory.  The reason for supporting the ability to
+ *  allocate from 2 distinct blocks of memory is so that the monitor can
+ *  be built with some reasonable amount of heap space allocated to it; then
+ *  if the application is going to also use this malloc, it can do so
+ *  by simply extending the heap.  The monitor would not have to be
+ *  specifically built to support the large heap allocation.
+ *  
+ *  The allocator data structures are part of the memory space used for
+ *  the allocation.  To test for memory overruns (using memory after the
+ *  end of the allocated space) or underruns (using memory prior to the
+ *  beginning of the allocated space), the data structure starts and ends
+ *  with a fixed tag that is always checked upon entry into malloc()
+ *  or free().
+ *  When the memory is freed, the next and previous block is checked to
+ *  determine if this newly freed block can be combined with a neighboring
+ *  block.  This provides some level of defragmentation.  Note, at
+ *  this point, that the blocks are only combined if they are found to be
+ *  contiguous.  This correctly implies that neighboring free blocks need
+ *  not be within contiguous memory space.
+ *  A function called GetMemory() must be provided as the underlying resource
+ *  of the memory used by the allocator.
+ *
+ *  NOTE THAT THERE IS ABSOLUTELY NO CONCERN FOR SPEED IN THIS MEMORY
+ *  ALLOCATOR, IT IS SLOW!  Every call to malloc/free does a sanity check
+ *  on all allocation structures, so it is fairly good at detecting illegal
+ *  use of the allocated memory.
+ *  
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "cli.h"
+
+#define PRETAG              0xDEAD
+#define POSTTAG             0xBEEF
+
+extern  char *GetMemory();
+extern  int GetMemoryLeft(void);
+extern  int extendHeap(char *,int);
+extern  void unExtendHeap();
+extern  char *getExtHeapBase(void);
+
+
+/* mhdr:
+   The control structure used by the memory allocator.
+*/
+struct  mhdr {
+    ushort  pretag;         /* Fixed value used as an overrun sanity
+                             * check for the previous memory block.
+                             */
+    int size;               /* Size of useable memory block.  Size is
+                             * positive if block is free and negative if
+                             * block is not free.
+                             */
+    struct mhdr *next;      /* Points to next mhdr structure (not
+                             * necessarily in contiguous memory space).
+                             */
+    struct mhdr *prev;      /* Points to previous mhdr structure (not
+                             * necessarily in contiguous memory space).
+                             */
+    ushort  posttag;        /* Fixed value used as an underrun sanity
+                             * check for this memory block.
+                             */
+};
+
+/* mcalls, fcalls & mfails:
+ *  Used to keep track of malloc and free calls.  Plus keep track
+ *  of the number of times malloc is called, but it returns 0.
+ */
+static int mcalls, fcalls, mfails;
+
+/* mtot, ftot & highwater:
+ *  Keep track of total amount of memory allocated.
+ */
+static int mtot, ftot, highwater;
+
+/* heapbase:
+ *  Initially zero, this pointer is set to the base of the heap on
+ *  the first call to malloc().
+ */
+static struct mhdr  *heapbase;
+
+static void
+<A NAME="heapinit">heapinit</A>(void)
+{
+    mcalls = fcalls = mfails = 0;
+    mtot = ftot = highwater = 0;
+    heapbase = (struct mhdr *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#GetMemory>GetMemory</A>(ALLOCSIZE);
+    heapbase-&gt;pretag = PRETAG;
+    heapbase-&gt;posttag = POSTTAG;
+    heapbase-&gt;size = ALLOCSIZE - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+    if (heapbase-&gt;size &lt; 0)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("heapinit(): ALLOCSIZE too small!\n");
+    heapbase-&gt;next = (struct mhdr *)0;
+    heapbase-&gt;prev = (struct mhdr *)0;
+}
+
+/* heapcheck():
+ *  Called with an mhdr pointer (or NULL).  This function just steps through
+ *  the heap control structures to make sure there is some level of sanity.
+ *  If the incoming mhdr pointer is non-zero, then it will also verify that
+ *  the pointer is a valid control pointer in the heap.
+ */
+int
+<A NAME="heapcheck">heapcheck</A>(struct mhdr *mp,char *msg)
+{
+    int i, mpok;
+    register struct mhdr *mptr;
+
+    mpok = 0;
+    if (!heapbase)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapinit>heapinit</A>();
+
+    mptr = heapbase;
+    for(i=0;mptr;i++,mptr=mptr-&gt;next) {
+        if (mp == mptr)
+            mpok = 1;
+        if ((mptr-&gt;pretag != PRETAG) || (mptr-&gt;posttag != POSTTAG)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\007MALLOC ERROR: heap corrupted at entry %d",i);
+            if (msg)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" (%s)",msg);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+            return(-1);
+        }
+    }
+    if ((mp) && (!mpok)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\007MALLOC ERROR: 0x%lx (mem @ 0x%lx) invalid heap pointer",
+            (ulong)mp,(ulong)(mp+1));
+        if (msg)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" (%s)",msg);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+        return(-1);
+    }
+    return(0);
+}
+
+char *
+<A NAME="malloc">malloc</A>(int size)
+{
+    register struct mhdr *mptr, *mptr1;
+
+    if (size &lt;= 0)
+        return(0);
+
+    /* Start by checking sanity of heap. */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapcheck>heapcheck</A>(0,0) &lt; 0)
+        return((char *)0);
+
+    /* Keep track of number of calls to malloc for debug. */
+    mcalls++;
+
+    /* Make size divisible by 4: */
+    if (size & 3) {
+        size += 4;
+        size &= 0xfffffffc;
+    }
+
+    mptr = (struct mhdr *)heapbase;
+    while(1) {
+        /* If request size is equal to the free block size or
+         * if the free block size is only slightly larger than the
+         * request size, then just use that free block as is.
+         * If the request size is at least "sizeof(struct mhdr) * 2"
+         * bytes smaller than free block size, then break
+         * that block up into 2 smaller chunks with one of the chunks
+         * being the size of the request and the size of the other chunk
+         * being whatever is left over.
+         */
+        if (mptr-&gt;size &gt;= size) {
+            if (mptr-&gt;size &lt;= (int)(size + (<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr) * 2))) {
+                mtot += mptr-&gt;size;
+                if ((mtot - ftot) &gt; highwater)
+                    highwater = (mtot - ftot);
+                mptr-&gt;size = -mptr-&gt;size;
+                return((char *)(mptr+1));
+            }
+            else {
+                mptr1 = (struct mhdr *)((char *)(mptr+1) + size);
+                mptr1-&gt;pretag  = PRETAG;
+                mptr1-&gt;posttag = POSTTAG;
+                mptr1-&gt;next = mptr-&gt;next;
+                mptr-&gt;next = mptr1;
+                if (mptr1-&gt;next)
+                    mptr1-&gt;next-&gt;prev = mptr1;
+                mptr1-&gt;prev = mptr;
+                mptr1-&gt;size = (mptr-&gt;size - size) - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+                mptr-&gt;size = -size;
+                mtot += size;
+                if ((mtot - ftot) &gt; highwater)
+                    highwater = (mtot - ftot);
+                return((char *)(mptr+1));
+            }
+        }
+        if (mptr-&gt;next == (struct mhdr *)0) {
+            struct mhdr *moremem;
+            int     getsize;
+
+            getsize = size + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+            moremem = (struct mhdr *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#GetMemory>GetMemory</A>(getsize);
+            if (!moremem) {
+                mfails++;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\007MALLOC ERROR: no more memory\n");
+                return((char *)0);
+            }
+            mptr-&gt;next = moremem;
+            mptr-&gt;next-&gt;prev = mptr;
+            mptr = mptr-&gt;next;
+            mptr-&gt;next = (struct mhdr *)0;
+            mptr-&gt;pretag = PRETAG;
+            mptr-&gt;posttag = POSTTAG;
+            mptr-&gt;size = getsize - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+        }
+        else
+            mptr = mptr-&gt;next;
+    }
+}
+
+void
+<A NAME="free">free</A>(char *cp)
+{
+    struct  mhdr    *mptr;
+
+    /* Keep track of number of calls to free for debug. */
+    fcalls++;
+
+    mptr = (struct mhdr *)cp - 1;
+
+    /* Start by checking sanity of heap and make sure that the incoming
+     * pointer corresponds to a valid entry in the heap.
+     */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapcheck>heapcheck</A>(mptr,0) &lt; 0)
+        return;
+
+    /* The first thing to do to free the block is to make the size
+     * positive.
+     */
+    mptr-&gt;size = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#abs>abs</A>(mptr-&gt;size);
+
+    /* Keep track of how much memory is freed for debug. */
+    ftot += mptr-&gt;size;
+
+    /* To defragment the memory, see if previous and/or
+     * next block is free; if yes, then join them into one larger
+     * block. Note that the blocks will only be joined if they are in
+     * contiguous memory space.
+     */
+    if (mptr-&gt;next) {
+        if ((mptr-&gt;next-&gt;size &gt; 0)  &&
+            (mptr-&gt;next == (struct mhdr *)
+            ((char *)mptr+mptr-&gt;size+<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr)))) {
+            mptr-&gt;size += mptr-&gt;next-&gt;size + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+            mptr-&gt;next = mptr-&gt;next-&gt;next;
+            if (mptr-&gt;next)
+                mptr-&gt;next-&gt;prev = mptr;
+        }
+    }
+    if (mptr-&gt;prev) {
+        if ((mptr-&gt;prev-&gt;size &gt; 0) &&
+            (mptr-&gt;prev == (struct mhdr *)
+            ((char *)mptr-mptr-&gt;prev-&gt;size-<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr)))) {
+            if (mptr-&gt;next)
+                mptr-&gt;next-&gt;prev = mptr-&gt;prev;
+            mptr-&gt;prev-&gt;next = mptr-&gt;next;
+            mptr-&gt;prev-&gt;size += mptr-&gt;size + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr);
+        }
+    }
+}
+
+/* calloc():
+ *  Allocate space for an array of nelem elements of size elsize.
+ *  Initialize the space to zero.
+ */
+char *
+<A NAME="calloc">calloc</A>(int nelem, int elsize)
+{
+    register char   *cp, *end;
+    char    *base;
+    int     size;
+
+    size = nelem * elsize;
+    base = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(size);
+    if (base) {
+        cp = base;
+        end = base+size;
+        while(cp&lt;end)
+            *cp++ = 0;
+    }
+    return(base);
+}
+
+char *
+<A NAME="realloc">realloc</A>(char *cp,int size)
+{
+    char            *new;
+    int             asize;
+    struct  mhdr    *mptr;
+
+    /* If incoming pointer is NULL, then do a regular malloc. */
+    if (!cp)
+        return(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(size));
+
+    /* If size is zero and pointer is not null, then do a free. */
+    if (!size) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(cp);
+        return((char *)0);
+    }
+
+    mptr = (struct mhdr *)cp - 1;
+
+    /* Start by checking sanity of heap and make sure that the incoming
+     * pointer corresponds to a valid entry in the heap.
+     */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapcheck>heapcheck</A>(mptr,0) &lt; 0)
+        return((char *)0);
+
+    /* Recall that mptr-size is negative since the block is not free, so
+     * use the absolute value of mptr-size...
+     */&gt;&gt;
+    asize = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#abs>abs</A>(mptr-&gt;size);
+
+    /* If new size is less than or equal to current size, just return with
+     * the same pointer.  At some point, this should be improved so that
+     * the memory made made available by this reallocation is put back in
+     * the pool.
+     */
+    if (size &lt;= asize)
+        return(cp);
+
+    /* First, see if the next fragment after this one is large enough to
+     * support the additional space.
+     */
+    /* NOT SUPPORTED YET */
+
+    /* If the next fragment is not large enough, then malloc new space,
+     * copy the existing data to that block, free the old space and return
+     * a pointer to the new block.
+     */
+    new = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(size);
+    if (!new)
+        return((char *)0);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(new,cp,asize);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>(cp);
+    return(new);
+}
+
+void
+<A NAME="heapdump">heapdump</A>(int full)
+{
+    register struct mhdr *mptr;
+    char    freenow;
+    int     i, alloctot, freetot, size;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapcheck>heapcheck</A>(0,0);
+
+    mptr = heapbase;
+    i=0;
+    freetot = 0;
+    alloctot = 0;
+    if (full)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("        addr     size free?    mptr        nxt        prv      ascii@addr\n");
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Heap summary:\n");
+    for(i=0;mptr;i++) {
+        if (mptr-&gt;size &lt; 0) {
+            freenow = 'n';
+            size = -mptr-&gt;size;
+            alloctot += size;
+        }
+        else {
+            freenow = 'y';
+            size = mptr-&gt;size;
+            freetot += size;
+        }
+        if (full) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%3d: 0x%08lx %5d   %c   0x%08lx 0x%08lx 0x%08lx  ",
+                i,(ulong)(mptr+1),size,freenow,(ulong)mptr,
+                (ulong)(mptr-&gt;next),(ulong)(mptr-&gt;prev));
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#prascii>prascii</A>((unsigned char *)(mptr+1),size &gt; 16 ? 16 : size);
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+        }
+        mptr = mptr-&gt;next;
+    }
+    if (full)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/chario.c.html#putchar>putchar</A>('\n');
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Malloc/free calls:  %d/%d (delta=%d)\n",
+        mcalls,fcalls,mcalls-fcalls);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Malloc/free totals: %d/%d\n",mtot,ftot);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  High-water level:   %d\n",highwater);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Malloc failures:    %d\n",mfails);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Bytes overhead:     %d\n",i*<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct mhdr));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Bytes currently allocated:   %d\n",alloctot);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Bytes free on current heap:  %d\n",freetot);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Bytes left in allocation pool:  %d\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#GetMemoryLeft>GetMemoryLeft</A>());
+}
+
+/* releaseExtendedHeap():
+ *  If memory has been allocated through the extended heap established
+ *  by the heap -x{start,size} command, this function will attempt
+ *  to "undo" that.  It can only be un-done if there is no currently active
+ *  allocations in that range.
+ *
+ *  This function is accessible by the application through monlib.
+ */
+int
+<A NAME="releaseExtendedHeap">releaseExtendedHeap</A>(int verbose)
+{
+    int i;
+    struct  mhdr *mptr, *extbase;
+
+    extbase = (struct mhdr *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#getExtHeapBase>getExtHeapBase</A>();
+    if (!extbase) {
+        if (verbose)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Heap extension not set\n");
+        return(-1);
+    }
+    
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapcheck>heapcheck</A>(0,0);
+    mptr = heapbase;
+    for(i=0;mptr;i++) {
+        if (mptr-&gt;next == extbase) {
+            if (mptr-&gt;next-&gt;next == (struct mhdr *)0) {
+                mptr-&gt;next = (struct mhdr *)0;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#unExtendHeap>unExtendHeap</A>();
+                if (verbose)
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Heap extension cleared\n");
+                return(0);
+            }
+            else if (verbose)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Extended heap space is in use.\n");
+            break;
+        }
+        mptr = mptr-&gt;next;
+    }
+    if ((!mptr) && (verbose)) {     /* Heap was extended, but not used. */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#unExtendHeap>unExtendHeap</A>();             /* Remove the extension. */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Heap extension cleared.\n");
+    }
+    return(0);
+}
+
+
+char *HeapHelp[] = {
+    "Display heap statistics.",
+    "-[cf:m:vX:x]",
+    "Options:",
+    " -c        clear high-water level and malloc/free totals",
+    " -f{ptr}   free block @ 'ptr'",
+    " -m{size}  malloc 'size' bytes",
+    " -v        verbose (more detail)",
+    " -X{base,size}",
+    "           extend heap by 'size' bytes starting at 'base'",
+    " -x        clear heap extension",
+    0
+};
+
+int
+<A NAME="Heap">Heap</A>(int argc,char *argv[])
+{
+    char *establish_extended_heap, buf[32];
+    int verbose, release_extended_heap, showheap, opt;
+
+    showheap = 1;
+    establish_extended_heap = (char *)0;
+    release_extended_heap = verbose = 0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"cf:m:vX:x")) != -1) {
+        switch(opt) {
+        case 'c':
+            mcalls = fcalls = 0;
+            mtot = ftot = highwater = 0;
+            showheap = 0;
+            break;
+        case 'f':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#free>free</A>((char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,0,0));
+            showheap = 0;
+            break;
+        case 'm':
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#shell_sprintf>shell_sprintf</A>("MALLOC","0x%lx",
+                (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#malloc>malloc</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(optarg,0,0)));
+            if (verbose)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s\n",buf);
+            showheap = 0;
+            break;
+        case 'v':
+            verbose = 1;
+            break;
+        case 'X':
+            establish_extended_heap = optarg;
+            showheap = 0;
+            break;
+        case 'x':
+            release_extended_heap = 1;
+            showheap = 0;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (release_extended_heap)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#releaseExtendedHeap>releaseExtendedHeap</A>(verbose);
+
+    if (establish_extended_heap) {
+        int  size;
+        char *comma, *begin;
+
+        comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(establish_extended_heap,',');
+        if (!comma)
+            return(CMD_PARAM_ERROR);
+        *comma = 0;
+        begin = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(establish_extended_heap,0,0);
+        size = (int)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(comma+1,0,0);
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#extendHeap>extendHeap</A>(begin,size) == -1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Extended heap already exists @ 0x%lx\n",
+                (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/sbrk.c.html#getExtHeapBase>getExtHeapBase</A>());
+            return(CMD_FAILURE);
+        }
+    }
+
+    if (!showheap)
+        return(CMD_SUCCESS);
+
+    if (optind == argc)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/malloc.c.html#heapdump>heapdump</A>(verbose);
+
+    return(CMD_SUCCESS);
+}
+</HTML>
+</PRE>
+</BODY>

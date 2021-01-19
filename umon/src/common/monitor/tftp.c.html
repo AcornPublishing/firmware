@@ -1,0 +1,1049 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tftp.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tftp.c:
+ *  This code supports the monitor's TFTP server.
+ *  TFTP is covered under RFC 783.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_TFTP
+#include "endian.h"
+#include "genlib.h"
+#include "cpuio.h"
+#include "ether.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+#include "monflags.h"
+#include "stddefs.h"
+#include "cli.h"
+
+#define MODE_NULL       0
+#define MODE_NETASCII   1
+#define MODE_OCTET      2
+
+void ShowTftpStats();
+int SendTFTPData(struct ether_header *,ushort,uchar *,int);
+int SendTFTPErr(struct ether_header *,short,char *,int);
+int SendTFTPAck(struct ether_header *,ushort);
+int SendTFTPRRQ(uchar *,uchar *,char *,char *,uchar *);
+
+
+static ushort   tftpLastblock;  /* Keeps the value of the block number of
+                                 * the last TFTP transaction.
+                                 */
+static int tftpRetry_delayloops;/* Number of times tftpStateCheck() must be
+                                 * called to reach tftpRetry_delaysecs.
+                                 */
+static int tftpRetry_delaysecs; /* Number of seconds to wait prior to retry. */
+static int tftpRetry_lastchance;/* Set if we are on the last retry and are
+                                 * about to give up.
+                                 */
+
+static int TftpWrqMode;         /* Set to MODE_NETASCII, MODE_OCTET or
+                                 * MODE_NULL based on the incoming WRQ
+                                 * request
+                                 */
+static int TftpChopCount;       /* Number of characters chopped from the
+                                 * incoming file because of NETASCII
+                                 * conversion (remove 0x0d).
+                                 */
+static int TftpLastPktSize;
+static uchar TftpLastPkt[TFTP_PKTOVERHEAD+TFTP_DATAMAX+4];
+                                /* Storage of last packet sent.  This is
+                                 * used if it is determined that the packet
+                                 * most recently sent must be sent again.
+                                 */
+
+static long TftpRetryTimeout;   /* Count used during a TFTP transfer to
+                                 * kick off a retransmission of a packet.
+                                 * It is cleared each time a valid packet
+                                 * is sent, and incremented by the
+                                 * tftpStateCheck() function.
+                                 */
+static ushort TftpRmtPort;      /* Remote port of tftp transfer */
+static uchar *TftpAddr;         /* Current destination address used for tftp
+                                 * file transfer into local memory.
+                                 */
+static int  TftpCount;          /* Running total number of bytes transferred
+                                 * for a particular tftp transaction.
+                                 */
+static int  TftpState;          /* Used to keep track of the current state
+                                 * of a tftp transaction.
+                                 */
+static int  TftpTurnedOff;      /* If non-zero, then tftp is disabled. */
+static char TftpErrString[32];  /* Used to post a tftp error message. */
+static char TftpTfsFname[TFSNAMESIZE+64];   /* Store name of WRQ destination
+                                             * file (plus flags & info).
+                                             */
+char *
+<A NAME="tftpStringState">tftpStringState</A>(int state)
+{
+    switch(state) {
+        case TFTPOFF:
+            return("OFF");
+        case TFTPIDLE:
+            return("IDLE");
+        case TFTPACTIVE:
+            return("ACTIVE");
+        case TFTPERROR:
+            return("ERROR");
+        case TFTPSENTRRQ:
+            return("SENTRRQ");
+        case TFTPTIMEOUT:
+            return("TIMEOUT");
+        default:
+            return("???");
+    }
+}
+
+int
+<A NAME="tftpGotoState">tftpGotoState</A>(int state)
+{
+    int ostate;
+
+    ostate = TftpState;
+    TftpState = state;
+    if ((EtherVerbose & SHOW_TFTP) && (state != ostate))
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  TFTP State change %s -&gt; %s\n",
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpStringState>tftpStringState</A>(ostate), <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpStringState>tftpStringState</A>(state));
+    return(ostate);
+}
+
+/* tftpGet():
+ *  Return size of file if successful; else 0.
+ */
+int
+<A NAME="tftpGet">tftpGet</A>(ulong addr,char *tftpsrvr,char *mode, char *hostfile,char *tfsfile,
+    char *tfsflags,char *tfsinfo)
+{
+    int     done;
+    char    buf[32];
+    uchar   binip[8], binenet[8], *enetaddr;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("TFTPGET",0);
+
+    /* Convert IP address to binary: */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#IpToBin>IpToBin</A>(tftpsrvr,binip) &lt; 0)
+        return(0);
+
+
+    /* Get the ethernet address for the IP: */
+    /* Give ARP the same verbosity (if any) set up for TFTP: */
+    if (EtherVerbose & SHOW_TFTP)
+        EtherVerbose |= SHOW_ARP;
+    enetaddr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/arp.c.html#ArpEther>ArpEther</A>(binip,binenet,0);
+    EtherVerbose &= ~SHOW_ARP;
+    if (!enetaddr) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("ARP failed for %s\n",tftpsrvr);
+        return(0);
+    }
+
+    /* Initialize the retransmission delay calculator: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_TFTP);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Retrieving %s from %s...",hostfile,tftpsrvr);
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+
+    /* Send the TFTP RRQ to initiate the transfer. */
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPRRQ>SendTFTPRRQ</A>(binip,binenet,hostfile,mode,(uchar *)addr) &lt; 0) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("RRQ failed\n");
+        return(0);
+    }
+
+    /* Wait for TftpState to indicate that the transaction has completed... */
+    done = 0;
+    while(!done) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#pollethernet>pollethernet</A>();
+        switch(TftpState) {
+            case TFTPIDLE:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" %d bytes",TftpCount);
+                done = 1;
+                break;
+            case TFTPERROR:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" host error: %s\n",TftpErrString);
+                done = 2;
+                break;
+            case TFTPTIMEOUT:
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" timing out (%d bytes rcvd)\n",TftpCount);
+                done = 2;
+                break;
+            default:
+                break;
+        }
+    }
+    if (done == 2)
+        return(0);
+
+    if (tfsfile) {
+        int err, filesize;
+
+        filesize = TftpCount - TftpChopCount;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\nAdding %s (size=%d) to TFS...",tfsfile,filesize);
+        err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(tfsfile,tfsinfo,tfsflags,(uchar *)addr,filesize);
+        if (err != TFS_OKAY)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s: %s\n",tfsfile,(char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"%d",TftpCount);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>("TFTPGET",buf);
+    return(TftpCount);
+}
+
+/* tftpInit():
+ *  Called by the ethenet initialization to initialize state variables.
+ */
+void
+<A NAME="tftpInit">tftpInit</A>()
+{
+    TftpCount = -1;
+    TftpRmtPort = 0;
+    TftpTurnedOff = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPIDLE);
+    TftpAddr = (uchar *)0;
+}
+
+/* storePktAndSend():
+ *  The final stage in sending a TFTP packet...
+ *  1. Compute IP and UDP checksums;
+ *  2. Copy ethernet packet to a buffer so that it can be resent
+ *      if necessary (by tftpStateCheck()).
+ *  3. Store the size of the packet; 
+ *  4. Send the packet out the interface.
+ *  5. Reset the timeout count and re-transmission delay variables.
+ */
+void
+<A NAME="storePktAndSend">storePktAndSend</A>(struct ip *ipp, struct ether_header *epkt,int size)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipChksum>ipChksum</A>(ipp);                          /* Compute csum of ip hdr */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#udpChksum>udpChksum</A>(ipp);                         /* Compute UDP checksum */
+                                            /* Copy packet to static buffer */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)TftpLastPkt,(char *)epkt,size);
+    TftpLastPktSize = size;                 /* Copy size to static location */
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(size);                       /* Send buffer out ethernet i*/
+
+    /* Clear the retry timeout counters and re-initialize the */
+    /* re-transmission delay variables. */
+    TftpRetryTimeout = 0;   
+    tftpRetry_lastchance = 0;
+    tftpRetry_delayloops = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INIT_TFTP);
+}
+
+/* getTftpSrcPort():
+ *  Each time a TFTP RRQ goes out, use a new source port number.
+ *  Cycle through a block of 256 port numbers...
+ */
+ushort
+<A NAME="getTftpSrcPort">getTftpSrcPort</A>(void)
+{
+    if (TftpSrcPort &lt; (IPPORT_TFTPSRC+256))
+        TftpSrcPort++;
+    else
+        TftpSrcPort = IPPORT_TFTPSRC;
+    return(TftpSrcPort);
+}
+
+/* tftpStateCheck():
+ *  Called by the pollethernet function to support the ability to retry
+ *  on a TFTP transmission that appears to have terminated prematurely
+ *  due to a lost packet.  If a packet is sent and the response is not
+ *  received within about 1-2 seconds, the packet is re-sent.  The retry
+ *  will repeat 8 times; then give up and set the TFTP state to idle.
+ *
+ *  Taken from RFC 1350 section 2 "Overview of the Protocol"...
+ *  ... If a packet gets lost in the network, the intended recipient will
+ *  timeout and may retransmit his last packet (which may be data or an
+ *  acknowledgement), thus causing the sender of the lost packet to retransmit
+ *  the lost packet.
+ *
+ *  Taken from RFC 1123 section 4.2.3.2 "Timeout Algorithms"...
+ *  ... a TFTP implementation MUST use an adaptive timeout ...
+ */
+
+void
+<A NAME="tftpStateCheck">tftpStateCheck</A>(void)
+{
+    uchar   *buf;
+    ushort  tftp_opcode;
+    struct  ip *ihdr;
+    struct  Udphdr *uhdr;
+    struct  ether_header *ehdr;
+
+    switch(TftpState) {
+        case TFTPIDLE:
+        case TFTPTIMEOUT:
+        case TFTPERROR:
+            tftpRetry_lastchance = tftpRetry_delayloops = 0;
+            return;
+        default:
+            break;
+    }
+
+    if (!tftpRetry_delayloops) {
+        tftpRetry_delaysecs = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_OR_TIMEOUT_RETURN);
+        tftpRetry_delayloops = tftpRetry_delaysecs * LoopsPerSecond;
+    }
+    
+    /* If the value in TftpRetryTimeout reaches the tftpRetry_delayloops */
+    /* value, then assume it is time to re-transmit a packet... */
+    if (++TftpRetryTimeout &lt; tftpRetry_delayloops)
+        return;
+
+    if (tftpRetry_lastchance) {
+        if (EtherVerbose & SHOW_TFTP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  TFTP_RETRY giving up\n");
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPTIMEOUT);
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enableBroadcastReception>enableBroadcastReception</A>();
+        TftpRetryTimeout = 0;
+        return;
+    }
+
+    /* Get a transmit buffer and copy the packet that was last sent.
+     * Insert a new IP ID, recalculate the checksums and send it again...
+     * If the opcode of the packet to be re-transmitted is RRQ, then
+     * use a new port number.
+     */
+    buf = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)buf,(char *)TftpLastPkt,TftpLastPktSize);
+    ehdr = (struct ether_header *)buf;
+    ihdr = (struct ip *)(ehdr + 1);
+    uhdr = (struct Udphdr *)(ihdr + 1);
+    tftp_opcode = *(ushort *)(uhdr + 1);
+    ihdr-&gt;ip_id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipId>ipId</A>();
+    if (tftp_opcode == <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_RRQ)) {
+        uhdr-&gt;uh_sport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#getTftpSrcPort>getTftpSrcPort</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(uhdr-&gt;uh_sport);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipChksum>ipChksum</A>(ihdr);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#udpChksum>udpChksum</A>(ihdr);
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(TftpLastPktSize);
+
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  TFTP_RETRY (%d secs)\n",tftpRetry_delaysecs);
+    tftpRetry_delayloops = 0;
+    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#RetransmitDelay>RetransmitDelay</A>(DELAY_INCREMENT) == RETRANSMISSION_TIMEOUT)
+        tftpRetry_lastchance = 1;
+
+    TftpRetryTimeout = 0;
+    return;
+}
+
+/* tftpStartSrvrFilter():
+ *  Called when either a TFTP_RRQ or TFTP_WRQ is received indicating that
+ *  a client wants to start up a transfer.
+ *  If TftpState is IDLE, ERROR or TIMEOUT, this means it is safe to start
+ *  up a new transfer through the server; otherwise return 0. 
+ */
+int
+<A NAME="tftpStartSrvrFilter">tftpStartSrvrFilter</A>(struct ether_header *ehdr,struct Udphdr *uhdr)
+{
+    if ((TftpState == TFTPIDLE) || (TftpState == TFTPERROR) ||
+        (TftpState == TFTPTIMEOUT)) {
+        TftpTfsFname[0] = 0;
+        TftpRmtPort = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uhdr-&gt;uh_sport);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPACTIVE);
+        return(1);
+    }
+    /* If block is zero and the incoming WRQ request is from the same
+     * port as was previously recorded, then assume the ACK sent back
+     * to the requester was not received, and this is a WRQ that is
+     * being re-sent.  That being the case, just send the Ack back.
+     */
+    else if ((tftpLastblock == 0) && (TftpRmtPort == uhdr-&gt;uh_sport)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPAck>SendTFTPAck</A>(ehdr,0);
+        return(0);
+    }
+    else {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("   (tftp busy)\n");
+        /* Note: the value of TftpState is not changed (final arg to
+         * SendTFTPErr is 0) to TFTPERROR.  This is because
+         * we received a RRQ/WRQ request while processing a different
+         * TFTP transfer.  We want to send the error response to the
+         * sender, but we don't want to stay in an error state because
+         * there is another valid TFTP transfer in progress.
+         */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"TFTP server busy.",0);
+        return(0);
+    }
+}
+
+/* processTFTP():
+ *  This function handles the majority of the TFTP requests that a
+ *  TFTP server must be able to handle.  There is no real robust 
+ *  error handling, but it seems to work pretty well.
+ *  Refer to Stevens' "UNIX Network Programming" chap 12 for details
+ *  on TFTP.
+ *  Note: During TFTP, promiscuity, broadcast & multicast reception
+ *  are all turned off.  This is done to speed up the file transfer.
+ */
+int
+<A NAME="processTFTP">processTFTP</A>(struct ether_header *ehdr,ushort size)
+{
+    static  uchar   *oaddr;
+    struct  ip *ihdr;
+    struct  Udphdr *uhdr;
+    uchar   *data;
+    int     count, tmpcount;
+    ushort  opcode, block, errcode;
+    char    *comma, *tftpp, *filename, *mode, *errstring, msg[64];
+
+    if (TftpTurnedOff)
+        return(0);
+
+    ihdr = (struct ip *)(ehdr + 1);
+    uhdr = (struct Udphdr *)((char *)ihdr + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ether.h.html#IP_HLEN>IP_HLEN</A>(ihdr));
+    tftpp = (char *)(uhdr + 1);
+    opcode = *(ushort *)tftpp;
+
+    switch (opcode) {
+    case <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_WRQ):
+        filename = tftpp+2;
+        if ((EtherVerbose & SHOW_TFTP) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_NOTFTPPRN>MFLAGS_NOTFTPPRN</A>()))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFTP rcvd WRQ: file %s\n", filename);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpStartSrvrFilter>tftpStartSrvrFilter</A>(ehdr,uhdr))
+            return(0);
+
+        mode = filename;
+        while(*mode)
+            mode++;
+        mode++;
+        
+        /* Destination of WRQ can be an address (0x...), environment
+         * variable ($...) or a TFS filename...
+         */
+        if ((filename[0] == '$') && (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>(&filename[1]))) {
+            TftpAddr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#getenv>getenv</A>(&filename[1]),(char **)0,0);
+        }
+        else if ((filename[0] == '0') && (filename[1] == 'x')) {
+            TftpAddr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(filename,(char **)0,0);
+        }
+        else {
+            if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_NOTFTPOVW>MFLAGS_NOTFTPOVW</A>() && <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(filename)) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,6,"File already exists.",1);
+                return(0);
+            }
+            TftpAddr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>();
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(TftpTfsFname,filename,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(TftpTfsFname)-1);
+            TftpTfsFname[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(TftpTfsFname)-1] = 0;
+        }
+        TftpCount = -1; /* not used with WRQ, so clear it */
+
+        /* Convert mode to lower case... */
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtolower>strtolower</A>(mode);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(mode,"netascii"))
+            TftpWrqMode = MODE_NETASCII;
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(mode,"octet"))
+            TftpWrqMode = MODE_OCTET;
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Mode not supported.",1);
+            TftpWrqMode = MODE_NULL;
+            TftpCount = -1;
+            return(0);
+        }
+        block = 0;
+        tftpLastblock = block;
+        oaddr = TftpAddr;
+        TftpChopCount = 0;
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#disableBroadcastReception>disableBroadcastReception</A>();
+        break;
+    case <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_RRQ):
+        filename = tftpp+2;
+        if ((EtherVerbose & SHOW_TFTP) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_NOTFTPPRN>MFLAGS_NOTFTPPRN</A>()))
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFTP rcvd RRQ: file %s\n",filename);
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpStartSrvrFilter>tftpStartSrvrFilter</A>(ehdr,uhdr))
+            return(0);
+        mode = filename;
+        while(*mode) mode++;
+        mode++;
+        comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(filename,',');
+        if (!comma) {
+            TFILE   *tfp; 
+            tfp = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsstat>tfsstat</A>(filename);
+            if (!tfp) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"File not found, try 'address,count'",1);
+                TftpCount = -1;
+                return(0);
+            }
+            TftpAddr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_BASE>TFS_BASE</A>(tfp);
+            TftpCount = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.h.html#TFS_SIZE>TFS_SIZE</A>(tfp);
+        }
+        else {
+            comma++;
+            TftpAddr = (uchar *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(filename,(char **)0,0);
+            TftpCount = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(comma,(char **)0,0);
+        }
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(mode,"octet")) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Must use binary mode",1);
+            TftpCount = -1;
+            return(0);
+        }
+        block = tftpLastblock = 1;
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#disableBroadcastReception>disableBroadcastReception</A>();
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPACTIVE);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPData>SendTFTPData</A>(ehdr,block,TftpAddr,TftpCount);
+        return(0);
+    case <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_DAT):
+        block = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(*(ushort *)(tftpp+2));
+        count = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uhdr-&gt;uh_ulen) - (<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr)+4);
+        if (EtherVerbose & SHOW_TFTP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Rcvd TFTP_DAT (%d,blk=%d)\n",count,block);
+
+        if (TftpState == TFTPSENTRRQ) {     /* See notes in SendTFTPRRQ() */
+            tftpLastblock = 0;
+            if (block == 1) {
+                TftpRmtPort = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uhdr-&gt;uh_sport);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPACTIVE);
+            }
+            else {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"invalid block",1);
+                return(0);
+            }
+        }
+        /* Since we don't ACK the final TFTP_DAT from the server until after
+         * the file has been written, it is possible that we will receive
+         * a re-transmitted TFTP_DAT from the server.  This is ignored by
+         * Sending another ACK...
+         */
+        else if ((TftpState == TFTPIDLE) && (block == tftpLastblock)) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPAck>SendTFTPAck</A>(ehdr,block);    
+            if (EtherVerbose & SHOW_TFTP)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  (packet ignored)\n");
+            return(0);              
+        }
+        else if (TftpState != TFTPACTIVE) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"invalid state",1);
+            return(0);
+        }
+
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(uhdr-&gt;uh_sport) != TftpRmtPort) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"invalid source port",0);
+            return(0);
+        }
+        if (block == tftpLastblock) {   /* If block didn't increment, assume */
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPAck>SendTFTPAck</A>(ehdr,block);    /* retry.  Ack it and return here.  */
+            return(0);          /* Otherwise, if block != tftpLastblock+1, */
+        }                       /* return an error, and quit now.   */
+        else if (block != tftpLastblock+1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Unexpected block number",1);
+            TftpCount = -1;
+            return(0);
+        }
+        TftpCount += count;
+        oaddr = TftpAddr;
+        tftpLastblock = block;
+        data = (uchar *)(tftpp+4);
+
+        /* If count is less than TFTP_DATAMAX, this must be the last
+         * packet of the transfer, so clean up state here.
+         */
+        if (count &lt; TFTP_DATAMAX) {
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enableBroadcastReception>enableBroadcastReception</A>();
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPIDLE);
+        }
+
+        /* Copy data from enet buffer to TftpAddr location... */
+        tmpcount = count;
+        while(tmpcount) {       
+            if (TftpWrqMode == MODE_NETASCII) {
+                if (*data == 0x0d) {
+                    data++;
+                    tmpcount--;
+                    TftpChopCount++;
+                    continue;
+                }
+            }
+                
+            *TftpAddr = *data;
+            if (*TftpAddr != *data) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(msg,"Write error at 0x%lx",(ulong)TftpAddr);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,msg,1);
+                TftpCount = -1;
+                return(0);
+            }
+            TftpAddr++;
+            data++;
+            tmpcount--;
+        }
+
+        /* Check for transfer complete (count  TFTP_DATAMAX)... */&lt;
+        if (count &lt; TFTP_DATAMAX) {
+            if (TftpTfsFname[0]) {
+                char *fcomma, *icomma, *flags, *info;
+                int err;
+
+                /* If the transfer is complete and TftpTfsFname[0]
+                 * is non-zero, then write the data to the specified
+                 * TFS file... Note that a comma in the filename is
+                 * used to find the start of (if any) the TFS flags
+                 * string.  A second comma, marks the info field.
+                 */
+                info = (char *)0;
+                flags = (char *)0;
+                fcomma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(TftpTfsFname,',');
+                if (fcomma) {
+                    icomma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(fcomma+1,',');
+                    if (icomma) {
+                        *icomma = 0;
+                        info = icomma+1;
+                    }
+                    if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_FATOB,(long)(fcomma+1),0) != -1) {
+                        *fcomma = 0;
+                        flags = fcomma+1;
+                    }
+                    else {
+                        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Invalid flag spec.",1);
+                        TftpTfsFname[0] = 0;
+                        break;
+                    }
+                }
+                if ((EtherVerbose & SHOW_TFTP) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_NOTFTPPRN>MFLAGS_NOTFTPPRN</A>()))
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFTP adding file: '%s' to TFS.\n",TftpTfsFname);
+                err = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(TftpTfsFname,info,flags,
+                    (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>(),TftpCount+1-TftpChopCount);
+                if (err != TFS_OKAY) {
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(msg,"TFS err: %s",
+                        (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsctrl>tfsctrl</A>(TFS_ERRMSG,err,0));
+                    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,msg,1);
+                }
+                TftpTfsFname[0] = 0;
+            }
+            else {
+                int cnt;
+                char *addr;
+
+                /* If the transfer is complete and no file add is to
+                 * be done, then we flush d-cache and invalidate
+                 * i-cache across the memory space that was just
+                 * copied to.  This is necessary in case the
+                 * binary data that was just transferred is code.
+                 */
+                cnt = TftpCount + 1;
+                addr = TftpAddr - cnt;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#flushDcache>flushDcache</A>(addr,cnt);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cache.c.html#invalidateIcache>invalidateIcache</A>(addr,cnt);
+            }
+            if ((EtherVerbose & SHOW_TFTP) || (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/monflags.h.html#MFLAGS_NOTFTPPRN>MFLAGS_NOTFTPPRN</A>()))
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TFTP transfer complete.\n");
+        }
+        break;
+    case <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_ACK):
+        block = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(*(ushort *)(tftpp+2));
+        if (TftpState != TFTPACTIVE) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Illegal server state for incoming TFTP_ACK",1);
+            return(0);
+        }
+        if (EtherVerbose & SHOW_TFTP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Rcvd TFTP_ACK (blk#%d)\n",block);
+
+        if (block == tftpLastblock) {
+            if (TftpCount &gt; TFTP_DATAMAX) {
+                TftpCount -= TFTP_DATAMAX;
+                TftpAddr += TFTP_DATAMAX;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPData>SendTFTPData</A>(ehdr,block+1,TftpAddr,TftpCount);
+                tftpLastblock++;
+            }
+            else if (TftpCount == TFTP_DATAMAX) {
+                TftpCount = 0;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPIDLE);
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPData>SendTFTPData</A>(ehdr,block+1,TftpAddr,0);
+                tftpLastblock++;
+            }
+            else {
+                TftpAddr += TftpCount;
+                TftpCount = 0;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPIDLE);
+                <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#enableBroadcastReception>enableBroadcastReception</A>();
+            }
+        }
+        else if (block == tftpLastblock-1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPData>SendTFTPData</A>(ehdr,block+1,TftpAddr,TftpCount);
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPErr>SendTFTPErr</A>(ehdr,0,"Blockno confused",1);
+            TftpCount = -1;
+            return(0);
+        }
+        return(0);
+    case <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_ERR):
+        errcode = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(*(ushort *)(tftpp+2));
+        errstring = tftpp+4;
+        if (EtherVerbose & SHOW_TFTP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Rcvd TFTP_ERR #%d (%s)\n",errcode,errstring);
+        TftpCount = -1;
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPERROR);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(TftpErrString,errstring,<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(TftpErrString)-1);
+        TftpErrString[<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(TftpErrString)-1] = 0;
+        return(0);
+    default:
+        if (EtherVerbose & SHOW_TFTP)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Rcvd &lt;%04x&gt; unknown TFTP opcode\n", opcode);
+        TftpCount = -1;
+        return(-1);
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#SendTFTPAck>SendTFTPAck</A>(ehdr,block);
+    return(0);
+}
+
+/* SendTFTPRRQ():
+ *  Pass the ether and ip address of the TFTP server, along with the
+ *  filename and mode to start up a target-initiated TFTP download.
+ *  The initial TftpState value is TFTPSENTRRQ, this is done so that incoming
+ *  TFTP_DAT packets can be verified...
+ *   - If a TFTP_DAT packet is received and TftpState is TFTPSENTRRQ, then
+ *     the block number should be 1.  If this is true, then that server's
+ *     source port is stored away in TftpRmtPort so that all subsequent
+ *     TFTP_DAT packets will be compared to the initial source port.  If no
+ *     match, then respond with a TFTP error or ICMP PortUnreachable message.
+ *   - If a TFTP_DAT packet is received and TftpState is TFTPSENTRRQ, then
+ *     if the block number is not 1, generate a error.
+ */
+int
+<A NAME="SendTFTPRRQ">SendTFTPRRQ</A>(uchar *ipadd,uchar *eadd,char *filename,char *mode,uchar *loc)
+{
+    uchar *tftpdat;
+    ushort ip_len;
+    struct ether_header *te;
+    struct ip *ti;
+    struct Udphdr *tu;
+
+    TftpChopCount = 0;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPSENTRRQ);
+    TftpAddr = loc;
+    TftpCount = 0;
+
+    /* Retrieve an ethernet buffer from the driver and populate the
+     * ethernet level of packet:
+     */
+    te = (struct ether_header *) <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#getXmitBuffer>getXmitBuffer</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_shost,BinEnetAddr,6);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&te-&gt;ether_dhost,eadd,6);
+    te-&gt;ether_type = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ETHERTYPE_IP);
+
+    /* Move to the IP portion of the packet and populate it appropriately: */
+    ti = (struct ip *) (te + 1);
+    ti-&gt;ip_vhl = IP_HDR_VER_LEN;
+    ti-&gt;ip_tos = 0;
+    ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) +
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(filename) + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(mode) + 4;
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ip_len);
+    ti-&gt;ip_id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipId>ipId</A>();
+    ti-&gt;ip_off = 0;
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ti-&gt;ip_src.s_addr,BinIpAddr,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ti-&gt;ip_dst.s_addr,ipadd,4);
+
+    /* Now udp... */
+    tu = (struct Udphdr *) (ti + 1);
+    tu-&gt;uh_sport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#getTftpSrcPort>getTftpSrcPort</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(tu-&gt;uh_sport);
+    tu-&gt;uh_dport = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TftpPort);
+    tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>((ushort)(ip_len - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip)));
+
+    /* Finally, the TFTP specific stuff... */
+    tftpdat = (uchar *)(tu+1);
+    *(ushort *)(tftpdat) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_RRQ);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(tftpdat+2,filename);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(tftpdat+2+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(filename)+1,mode);
+
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(mode,"netascii"))
+        TftpWrqMode = MODE_NETASCII;
+    else
+        TftpWrqMode = MODE_OCTET;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#storePktAndSend>storePktAndSend</A>(ti, te,TFTPACKSIZE+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(filename)+<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(mode));
+
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n  Sent TFTP_RRQ (file=%s)\n",filename);
+
+    return(0);
+}
+
+/* SendTFTPAck():
+ */
+int
+<A NAME="SendTFTPAck">SendTFTPAck</A>(struct ether_header *re,ushort block)
+{
+    uchar *tftpdat;
+    ushort ip_len;
+    struct ether_header *te;
+    struct ip *ti, *ri;
+    struct Udphdr *tu, *ru;
+
+    te = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherCopy>EtherCopy</A>(re);
+
+    ti = (struct ip *) (te + 1);
+    ri = (struct ip *) (re + 1);
+    ti-&gt;ip_vhl = ri-&gt;ip_vhl;
+    ti-&gt;ip_tos = ri-&gt;ip_tos;
+    ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + 4;
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(ip_len);
+    ti-&gt;ip_id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipId>ipId</A>();
+    ti-&gt;ip_off = ri-&gt;ip_off;
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_src.s_addr),(char *)&(ri-&gt;ip_dst.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_dst.s_addr),(char *)&(ri-&gt;ip_src.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+
+    tu = (struct Udphdr *) (ti + 1);
+    ru = (struct Udphdr *) (ri + 1);
+    tu-&gt;uh_sport = ru-&gt;uh_dport;
+    tu-&gt;uh_dport = ru-&gt;uh_sport;
+    tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>((ushort)(ip_len - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip)));
+
+    tftpdat = (uchar *)(tu+1);
+    *(ushort *)(tftpdat) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_ACK);
+    *(ushort *)(tftpdat+2) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(block);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#storePktAndSend>storePktAndSend</A>(ti,te,TFTPACKSIZE);
+
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Sent TFTP_ACK (blk#%d)\n",block);
+    return(0);
+}
+
+/* SendTFTPErr():
+ */
+int
+<A NAME="SendTFTPErr">SendTFTPErr</A>(struct ether_header *re,short errno,char *errmsg,int changestate)
+{
+    short len, tftplen, hdrlen;
+    uchar *tftpmsg;
+    struct ether_header *te;
+    struct ip *ti, *ri;
+    struct Udphdr *tu, *ru;
+
+    if (changestate)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPERROR);
+
+    tftplen = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(errmsg) + 1 + 4;
+    hdrlen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr);
+    len = tftplen + hdrlen ;
+
+    te = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherCopy>EtherCopy</A>(re);
+
+    ti = (struct ip *) (te + 1);
+    ri = (struct ip *) (re + 1);
+    ti-&gt;ip_vhl = ri-&gt;ip_vhl;
+    ti-&gt;ip_tos = ri-&gt;ip_tos;
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(len);
+    ti-&gt;ip_id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipId>ipId</A>();
+    ti-&gt;ip_off = ri-&gt;ip_off;
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_src.s_addr),(char *)&(ri-&gt;ip_dst.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_dst.s_addr),(char *)&(ri-&gt;ip_src.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+
+    tu = (struct Udphdr *) (ti + 1);
+    ru = (struct Udphdr *) (ri + 1);
+    tu-&gt;uh_sport = ru-&gt;uh_dport;
+    tu-&gt;uh_dport = ru-&gt;uh_sport;
+    tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + tftplen;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(tu-&gt;uh_ulen);
+
+    tftpmsg = (uchar *)(tu+1);
+    *(ushort *)(tftpmsg) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_ERR);
+    * (ushort *)(tftpmsg+2) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(errno);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(tftpmsg+4,errmsg);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#storePktAndSend>storePktAndSend</A>(ti,te,TFTPACKSIZE + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strlen>strlen</A>(errmsg) + 1);
+
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Sent TFTP Err#%d (%s) \n",errno,errmsg);
+
+    return(0);
+}
+
+/* SendTFTPData():
+ */
+int
+<A NAME="SendTFTPData">SendTFTPData</A>(struct ether_header *re,ushort block,uchar *data,int count)
+{
+    int len, tftplen, hdrlen;
+    uchar *tftpmsg;
+    struct ether_header *te;
+    struct ip *ti, *ri;
+    struct Udphdr *tu, *ru;
+
+    if (count &gt; TFTP_DATAMAX)
+        count = TFTP_DATAMAX;
+
+    tftplen = count + 2 + 2; /* sizeof (data + opcode + blockno) */
+    hdrlen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip) + <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr);
+    len = tftplen + hdrlen ;
+
+    te = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherCopy>EtherCopy</A>(re);
+
+    ti = (struct ip *) (te + 1);
+    ri = (struct ip *) (re + 1);
+    ti-&gt;ip_vhl = ri-&gt;ip_vhl;
+    ti-&gt;ip_tos = ri-&gt;ip_tos;
+    ti-&gt;ip_len = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(len);
+    ti-&gt;ip_id = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipId>ipId</A>();
+    ti-&gt;ip_off = ri-&gt;ip_off;
+    ti-&gt;ip_ttl = UDP_TTL;
+    ti-&gt;ip_p = IP_UDP;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_src.s_addr),(char *)&(ri-&gt;ip_dst.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_dst.s_addr),(char *)&(ri-&gt;ip_src.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+
+    tu = (struct Udphdr *) (ti + 1);
+    ru = (struct Udphdr *) (ri + 1);
+    tu-&gt;uh_sport = ru-&gt;uh_dport;
+    tu-&gt;uh_dport = ru-&gt;uh_sport;
+    tu-&gt;uh_ulen = <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct Udphdr) + tftplen;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#self_ecs>self_ecs</A>(tu-&gt;uh_ulen);
+
+    tftpmsg = (uchar *)(tu+1);
+    *(ushort *)(tftpmsg) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(TFTP_DAT);
+    *(ushort *)(tftpmsg+2) = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/endian.h.html#ecs>ecs</A>(block);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>(tftpmsg+4,data,count);
+
+    len+=<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ether_header);
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#storePktAndSend>storePktAndSend</A>(ti,te,len);
+
+    if (EtherVerbose & SHOW_TFTP)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("  Sent TFTP data blk#%d (%d bytes @ 0x%lx) \n",
+            block,count,(ulong)data);
+    return(0);
+}
+
+/* Tftp():
+ *  Initiate a tftp transfer at the target (target is client).
+ *  Command line:
+ *      tftp [options] {IP} {get|put} {file|addr} [len]...
+ *      tftp [options] {IP} get file dest_addr
+ *      tftp [options] {IP} put addr dest_file len
+ *  Currently, only "get" is supported.
+ */
+
+char *TftpHelp[] = {
+    "Trivial file transfer protocol",
+    "-[aF:f:i:nvV] [on|off|IP] {get filename [addr]}",
+    " -a        use netascii mode",
+    " -F {file} name of tfs file to copy to",
+    " -f {flgs} file flags (see tfs)",
+    " -i {info} file info (see tfs)",
+    " -v        low verbosity",
+    " -V        high verbosity",
+    0,
+};
+
+int
+<A NAME="Tftp">Tftp</A>(int argc,char *argv[])
+{
+    int     opt;
+    char    *mode, *file, *info, *flags;
+    ulong   addr;
+
+    file = (char *)0;
+    info = (char *)0;
+    flags = (char *)0;
+    mode = "octet";
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"aF:f:i:vV")) != -1) {
+        switch(opt) {
+        case 'a':
+            mode = "netascii";
+            break;
+        case 'f':
+            flags = optarg;
+            break;
+        case 'F':
+            file = optarg;
+            break;
+        case 'i':
+            info = optarg;
+            break;
+        case 'v':
+            EtherVerbose |= SHOW_TFTP;
+            break;
+        case 'V':
+            EtherVerbose = SHOW_TFTP | SHOW_INCOMING | SHOW_OUTGOING;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+    if (argc &lt; (optind+1))
+        return(CMD_PARAM_ERROR);
+
+    if (argc == optind+1) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind],"on"))
+            TftpTurnedOff = 0;
+        else if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind],"off")) {
+            TftpTurnedOff = 1;
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGotoState>tftpGotoState</A>(TFTPIDLE);
+        }
+        else
+            return(CMD_PARAM_ERROR);
+        return(CMD_SUCCESS);
+    }
+
+    /* If either the info or flags field has been specified, but the */
+    /* filename is not specified, error here... */
+    if ((info || flags) && (!file)) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Filename missing\n");
+        return(CMD_FAILURE);
+    }
+
+    TftpTurnedOff = 0;
+    if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind+1],"get")) {
+
+        if (argc == optind+4)
+            addr = (ulong)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind+3],0,0);
+        else if (argc == optind+3)
+            addr = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#getAppRamStart>getAppRamStart</A>();
+        else
+            return(CMD_PARAM_ERROR);
+
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpGet>tftpGet</A>(addr,argv[optind],mode,argv[optind+2],file,flags,info);
+
+        EtherVerbose = 0;
+    }
+    else if ((argc == optind+5) && !<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(argv[optind+1],"put")) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("tftp 'put' not yet supported\n");
+    }
+    else
+        return(CMD_PARAM_ERROR);
+
+    return(CMD_SUCCESS);
+}
+
+void
+<A NAME="ShowTftpStats">ShowTftpStats</A>()
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Current TFTP state: %s\n",<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tftp.c.html#tftpStringState>tftpStringState</A>(TftpState));
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

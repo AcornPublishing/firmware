@@ -1,0 +1,199 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/start.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* start.c:
+ *
+ * This is typically the first 'C' code executed by the processor after a
+ * reset.
+ * 
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpu.h"
+#include "cpuio.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "devices.h"
+
+extern  void main(), initCPUio(), InitUART(), vinit(), InitMonSTATUS();
+extern  void bailout();
+
+const char *argv[] = {
+    MONARGV0,
+    (char *)0
+};
+
+/* The monitor's stack is declared in target-specific reset.s.
+ * It is externed here so that the bottom of the stack can be loaded with
+ * some fixed value to be checked periodically be stkchk() to determine if
+ * a stack overflow has occurred.
+ */
+extern ulong    MonStack[];
+
+
+/* APPLICATION_RAMSTART:
+ * Loaded with the address after which the application can be loaded.
+ */
+ulong       APPLICATION_RAMSTART;
+
+/* BOOTROM_BASE:
+ * Loaded with the address considered to be the base address of the
+ * bootrom.
+ */
+ulong       BOOTROM_BASE;
+
+/* LoopsPerSecond:
+ * Loaded with a count (established in config.h) that is an estimation of
+ * one second of elapsed time.  It is NOT an accurate value, but serves the
+ * purpose of providing a hardware-independent mechanism for establishing 
+ * a reasonable estimation of one second's worth of elapsed time.
+ */
+int         LoopsPerSecond;
+
+/* init1():
+ * This is the first level of initialization (aside from the most fundamental
+ * stuff that must be done in reset.s) that is done after the system resets.
+ */
+void
+<A NAME="init1">init1</A>(int baud)
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#initCPUio>initCPUio</A>();        /* Configure all chip-selects, parallel IO
+                         * direction registers, etc...  This may have
+                         * been done already in reset.s
+                         */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/except_860.c.html#vinit>vinit</A>();            /* Initialize the cpu's vector table. */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/devices.c.html#devInit>devInit</A>(baud);      /* Initialize system devices. */
+}
+
+/* start():
+ * Called at the end of reset.s as the first C function after processor
+ * bootup.  It is passed a state that is used to determine whether or not
+ * the CPU is restarting as a result of a warmstart or a coldstart.
+ *
+ * The FORCE_BSS_INIT definition can be established in the target-specific
+ * config.h file to force .bss space initialization regardless of warm/cold
+ * start.
+ * The bss_start, bss_end and boot_base variables are usually defined in 
+ * the target-specific linker memory-map definition file.  The bss_start
+ * and bss_end tags symbolically identify the beginning and end of the
+ * .bss section.  Many compilers support intrinsic tags for this; however,
+ * since it is apparently not consistent from one toolset to the next;
+ * I chose to make up my own tags so that this file never changes from
+ * one toolset to the next.  The boot_base tag points to the base of the
+ * flash that this monitor is burned into.
+ */
+void
+<A NAME="start">start</A>(register int state)
+{
+    int                 argc;
+    volatile register uchar *ramstart, *ramend;
+
+#ifdef FORCE_BSS_INIT
+    state = INITIALIZE;
+#endif
+
+    if (state == INITIALIZE) {
+        /* Initialize monitor-owned ram... Since this loop initializes
+         * all monitor ram, the code within the loop must NOT use any
+         * ram-based vars (ramstart is a register).  Also, since the
+         * stack gets cleared during this operation, this function
+         * (start) must never return, and cannot expect non-register
+         * local variables to retain their values.
+         */
+        ramstart = (uchar *)&bss_start;
+        ramend   = (uchar *)&bss_end;
+        while(ramstart &lt; ramend) {
+            *ramstart++ = 0;
+        }
+    }
+
+    StateOfMonitor = state;
+
+    /* Store the base address of memory that is used by application.
+     * Start it off on the next 4K boundary after the end of monitor ram.
+     * Usually APPRAMBASE and BOOTROMBASE can be retrieved from bss_end and
+     * boot_base; but they can be overridden with values specified in the
+     * target-specific config.h file.
+     */
+#ifdef APPRAMBASE_OVERRIDE
+    APPLICATION_RAMSTART = APPRAMBASE_OVERRIDE;
+#else
+    APPLICATION_RAMSTART = (((ulong)&bss_end) | 0xfff) + 1;
+#endif
+
+#ifdef BOOTROMBASE_OVERRIDE
+    BOOTROM_BASE = BOOTROMBASE_OVERRIDE;
+#else
+    {
+    BOOTROM_BASE = (ulong)&boot_base;
+    }
+#endif
+
+    /* Load bottom of stack with 0xdeaddead to be used by stkchk().
+     */
+    MonStack[0] = 0xdeaddead;
+
+    /* Set up default loops-per-second count.
+     */
+    LoopsPerSecond = LOOPS_PER_SECOND;
+
+    /* Do some fundamental initialization of system.
+     */
+    if (state == INITIALIZE)
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/start.c.html#init1>init1</A>(DEFAULT_BAUD_RATE);
+    else
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/start.c.html#init1>init1</A>(0);
+
+    argc = 0;
+    while(argv[argc] != 0) {
+        argc++;
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#main>main</A>(argc,argv);
+
+    /* The function main() should not return, but just in case...
+     */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/go.c.html#bailout>bailout</A>();  
+}
+
+/* __eabi():
+ * Called intrinsically by main for PowerPc builds.
+ * I'm not sure what the purpose of it is, but EABI is Embedded Application
+ * Binary Interface, and is documented on Motorola's web site at
+ *    http://www.mcu.motsps.com/lit/manuals/eabispec.html#536421
+ */
+void
+<A NAME="__eabi">__eabi</A>()
+{
+}
+
+/* __main() is called intrinsically by main.  It is typically used to
+   run constructors and destructors (I think) for C++.  If this function
+   is not created here, then the compiler will automatically create one
+   and with it, will come other unnecessary baggage.
+*/
+void
+<A NAME="__main">__main</A>()
+{
+}
+</HTML>
+</PRE>
+</BODY>

@@ -1,0 +1,128 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: ARGV</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ARGV</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">argv</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Create or read in an argument
+list.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">argv -[cilv] [arg0] [arg1] ...
+[argN]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the monitor
+to build an argument list that is accessible by the application through
+the <a href="../monlib.html">monilb</a> function <a href="../api/getargv.html">getargv</a>()
+(for compiled executables) or by the argv command itself (for scripts).&nbsp;
+For compiled executables, this requires that the application be built with
+the getargv() call ran prior to main(); such that, getargv() will buile
+the argc,argv argument structures accessed by the application.&nbsp; For
+scripts the argument list is automatically built when the script is called
+on the command line and then the script uses the -c and -v optinos to retrieve
+the argument list (see below).</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-c</font></li>
+
+<br><font face="Arial,Helvetica">load the shell variable $ARGC with the
+argument count;</font>
+<li>
+<font face="Arial,Helvetica">-i</font></li>
+
+<br><font face="Arial,Helvetica">initialize (clear) the internal argv list;</font>
+<li>
+<font face="Arial,Helvetica">-l</font></li>
+
+<br><font face="Arial,Helvetica">list the current argv array strings;</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">load $ARGC with argument count and $ARG'N'
+with each argument passed into a script.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">argv appname PCM 0x1400</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Builds argv[0] as "appname",
+argv[1] as "PCM" and argv[2] as "0x1400"; the argument count would be 3</font>
+<li>
+<font face="Arial,Helvetica">argv -l</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Displays the current
+"char *argv[]" array configured</font>
+<li>
+<font face="Arial,Helvetica">argv -c</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Loads the shell variable
+$ARGC with the argument count currently stored by argv.</font>
+<li>
+<font face="Arial,Helvetica">argv -v</font></li>
+
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Loads $ARGC with argument
+count and $ARG'N' with each command line argument.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">A host-based debugger can use this command
+when an application is downloaded into RAM from the host.&nbsp; When an
+application under TFS is started, the arguments can be on the command line
+and argv is not needed.</font></li>
+
+<li>
+<font face="Arial,Helvetica">When the executable is a TFS script, the -v
+and -c options become useful for retrieving the argument count and argument
+list.&nbsp; The minimum argument count passed to a script would be 1, and
+the first argument of the list is ARG0.</font></li>
+</blockquote>
+
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Flash Configuration Considerations</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>Memory Layout Options for TFS</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; The monitor
+itself is a program.&nbsp; As a program, it doesn't require much of the
+system that it runs on...&nbsp; An RS-232 port, maybe an ethernet port,
+some RAM and some flash.&nbsp; That's about it, and if left at this point,
+chances are likely that the hardware will support the needs of the monitor.&nbsp;
+On the other hand, the application that the monitor will eventually be
+turning control over to may have requirements that justify a little bit
+of up-front thinking with regard to the memory layout.&nbsp; There are
+a few things to consider when configuring a memory design for use with
+a system that will run with MicroMonitor.&nbsp; A wide range of flash devices
+are now available.&nbsp; For the sake of this discussion, there are a few
+major distinctions between the various devices available:&nbsp; the size
+of the device and the flexibility it provides with regard to sector protection...</font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><b>The size of the device </b>is pretty obvious.&nbsp;
+You must be sure the application you plan to run, plus the monitor, will
+fit in the device.</font></li>
+
+<li>
+<font face="Arial,Helvetica"><b>The sector protection flexibility</b> is
+a bit less obvious but must be considered if there is any need for some
+portion of the device to be unprogrammable while other portions are programmable.&nbsp;
+There are a lot of options here.&nbsp; Some devices can be programmed with
+an external device programmer and then certain sectors can be made uneraseable.&nbsp;
+Once put into the system those uneraseable sectors are safe from any "devious"
+firmware that may accidentally attempt to corrupt that space.&nbsp; This
+is good.&nbsp; On the other hand, if those sectors ever need to be reprogrammed,
+then the device will have to be removed from the target system and reprogrammed
+by the external device programmer.&nbsp; Some of the newer parts support
+"temporary sector un-protect" and there are varying levels of support for
+this.&nbsp; Some of the parts go into an "unprotect" mode if some higher
+voltage is applied to a pin, while others simply need to have one of their
+pins set to a high or low state (via some physical jumper).&nbsp; Lots
+of choices here, so think about what you need before you just assume "flash
+is flash".</font></li>
+</ul>
+<font face="Arial,Helvetica">Following is a list of considerations that
+start with a system that needs minimal memory support, up through a system
+that should consider additional hardware support for TFS.&nbsp; Each question
+is followed by a brief discussion and a device suggestion in italics.</font>
+<br>&nbsp;
+<h2>
+<font face="Arial,Helvetica"><font size=+0>Will the system ever be updated
+after initial factory installation?</font></font></h2>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If the answer to this question
+is no, then you have the simplest of systems.&nbsp; The monitor and application
+files can be burned into the memory and as long as the code doesn't try
+to modify anything, everything will work fine.
+<i>Since this system does
+not require any in-system changes, it would be adequate to use EPROM, but
+EPROM is quickly becoming "old" technology.&nbsp; Careful consideration
+should be taken if EPROM is being considered.&nbsp; Much of the flexibility
+of the monitor is lost without the ability to write to the file system.</i></font>
+<h2>
+<font face="Arial,Helvetica"><font size=+0>Is it ok for the monitor binary
+to be in flash space that is eraseable?</font></font></h2>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If the answer to this question
+is yes, then the monitor and application files can all exist in the same
+flash device and there is no need to consider any hardware-assisted flash
+protection, just leave all the flash in its normal write/erase more.&nbsp;
+If the answer to this is no, then either the sectors of the flash device
+that contain the monitor must be protected, or the boot monitor must be
+in a different device than TFS.&nbsp; <i>This system would be adequately
+served by an AMD 29F010-type device.&nbsp; It's simple, and is probably
+at the lower end of the price range for flash.</i></font>
+<br><font face="Arial,Helvetica">Note that if the monitor binary is in
+space that is not eraseable, then it cannot be updated in the field.</font>
+<h2>
+<font face="Arial,Helvetica"><font size=+0>Is there a need for some files
+in TFS to be un-eraseable and others to be eraseable?</font></font></h2>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If the answer to this is
+yes, then the hardware must be able to selectively protect (or not)&nbsp;
+multiple sectors of flash space.&nbsp; Note that this does not necessarily
+mean any additional hardware, it can be addressed by selecting a more versatile
+flash device.&nbsp; <i>The Intel TE28F320 device (family) is very versatile
+for this kind of stuff.</i></font>
+<h2>
+<font face="Arial,Helvetica"><font size=+0>Is there a need for some files
+to be very frequently written and rewritten?</font></font></h2>
+<font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; If the answer to this is
+yes, then the best solution is to add some battery backed ram to the system
+and overlay TFS onto that memory range.&nbsp; Note that we are talking
+about tens-of-thousands of rewrites here, not just a few. <i>Dallas Semiconductor
+makes BBRAM parts that have the battery built into the device and tout
+a 10-year life.&nbsp; They also have devices that allow you to turn a normal
+SRAM into a battery-backed RAM.</i></font>
+<p><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; Once the answers to
+these questions are known, then it's necessary to decide what hardware
+support to add and if not added, what adjustments need to be made to the
+requirements.&nbsp; For the bottom boot system, the monitor would reside
+just above the reset vector address of the CPU.&nbsp; For the top boot
+system, the monitor would reside just below the reset vector address of
+the CPU.&nbsp; Following are a few diagrams that should help...</font></blockquote>
+
+<center><img SRC="../images/single_flashcfg.gif" NOSAVE height=576 width=768>
+<br>&nbsp;
+<br>&nbsp;
+<p><img SRC="../images/multi_flashcfg.gif" NOSAVE height=576 width=768></center>
+
+<p><br>
+<blockquote><font face="Arial,Helvetica">Note that there is additional
+discussion on flash in&nbsp;</font> <font face="Arial,Helvetica">the <a href="../commands/flash.html">flash</a>
+command and the&nbsp; <a href="bootblock.html">boot block safety</a> appnote.</font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

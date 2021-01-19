@@ -1,0 +1,144 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor Tools: moncmd</title>
+</head>
+<body background="../../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Tools</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>MONCMD</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">moncmd</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Interface to the monitor's UDP
+command interface port.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">moncmd [-p:w:qrV] {target ip-address}
+"target command string"</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This tool allows the user to communicate
+with a target running MicroMonitor through ethernet/UDP.&nbsp; The monitor
+has a server waiting for incoming command strings on port 777 (or whatever
+port is assigned in the <a href="../../shellvars.html#MCMDPORT">MCMDPORT</a>
+shell variable).&nbsp; It will process the command string sent via moncmd
+just as it would process a command from the console interface.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">-p {##}</font></li>
+
+<br><font face="Arial,Helvetica">override default port number of 777;</font>
+<li>
+<font face="Arial,Helvetica">-w {##}</font></li>
+
+<br><font face="Arial,Helvetica">number of seconds to wait for response,
+after which a timeout will occur (default is 10 seconds);</font>
+<li>
+<font face="Arial,Helvetica">-q</font></li>
+
+<br><font face="Arial,Helvetica">quiet mode (don't print the timeout message);</font>
+<li>
+<font face="Arial,Helvetica">-r</font></li>
+
+<br><font face="Arial,Helvetica">retry if command-not-received.&nbsp; Note
+that if the command is received, but not completed the retry does not apply.</font>
+<li>
+<font face="Arial,Helvetica">-v</font></li>
+
+<br><font face="Arial,Helvetica">verbose mode (print the 'Sending...' string);</font>
+<li>
+<font face="Arial,Helvetica">-V</font></li>
+
+<br><font face="Arial,Helvetica">display the version (build date) of the
+tool</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">moncmd 135.3.94.136 "tfs ls"</font></li>
+
+<br><font face="Arial,Helvetica">Send the command string "tfs ls" to a
+target at IP address 135.3.94.136</font>
+<li>
+<font face="Arial,Helvetica">moncmd -w0 135.3.94.136 "reset"</font></li>
+
+<br><font face="Arial,Helvetica">Tell the target at IP address 135.3.94.136
+to reset.&nbsp; Note that waittime is set to zero because there will be
+no response, since we are resetting the target firmware.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXIT STATUS:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">0 if successful</font></li>
+
+<br><font face="Arial,Helvetica">Command was received, executed and completed.</font>
+<li>
+<font face="Arial,Helvetica">1 if timeout waiting for command completion</font></li>
+
+<br><font face="Arial,Helvetica">In this case, moncmd verified that the
+command was received by the target, but there was no command completion
+handshake.&nbsp; This would be the type of timeout that would occur if
+moncmd was used to issue a target reset.</font>
+<li>
+<font face="Arial,Helvetica">2 if error</font></li>
+
+<br><font face="Arial,Helvetica">Some kind of usage error typically.</font>
+<li>
+<font face="Arial,Helvetica">3 if timeout waiting for command reception</font></li>
+
+<br><font face="Arial,Helvetica">In this case, moncmd could not even verify
+that the command was received by the target.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DOWNLOAD:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica"><a href="../solaris/moncmd">SUN Solaris</a>&nbsp;
+(to download this using your browser, use the right mouse button and click
+on "Save Image as...")</font></li>
+
+<li>
+<font face="Arial,Helvetica"><a href="../win95/moncmd.exe">PC Win95</a></font></li>
+</ul>
+
+</body>
+</html>

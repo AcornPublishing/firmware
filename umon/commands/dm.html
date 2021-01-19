@@ -1,0 +1,173 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Command: DM</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>DM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">dm</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Display memory.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">dm -[24bdefmsv:] {address} [byte-count]</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">There are several different types
+of memory that can reside on a target.</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">Standard memory: used by the CPU for instruction
+and/or data storage. This is addressed sequentially with the options to
+specify the width of the memory.&nbsp; The width specification effects
+both the display format as well as the access type (byte, short, and long)
+used to retrieve the data.</font></li>
+
+<li>
+<font face="Arial,Helvetica">FIFO memory: can be read/written to empty/fill
+a FIFO.&nbsp; This type of access is not sequential, the same address is
+used for each access and the FIFO itself handles the queuing or de-queing
+of the data.&nbsp; This is also width dependent.</font></li>
+
+<li>
+<font face="Arial,Helvetica">Memory mapped peripherals: have their own
+unique "qualities" that put restrictions on how they can be accessed.</font></li>
+</ul>
+<font face="Arial,Helvetica">This command attempts to support all modes
+of memory access through different options.&nbsp; Width can be specified
+for 8/16/32 bit access, the exact number of accesses can also be specified;
+there is no modulo of the user-specified count. This is actually quite
+important for FIFO and/or memory mapped peripherals because you want to
+read the EXACT number of bytes specified. Note that the count specification
+is in bytes, regardless of the width specification.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>OPTIONS:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">-2</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve data as 16-bit (2 bytes) wide
+units.;</font>
+<li>
+<font face="Arial,Helvetica">-4</font></li>
+
+<br><font face="Arial,Helvetica">Retrieve data as 32-bit (4 bytes) wide
+units;</font>
+<li>
+<font face="Arial,Helvetica">-b</font></li>
+
+<br><font face="Arial,Helvetica">Dump memory in binary.&nbsp; This is typically
+used by a host-resident debugger that is connected to the target for faster
+data retrieval.&nbsp; Width can be specified for 8/16/32 bits.</font>
+<li>
+<font face="Arial,Helvetica">-d</font></li>
+
+<br><font face="Arial,Helvetica">Display memory in decimal units instead
+of the default hex.&nbsp; Width can be specified for 8/16/32 bits.</font>
+<br><font face="Arial,Helvetica">-e</font>
+<li>
+<font face="Arial,Helvetica">Display 2 and 4-byte memory units endian reversed.</font></li>
+
+<li>
+<font face="Arial,Helvetica">-f</font></li>
+
+<br><font face="Arial,Helvetica">Display memory as if it were a FIFO.&nbsp;
+The address is not incremented, and width can be specified for 8/16/32
+bits.</font>
+<li>
+<font face="Arial,Helvetica">-m</font></li>
+
+<br><font face="Arial,Helvetica">Interactively provide a "more?" query
+to the user to support user-controlled throttling of the output.</font>
+<li>
+<font face="Arial,Helvetica">-s</font></li>
+
+<br><font face="Arial,Helvetica">Display the data as a null-terminated
+ASCII string.&nbsp;&nbsp;&nbsp; Display continues through memory until
+a NULL is detected.&nbsp; The only width supported here is 8-bit.</font>
+<li>
+<font face="Arial,Helvetica">-v {varname}</font></li>
+
+<br><font face="Arial,Helvetica">Load a single data element at location
+'address' into the shell variable 'varname'.&nbsp; If -s option is also
+present, then the variable is loaded with the address after the NULL termination
+of the string just printed.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">dm -2 0xa3000000</font></li>
+
+<br><font face="Arial,Helvetica">Display in short (16-bit) format, a block
+of memory starting at&nbsp;&nbsp;&nbsp;&nbsp; location 0xa3000000.</font>
+<li>
+<font face="Arial,Helvetica">dm -2f 0xa0100000 32</font></li>
+
+<br><font face="Arial,Helvetica">Pull 32 units out of a 16-bit FIFO residing
+at location 0xa0100000 in the memory map.</font>
+<li>
+<font face="Arial,Helvetica">dm -s 0xa0041000 32</font></li>
+
+<br><font face="Arial,Helvetica">Display memory starting at address 0xa0041000
+as if it were an ASCII string.&nbsp; If a null is detected prior to the
+32nd byte, terminate; else terminate at the 32nd byte regardless.</font>
+<li>
+<font face="Arial,Helvetica">To print a list of concatenated, NULL-terminated
+strings...</font></li>
+
+<ul><font face="Arial,Helvetica">set NEXT 0x100000</font>
+<br><font face="Arial,Helvetica">dm -v NEXT -s $NEXT</font>
+<br><font face="Arial,Helvetica">dm -v NEXT -s $NEXT</font>
+<br><font face="Arial,Helvetica">dm -v NEXT -s $NEXT</font>
+<br><font face="Arial,Helvetica">etc...</font></ul>
+<font face="Arial,Helvetica">Each 'dm' command reloads the value of NEXT
+with the address after the string just printed.</font></ul>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>NOTES:</font></font></h1>
+
+<blockquote>
+<li>
+<font face="Arial,Helvetica">All command arguments in the monitor are assumed
+to be of the syntax requiring that hex data be entered with a leading 0x,
+octal with a leading 0 else assume decimal.</font></li>
+</blockquote>
+
+</body>
+</html>

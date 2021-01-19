@@ -1,0 +1,88 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: malloc</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_malloc()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_malloc()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Similar to standard malloc().</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">char&nbsp;&nbsp;&nbsp; *mon_malloc(int
+size);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This provides the application
+with a malloc() whose heap is maintained by the monitor.&nbsp; In addition,
+the heap is queriable through the <a href="../commands/heap.html">heap</a>
+command.&nbsp; At each allocation/deallocation, the entire control structure
+of the heap is checked for sanity.&nbsp; Also, in addition to control verification,
+overrun and underrun checks are made because the space returned by malloc
+also has additional wrapper space that is checked to verify that the space
+is not used beyond (or prior to) its limit.&nbsp; This implies overhead
+which may or may not be desired, but does provide a fairly strong amount
+of debugging.</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+The monitor is built with an amount of heap space that is needed for the
+monitor itself plus a bit extra for application space.&nbsp; To allow additional
+memory allocations to be made, the heap command allows the user to define
+a starting point and size of the additional space.&nbsp; Refer to the discussion
+on <a href="../appnotes/heapspace.html">extending the monitor's heap</a>
+for more information on this.</font>
+<br><font face="Arial,Helvetica">If interested, refer to text in the specified
+files below for more details on this malloc() implementation.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; size</font></li>
+
+<br><font face="Arial,Helvetica">the size of the block of memory to be
+allocated.</font></ul>
+
+<p><br><font face="Arial,Helvetica">Return:</font>
+<br><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; A pointer to the new
+block of memory or (char *)NULL if error.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/malloc.c.html#malloc">malloc.c</a>
+&amp; <a href="../src/common/monitor/sbrk.c.html">sbrk.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

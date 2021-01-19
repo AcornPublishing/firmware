@@ -1,0 +1,248 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro-Monitor Appnote: Servers using TFS</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<a NAME="top"></a><font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor AppNote:</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>TFTP, FTP &amp; HTTP Servers
+Using TFS</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<p><br>
+<blockquote><font face="Arial,Helvetica">&nbsp;&nbsp;&nbsp; A major portion
+of the complexity in building an embedded system TFTP, FTP or HTTP server
+is the fact that typically there is no file system.&nbsp; Since the monitor
+provides the application with a file system, basic versions of these servers
+are well within reach and have already been written.&nbsp; These servers
+are not part of the monitor code; rather, they assume that a complete Berkley-API
+sockets interface is available; hence, these servers assume to be running
+ontop of some RTOS.&nbsp; The current implementation is on VxWorks, but
+there is nothing in the code that depends on any VxWorks functionality
+that would not also be available on some other RTOS.&nbsp; The servers
+are not set up to serve simultaneous users (they're non-concurrent);&nbsp;
+this is a complexity that is typically not necessary for an embedded server;
+hence omitted for this implementation.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+0>TFTP Server:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Not much to say about this one.&nbsp;
+It works, supports gets and puts into and out of TFS.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+0>FTP Server:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This server exceeds the "Minimum
+Implementation" specification spoken of in <a href="../rfcs/rfc959.txt">RFC959</a>.</font>
+<br><font face="Arial,Helvetica">The following commands are supported:</font></blockquote>
+
+<center><table BORDER COLS=2 WIDTH="80%" >
+<tr>
+<td ALIGN=LEFT><font face="Arial,Helvetica">User</font></td>
+
+<td><font face="Arial,Helvetica">USER &lt;SP> &lt;username> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Password</font></td>
+
+<td><font face="Arial,Helvetica">PASS &lt;SP> &lt;password> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Present Working Directory</font></td>
+
+<td><font face="Arial,Helvetica">PWD &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Change Working Directory</font></td>
+
+<td><font face="Arial,Helvetica">CWD &lt;SP> &lt;dirname> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Change to parent directory</font></td>
+
+<td><font face="Arial,Helvetica">CDUP &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">System name</font></td>
+
+<td><font face="Arial,Helvetica">SYST &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">File modification time</font></td>
+
+<td><font face="Arial,Helvetica">MDTM &lt;SP> &lt;filename> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">File size</font></td>
+
+<td><font face="Arial,Helvetica">SIZE &lt;SP> &lt;filename> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Passive</font></td>
+
+<td><font face="Arial,Helvetica">PASV &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Delete file</font></td>
+
+<td><font face="Arial,Helvetica">DELE &lt;SP> &lt;pathname> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Reinitialize</font></td>
+
+<td><font face="Arial,Helvetica">REIN &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Data port</font></td>
+
+<td><font face="Arial,Helvetica">PORT &lt;SP> &lt;ip,ip,ip,ip,port,port>
+&lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Representation type</font></td>
+
+<td><font face="Arial,Helvetica">TYPE &lt;SP> &lt;A|E|I|L> [&lt;SP> &lt;N|T|C|bytesize>
+&lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Transfer mode</font></td>
+
+<td><font face="Arial,Helvetica">MODE &lt;SP> &lt;S|B|C> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">File structure</font></td>
+
+<td><font face="Arial,Helvetica">STRU &lt;SP> &lt;F|R|P> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">File listing</font></td>
+
+<td><font face="Arial,Helvetica">LIST [&lt;SP> &lt;pathname>] &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Name list</font></td>
+
+<td><font face="Arial,Helvetica">NLST [&lt;SP> &lt;pathname>] &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Store file</font></td>
+
+<td><font face="Arial,Helvetica">STOR &lt;SP> &lt;pathname> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Retrieve file</font></td>
+
+<td><font face="Arial,Helvetica">RETR &lt;SP> &lt;pathname> &lt;CRLF></font></td>
+</tr>
+
+<tr>
+<td><font face="Arial,Helvetica">Quit</font></td>
+
+<td><font face="Arial,Helvetica">QUIT &lt;CRLF></font></td>
+</tr>
+</table></center>
+
+<blockquote><font face="Arial,Helvetica"><font size=+1>Also, when a user
+first connects to the server, if the file '.ftpwelcome' is found in TFS,
+it will be printed as the welcome message presented to the newly logged
+in user.&nbsp; A few different logging levels are supported for dumping
+diagnostics to a console port and retrieval of username and password is
+supported.</font></font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>HTTP Server:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><font size=+1>This server supports
+GET, HEAD and POST requests to a limited degree...&nbsp; For GET, if the
+string is "GET / ", then the index.html file is the response, if the string
+is "GET /filename", then that file is used as the response.&nbsp; The same
+thing applies to HEAD, except that for the given filename, only the data
+between the &lt;HEAD> and &lt;/HEAD> strings is sent as the response.</font></font>
+<p><font face="Arial,Helvetica"><font size=+1>&nbsp;For POST, (generated
+by the html "form" mechanism), the input is assumed to be formatted as
+"POST /action" where 'action' defines what the server is to do with the
+next incoming TCP stream.&nbsp; This next stream is the data entered through
+the user interface presented by the html file that contains the form mechanism.&nbsp;
+There are a few different options that can be taken at this point...</font></font>
+<ul>
+<li>
+<font face="Arial,Helvetica"><font size=+1>the action can be some hardcoded
+response that is part of this server;</font></font></li>
+
+<li>
+<font face="Arial,Helvetica"><font size=+1>it can be another tfs file that
+can be executed through "docommand" by passing the name of the file (action
+string) and the address of the CGI stream that followed.&nbsp; It is then
+up to that executable to properly parse the CGI text stream and respond
+to it.</font></font></li>
+</ul>
+<font face="Arial,Helvetica"><font size=+1>The server supports Basic Authentication
+when the request is made to for a non-public file.&nbsp; By default all
+files are considered non-public, the PUBLIC directive of the .httpadmin
+file sets them up as public.&nbsp; The authentication is based on a set
+of userid/passwords that are established by the USERID directive in the
+.httpadmin file.&nbsp; The server supports the notion of single-user authorization
+(if&nbsp; the SINGLE_USER directive is set in .httpadmin.&nbsp; This, in
+conjunction with a timeout (MAX_SU_IDLE directive) allows one client to
+become authorized and this keeps others from becoming authorized until
+there is MAX_SU_IDLE seconds of idle time by the currently active authorized
+client.&nbsp; There is also an option to only allow clients to be accepted
+from the</font></font>
+<br><font face="Arial,Helvetica"><font size=+1>the local lan (CLIENT_MUST_BE_LOCAL).</font></font></blockquote>
+
+<br>&nbsp;
+<br>&nbsp;
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<blockquote>&nbsp;</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+</body>
+</html>

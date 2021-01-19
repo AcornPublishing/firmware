@@ -1,0 +1,124 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.73 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>Micro Monitor API: docommand</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor API</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>mon_docommand()</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font></center>
+
+<p><br>
+<h1>
+
+<hr WIDTH="100%"><b><font face="Arial,Helvetica"><font size=+1>API FUNCTION:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">mon_docommand()</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">A mechanism by which the application
+can invoke a command that is part of the monitor.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>PROTOTYPE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">int&nbsp;&nbsp;&nbsp; mon_docommand(char
+*cmd_string, int verbose);</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command allows the application
+code to execute commands that are normally executable from the console
+port of the monitor user interface.&nbsp; This allows, for example, an
+application to have a console interface with its own set of commands; then
+if the command entered does not match any of those commands in the application's
+command table, the command string can be passed to the monitor to see if
+the command is actually a monitor command.&nbsp; The end result is that
+the application code can inherit the command table of the monitor with
+almost zero overhead.</font>
+<p><font face="Arial,Helvetica">Parameters:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">char *cmd_string;</font></li>
+
+<br><font face="Arial,Helvetica">string of characters that would be typed
+as if they were a command entered at the console interface.</font>
+<li>
+<font face="Arial,Helvetica">int verbosity</font></li>
+
+<br><font face="Arial,Helvetica">this can be 0, 1 or 2 to provide different
+levels of verbosity.</font></ul>
+<font face="Arial,Helvetica">Return:</font>
+<ul>
+<li>
+<font face="Arial,Helvetica">CMD_SUCCESS:</font></li>
+
+<br><font face="Arial,Helvetica">Everything worked ok.</font>
+<br>&nbsp;
+<li>
+<font face="Arial,Helvetica">CMD_FAILURE:</font></li>
+
+<br><font face="Arial,Helvetica">Command parameters were valid, but command
+itself failed for some other reason.</font></ul>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">CMD_LINE_ERROR:</font></li>
+
+<br><font face="Arial,Helvetica">Command line itself was invalid.&nbsp;
+Too many args, invalid shell var syntax, etc.. Somekind of command line
+error prior to checking for the command name-to-function match.</font></ul>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">CMD_ULVL_DENIED:</font></li>
+
+<br><font face="Arial,Helvetica">Command's user level is higher than current
+user level, so access is denied.</font></ul>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">CMD_PARAM_ERROR:</font></li>
+
+<br><font face="Arial,Helvetica">Command line did not parse properly.&nbsp;
+There was a syntax error on the command line that did not even allow the
+command function to get going.</font></ul>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">CMD_NOT_FOUND:</font></li>
+
+<br><font face="Arial,Helvetica">Since these same return values are used
+for each command function plus the docommand() function, this error indicates
+that docommand() could not even find the command in the command table.</font></ul>
+</blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SOURCE FILE CONTAINING CODE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica"><a href="../src/common/monitor/docmd.c.html#docommand">docmd.c</a></font></blockquote>
+
+<blockquote>&nbsp;</blockquote>
+
+</body>
+</html>

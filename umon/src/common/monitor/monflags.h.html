@@ -1,0 +1,32 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/monflags.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+struct monflag {
+    unsigned long   bit;
+    char            *flagname;
+};
+
+extern int  monitorFlags;
+
+#define NOMONHEADER     (1 &lt;&lt; 0)    /* Don't print header at startup */
+#define NODEFRAGPRN     (1 &lt;&lt; 1)    /* Don't print defrag message */
+#define NOTFTPPRN       (1 &lt;&lt; 2)    /* Don't print tftp message */
+#define NOMONCMDPRN     (1 &lt;&lt; 3)    /* Don't print MONCMD message */
+#define NOTFTPOVW       (1 &lt;&lt; 4)    /* Don't allow tftp srvr to overwrite */
+                                    /* an existing file. */
+#define MONCOMVERBOSE   (1 &lt;&lt; 5)    /* The moncom() function will print */
+                                    /* status. */
+
+#define <A NAME="MFLAGS_NOMONHEADER">MFLAGS_NOMONHEADER</A>()    (monitorFlags & NOMONHEADER)
+#define <A NAME="MFLAGS_NODEFRAGPRN">MFLAGS_NODEFRAGPRN</A>()    (monitorFlags & NODEFRAGPRN)
+#define <A NAME="MFLAGS_NOTFTPPRN">MFLAGS_NOTFTPPRN</A>()      (monitorFlags & NOTFTPPRN)
+#define <A NAME="MFLAGS_NOMONCMDPRN">MFLAGS_NOMONCMDPRN</A>()    (monitorFlags & NOMONCMDPRN)
+#define <A NAME="MFLAGS_NOTFTPOVW">MFLAGS_NOTFTPOVW</A>()      (monitorFlags & NOTFTPOVW)
+#define <A NAME="MFLAGS_MONCOMVERBOSE">MFLAGS_MONCOMVERBOSE</A>()  (monitorFlags & MONCOMVERBOSE)
+</HTML>
+</PRE>
+</BODY>

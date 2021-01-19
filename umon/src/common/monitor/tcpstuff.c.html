@@ -1,0 +1,170 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/tcpstuff.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* tcpstuff.c:
+ *  Absolute minimum to properly refuse TCP connection requests to this
+ *  device.  The processTCP function is called if the incoming protocol is
+ *  TCP, but this code simply responds with a TCP RESET which is essentially
+ *  a refusal to establish the connection request being made from a remote
+ *  machine.
+ *  This is similar in functionality to the ICMP "destination unreachable
+ *  message".  Note that this is not an absolute necessity but it does
+ *  provide a "clean" response to the remote machine that is making the
+ *  connection request.  Without it, the remote machine would keep trying
+ *  to connect.
+ *  For more details, refer to TCP/IP Comer 3rd Edition pg 216-219.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#if INCLUDE_ETHERNET
+#include "genlib.h"
+#include "ether.h"
+#include "stddefs.h"
+
+/* SendTcpConnectionReset():
+ *  Called in response to any incoming TCP request.
+ *  It is used to let the sender know that the TCP connection is being
+ *  refused.
+ */
+int
+<A NAME="SendTcpConnectionReset">SendTcpConnectionReset</A>(re)
+struct ether_header *re;
+{
+    int     datalen;
+    ulong   ackno;
+    struct ether_header *te;
+    struct ip *ti, *ri;
+    struct tcphdr *ttcp, *rtcp;
+
+    ri = (struct ip *) (re + 1);
+    datalen = ri-&gt;ip_len - ((ri-&gt;ip_vhl & 0x0f) * 4);
+
+    te = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#EtherCopy>EtherCopy</A>(re);
+    ti = (struct ip *) (te + 1);
+    ti-&gt;ip_vhl = ri-&gt;ip_vhl;
+    ti-&gt;ip_tos = ri-&gt;ip_tos;
+    ti-&gt;ip_len = ri-&gt;ip_len;
+    ti-&gt;ip_id = ri-&gt;ip_id;
+    ti-&gt;ip_off = IP_DONTFRAG;
+    ti-&gt;ip_ttl = ri-&gt;ip_ttl/2;
+    ti-&gt;ip_p = ri-&gt;ip_p;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_src.s_addr),(char *)&(ri-&gt;ip_dst.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&(ti-&gt;ip_dst.s_addr),(char *)&(ri-&gt;ip_src.s_addr),
+        <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct in_addr));
+
+    ttcp = (struct tcphdr *) (ti + 1);
+    rtcp = (struct tcphdr *) (ri + 1);
+    ttcp-&gt;flags = rtcp-&gt;flags &= ~TCP_FLAGMASK;
+    ttcp-&gt;flags = rtcp-&gt;flags | TCP_ACK | TCP_RESET;
+    ttcp-&gt;sport = rtcp-&gt;dport;
+    ttcp-&gt;dport = rtcp-&gt;sport;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#memset>memset</A>((char *)&ttcp-&gt;seqno,0,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ackno,(char *)&rtcp-&gt;seqno,4);
+    ackno+=1;
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&ttcp-&gt;ackno,(char *)&ackno,4);
+
+    ttcp-&gt;windowsize = 0;
+    ttcp-&gt;urgentptr = 0;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)(ttcp+1),(char *)(rtcp+1),datalen-<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct tcphdr));
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ethernet.c.html#ipChksum>ipChksum</A>(ti);   /* compute checksum of ip hdr: (3rd Edition Comer pg 100) */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tcpstuff.c.html#tcpChksum>tcpChksum</A>(ti);  /* Compute TCP checksum */
+
+    <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/etherdev.c.html#sendBuffer>sendBuffer</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ether_header) + ti-&gt;ip_len);
+    return(0);
+}
+
+/*  tcpChksum():
+ *  Compute the checksum of the TCP packet.
+ *  The incoming pointer is to an ip header, the tcp header after that ip
+ *  header is directly populated with the result.  Similar to the udp
+ *  checksum calculation.  This one is mandatory.
+ */
+void
+<A NAME="tcpChksum">tcpChksum</A>(ihdr)
+struct ip *ihdr;
+{
+    register int    i;
+    register ushort *sp;
+    register ulong  t;
+    int     len;
+    struct  tcphdr *thdr;
+    struct  UdpPseudohdr    pseudohdr;
+
+    thdr = (struct tcphdr *)(ihdr+1);
+    thdr-&gt;tcpcsum = 0;
+
+    /* Start by building the pseudo header: */
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&pseudohdr.ip_src.s_addr,(char *)&ihdr-&gt;ip_src.s_addr,4);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/cstart.c.html#memcpy>memcpy</A>((char *)&pseudohdr.ip_dst.s_addr,(char *)&ihdr-&gt;ip_dst.s_addr,4);
+    pseudohdr.zero = 0;
+    pseudohdr.proto = ihdr-&gt;ip_p;
+    pseudohdr.ulen = ihdr-&gt;ip_len - <A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct ip);
+
+    /* Get checksum of pseudo header: */
+    sp = (ushort *) &pseudohdr;
+    for (i=0,t=0;i&lt;(<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(struct UdpPseudohdr)/<A HREF=FILE:/TOP_DIRNAME/src/common/cpu/mpc860.h.html#sizeof>sizeof</A>(ushort));i++,sp++)
+        t += *sp;
+
+    /* If length is odd, pad and add one. */
+    len = pseudohdr.ulen;
+    if (len & 1) {
+        uchar   *ucp;
+        ucp = (uchar *)thdr;
+        ucp[len] = 0;
+        len++;
+    }
+    len &gt;&gt;= 1;
+
+    sp = (ushort *) thdr;
+    for (i=0;i&lt;len;i++,sp++)
+        t += *sp;
+    t = (t & 0xffff) + (t &gt;&gt; 16);
+    thdr-&gt;tcpcsum = ~t;
+}
+
+void
+<A NAME="tcperrmsg">tcperrmsg</A>(msg)
+char    *msg;
+{
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("TCP error: %s\n",msg);
+}
+
+void
+<A NAME="processTCP">processTCP</A>(struct ether_header *ehdr,ushort size)
+{
+    struct  ip *ipp;
+    struct  tcphdr *tcpp;
+
+    ipp = (struct ip *)(ehdr + 1);
+    tcpp = (struct tcphdr *)((char *)ipp + <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ether.h.html#IP_HLEN>IP_HLEN</A>(ipp));
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tcpstuff.c.html#SendTcpConnectionReset>SendTcpConnectionReset</A>(ehdr);
+    return;
+}
+
+#endif
+</HTML>
+</PRE>
+</BODY>

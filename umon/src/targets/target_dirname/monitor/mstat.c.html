@@ -1,0 +1,91 @@
+<HTML>
+<HEADER>
+<TITLE>targets/target_dirname/monitor/mstat.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+#include "config.h"
+#include "cpu.h"
+#include "stddefs.h"
+#include "genlib.h"
+#include "arch_ppc.h"
+
+extern  void InitUART(), CSInfo(), InitMonSTATUS(), init_slot();
+
+static  ushort  MonitorSTATUS;
+
+void mstatshow();
+
+char *MstatHelp[] = {
+    "Monitor status",
+    "-[b:Hhs:]",
+    " -b {baud}  set baud rate",
+    " -c         dump chip-select info",
+    " -I         initialize ATLAS slots",
+    " -s {val}   set monitor state",
+    0,
+};
+
+int
+<A NAME="Mstat">Mstat</A>(int argc,char **argv)
+{
+    int opt;
+
+    /* If no args, just dump current status. */
+    if (argc == 1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/mstat.c.html#mstatshow>mstatshow</A>();
+        return(0);
+    }
+
+    while ((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"b:cs:x:")) != -1) {
+        switch(opt) {
+        case 'b':
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#InitUART>InitUART</A>(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#atoi>atoi</A>(optarg));
+            break;
+        case 'c':
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/cpuio.c.html#CSInfo>CSInfo</A>();
+            return(0);
+        case 's':
+            <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/mstat.c.html#InitMonSTATUS>InitMonSTATUS</A>((ushort)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(optarg,0,0));
+            break;
+        case 'x':
+            return(0);
+        default:
+            return(0);
+        }
+    }
+    if (argc != optind)
+        return(-1);
+    return(0);
+}
+
+void
+<A NAME="InitMonSTATUS">InitMonSTATUS</A>(ulong state)
+{
+    MonitorSTATUS = state;
+    ppcMtmsr((ushort)MonitorSTATUS);
+}
+
+void
+<A NAME="SetMonSTATUS">SetMonSTATUS</A>()
+{
+    ppcMtmsr((ushort)MonitorSTATUS);
+}
+
+void
+<A NAME="mstatshow">mstatshow</A>()
+{
+    extern  int <A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monState>monState</A>();
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#monHeader>monHeader</A>(0);
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/misc.c.html#mstatshowcom>mstatshowcom</A>();
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Current:\n");
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" SP:  0x%08x\n",(ulong)ppcMfsp());
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" MSR: 0x%08x\n",(ulong)ppcMfmsr());
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>(" PVR: 0x%08x\n",ppcMfpvr());
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Monitor STATE: %d\n",<A HREF=FILE:/TOP_DIRNAME/src/targets/target_dirname/monitor/main.c.html#monState>monState</A>());
+}
+</HTML>
+</PRE>
+</BODY>

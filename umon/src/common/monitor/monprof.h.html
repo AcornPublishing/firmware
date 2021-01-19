@@ -1,0 +1,19 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/monprof.h</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+#define MONPROF_FUNCLOG     (1 &lt;&lt; 0)
+#define MONPROF_TIDLOG      (1 &lt;&lt; 1)        
+#define MONPROF_PCLOG       (1 &lt;&lt; 2)        
+
+struct monprof {
+    unsigned long   type;
+    unsigned long   pc;
+    unsigned long   tid;
+};
+</HTML>
+</PRE>
+</BODY>

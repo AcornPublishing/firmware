@@ -1,0 +1,80 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="GENERATOR" content="Mozilla/4.6 [en]C-CCK-MCD EMS-1.4  (WinNT; U) [Netscape]">
+   <title>item</title>
+</head>
+<body background="../images/umonprompt.gif" nosave>
+
+<center>
+<h1>
+<font size=+0>&nbsp;</font>
+<hr WIDTH="100%"></h1></center>
+
+<center>
+<h1>
+<b><font face="Arial,Helvetica"><font size=+2>Micro Monitor Command Set</font></font></b></h1></center>
+
+<center>
+<h1>
+<font face="Arial,Helvetica"><font size=+2>ITEM</font></font></h1></center>
+
+<center><font face="Arial,Helvetica"><font size=+1><a href="../monitor.html">Return
+to MicroMonitor HomePage</a></font></font>
+<br><font face="Arial,Helvetica"><font size=+1><a href="../index.html">(click
+here for frames version)</a></font></font>
+<p>
+<hr WIDTH="100%"></center>
+
+<h1>
+<b><font face="Arial,Helvetica"><font size=+1>NAME:</font></font></b></h1>
+
+<blockquote><font face="Arial,Helvetica">item</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>SYNOPSIS:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">Process a list of strings.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>USAGE:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">item {idx} {stor_var} [item1]
+[item2] [item3] .....</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>DESCRIPTION:</font></font></h1>
+
+<blockquote><font face="Arial,Helvetica">This command, in conjunction with
+"if" and "goto", allows the user to build scripts that conveniently process
+a list of strings (or items).&nbsp; Consider the 3rd thru Nth arguments
+(itemN above) to be a list or table of items.&nbsp; The first argument
+(idx) is used as the index into this list (starting with 1) and the second
+argument is the name of the shell variable into which the item is to be
+placed.&nbsp; If the index is out of range, the variable is cleared.</font></blockquote>
+
+<h1>
+<font face="Arial,Helvetica"><font size=+1>EXAMPLES:</font></font></h1>
+
+<ul>
+<li>
+<font face="Arial,Helvetica">item 2 letter a b c d e f</font></li>
+
+<br><font face="Arial,Helvetica">This would place 'b' in the shell variable
+"letter"</font>
+<li>
+<font face="Arial,Helvetica">item $idx letter a b c d e f g</font></li>
+
+<br><font face="Arial,Helvetica">If the content of $idx was between 1 and
+7, then the shell variable "letter" would contain one of the letters a
+thru g respectively.&nbsp; For any other value in $idx, the shell variable
+"letter" would be empty.</font>
+<li>
+<font face="Arial,Helvetica">Refer to the <a href="../scripts.html#item">item
+example</a> in the <a href="../scripts.html">scripts man page</a>.</font></li>
+
+<br>&nbsp;</ul>
+
+</body>
+</html>

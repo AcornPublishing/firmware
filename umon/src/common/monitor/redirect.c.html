@@ -1,0 +1,222 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/redirect.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* redirect:
+ *  This code supports the monitor's ability to redirect what was destined for
+ *  the console to a block of memory in RAM.  Enough data is maintained so
+ *  that the block of memory can be transferred to a file using tfsadd().
+ *
+ *  Description of redirection CLI syntax:
+ *        buffer_addr,buffer_size[,filename]
+ *       [filename]
+ *
+ *  - Single arrow starts up a redirection to some specified block of memory
+ *    with a specified size.  If the filename is specified, then the output
+ *    of that single command is redirected to the buffer then transferred to
+ *    the specified file in TFS.  Any previously existent file of the same
+ *    name is overwritten.
+ *
+ *  - Double arrow with no argument says append output of this command to
+ *    the previously established buffer.
+ *
+ *  - Double arrow with an argument says append output of this command to
+ *    the previously established buffer and then write that buffer to the
+ *    specified filename.  Once again, any previously existent file of the
+ *    same name is overwritten.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */&gt;&gt;&gt;
+#include "config.h"
+#include "genlib.h"
+#include "stddefs.h"
+#include "ctype.h"
+#include "tfs.h"
+#include "tfsprivate.h"
+
+#if INCLUDE_REDIRECT
+
+/* Redirect states:
+ *  ACTIVE: the current command has issued some redirection, so
+ *      when RedirectCharacter() is called, it should copy the
+ *      character to the redirect buffer.
+ *  IDLE: the current command has not issued any redirection, so
+ *      when RedirectCharacter() is called, it simply returns.
+ *  UNINITIALIZED: the first call to base,size[,file] has not been
+ *      made so we don't have a buffer; hence we can't redirect anything.
+ */&gt;
+#define REDIRECT_UNINITIALIZED  0
+#define REDIRECT_ACTIVE         0x12345678
+#define REDIRECT_IDLE           0x87654321
+
+static int  RedirectSize, RedirectState;
+static char *RedirectBase, *RedirectPtr, *RedirectEnd;
+static char RedirectFile[TFSNAMESIZE];
+
+int
+<A NAME="RedirectionCheck">RedirectionCheck</A>(char *cmdcpy)
+{
+    int inquote;
+    char *arrow, *base, *comma, *space;
+
+    base = cmdcpy;
+    arrow = (char *)0;
+
+    /* Parse the incoming command line looking for a right arrow.
+     * This parsing assumes that there will be no negated arrows
+     * (preceding backslash) after a non-negated arrow is detected.
+     * Note that a redirection arrow within a double-quote set is
+     * ignored.  This allows a shell variable that contains a right arrow
+     * to be printed properly if put in double quotes.
+     *  For example...
+     *  set PROMPT "maint "
+     *  echo $PROMPT    # This will generate a redirection syntax error
+     *  echo "$PROMPT"  # This won't.
+     */&gt;
+    inquote = 0;
+    while(*cmdcpy) {
+        if ((*cmdcpy == '"') && ((cmdcpy == base) || (*(cmdcpy-1) != '\\'))) {
+            inquote = inquote == 1 ? 0 : 1;
+            cmdcpy++;
+            continue;
+        }   
+        if (inquote == 1) {
+            cmdcpy++;
+            continue;
+        }
+        if (*cmdcpy == '&gt;') {
+            arrow = cmdcpy;
+            if (*(arrow-1) == '\\') {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcpy>strcpy</A>(arrow-1,arrow);
+                cmdcpy = arrow+1;
+                arrow = (char *)0;
+                continue;
+            }
+            break;
+        }
+        cmdcpy++;
+    }
+    if (arrow == (char *)0)
+        return(0);
+
+    /* Remove the remaining text from the command line because it is to
+     * be used only by the redirection mechanism.
+     */
+    *arrow = 0;
+
+    /* Now parse the text after the first non-negated arrow. */
+    if (*(arrow+1) == '&gt;') {
+        if (RedirectState == REDIRECT_UNINITIALIZED) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Redirection not initialized\n");
+            return(-1);
+        }
+        arrow += 2;
+        while(<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/ctype.h.html#isspace>isspace</A>(*arrow))
+            arrow++;
+        if (*arrow != 0)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(RedirectFile,arrow,TFSNAMESIZE);
+    }
+    else {
+        RedirectPtr = RedirectBase = (char *)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoul>strtoul</A>(arrow+1,&comma,0);
+        if (*comma == ',') {
+            RedirectSize = (int)<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(comma+1,&comma,0);
+            if (RedirectSize &lt;= 0) {
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Redirection size error: %d\n",RedirectSize);
+                return(-1);
+            }
+            RedirectEnd = RedirectBase + RedirectSize;
+            if (*comma == ',') {
+                space = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strpbrk>strpbrk</A>(comma," \t\r\n");
+                if (space)
+                    *space = 0;
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strncpy>strncpy</A>(RedirectFile,comma+1,TFSNAMESIZE);
+            }
+            else
+                RedirectFile[0] = 0;
+        }
+        else {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Redirection syntax error\n");
+            return(-1);
+        }
+    }
+    RedirectState = REDIRECT_ACTIVE;
+    return(0);
+}
+
+/* RedirectCmdDone():
+ * As each command completes, this redirection mechanism must be notified.
+ * When this function is called (by docmd() after the command function has
+ * completed), if the RedirectFile[] array is populated, it transfers the
+ * buffer to the specified file; if the array is empty, then no TFS action
+ * is taken.
+ * The file specified in RedirectFile[] may have additional commas in it.
+ * They allow the filename to contain flags and info field.
+ */
+void
+<A NAME="RedirectionCmdDone">RedirectionCmdDone</A>(void)
+{
+
+    if (RedirectState != REDIRECT_UNINITIALIZED) {
+        RedirectState = REDIRECT_IDLE;
+        if (RedirectFile[0]) {
+            char    *comma, *info, *flags;
+
+            comma = info = flags = (char *)0;
+            comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(RedirectFile,',');
+            if (comma) {
+                *comma = 0;
+                flags = comma+1;
+                comma = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strchr>strchr</A>(flags,',');
+                if (comma) {
+                    *comma = 0;
+                    info = comma+1;
+                }
+            }
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/tfs.c.html#tfsadd>tfsadd</A>(RedirectFile,info,flags,(uchar *)RedirectBase,
+                (int)(RedirectPtr-RedirectBase));
+            RedirectFile[0] = 0;
+            RedirectPtr = RedirectBase;
+        }
+    }
+}
+
+/* RedirectCharacter():
+ * This function is called from putchar() in chario.c.  It simply
+ * copies the incoming character to the redirection buffer.
+ */
+void
+<A NAME="RedirectCharacter">RedirectCharacter</A>(char c)
+{
+    if (RedirectState == REDIRECT_ACTIVE) {
+        if (RedirectPtr &lt; RedirectEnd)
+            *RedirectPtr++ = c;
+    }
+}
+#else
+int
+<A NAME="RedirectionCheck">RedirectionCheck</A>(char *cmdcpy)
+{
+    return(0);
+}
+#endif
+</HTML>
+</PRE>
+</BODY>

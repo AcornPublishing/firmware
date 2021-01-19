@@ -1,0 +1,202 @@
+<HTML>
+<HEADER>
+<TITLE>common/monitor/reg_cache.c</TITLE>
+</HEADER>
+<BODY BGCOLOR = #f0f0f0>
+<PRE>
+<BODY>
+/* reg_cache.c:
+ *  Allow the user to display CPU registers that are locally cached
+ *  when an exception is hit.   These registers are not the currently
+ *  active registers in the CPU context; rather, a copy of the context at
+ *  the time of the most recent breakpoint or exception.
+ *
+ *  General notice:
+ *  This code is part of a boot-monitor package developed as a generic base
+ *  platform for embedded system designs.  As such, it is likely to be
+ *  distributed to various projects beyond the control of the original
+ *  author.  Please notify the author of any enhancements made or bugs found
+ *  so that all may benefit from the changes.  In addition, notification back
+ *  to the author will allow the new user to pick up changes that may have
+ *  been made by other users after this version of the code was distributed.
+ *
+ *  Note1: the majority of this code was edited with 4-space tabs.
+ *  Note2: as more and more contributions are accepted, the term "author"
+ *         is becoming a mis-representation of credit.
+ *
+ *  Original author:    Ed Sutter
+ *  Email:              esutter@lucent.com
+ *  Phone:              908-582-2351
+ */
+#include "config.h"
+#include "cpu.h"
+#include "genlib.h"
+#include "ctype.h"
+#include "stddefs.h"
+#include "regnames.c"
+#include "cli.h"
+
+/* The file regnames.c will contain a table of character pointers that
+ * corresond to registers that are stored away by the target's exception
+ * handler.  The table of names and the order in which the registers are
+ * stored by the exception handler must be synchronized.
+ * An example table is as follows (taken from FADS-MPC860 target)...
+ *
+ * static char  *regnames[] = {
+ *      "R0",       "R1",       "R2",       "R3",
+ *      "R4",       "R5",       "R6",       "R7",
+ *      "R8",       "R9",       "R10",      "R11",
+ *      "R12",      "R13",      "R14",      "R15",
+ *      "R16",      "R17",      "R18",      "R19",
+ *      "R20",      "R21",      "R22",      "R23",
+ *      "R24",      "R25",      "R26",      "R27",
+ *      "R28",      "R29",      "R30",      "R31",
+ *      "MSR",      "CR",       "LR",       "XER",
+ *      "DAR",      "DSISR",    "SRR0",     "SRR1",
+ *      "CTR",      "DEC",      "TBL",      "TBU",
+ *      "SPRG0",    "SPRG1",    "SPRG2",    "SPRG3",
+ * };
+ *
+ * The real definition of this array would be in the file regnames.c in 
+ * the target-specific directory.
+ */
+
+#define REGTOT  (sizeof regnames/<A NAME="sizeof">sizeof</A>(char *))
+
+/* regtbl[]:
+ * This array is used to store the actual register values.  Storage
+ * is done by the target's exception handler and must match the order
+ * of the register names in the regnames[] array.
+ */
+ulong regtbl[REGTOT];
+
+/* regidx():
+ * Return an index into the regnames[] array that matches the
+ * incoming register name.
+ * If no match is found, print an error message and return -1.
+ */
+static int
+<A NAME="regidx">regidx</A>(char *name)
+{
+    int i;
+
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtoupper>strtoupper</A>(name);
+    for(i=0;i&lt;REGTOT;i++) {
+        if (!<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strcmp>strcmp</A>(name,regnames[i])) {
+            return(i);
+        }
+    }
+    <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("Bad reg: '%s'\n",name);
+    return(-1);
+}
+
+/* putreg():
+ * Put the specified value into the specified register
+ * storage location.
+ */
+int
+<A NAME="putreg">putreg</A>(char *name,ulong value)
+{
+    int idx;
+
+    if ((idx = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#regidx>regidx</A>(name)) == -1)
+        return(-1);
+    
+    regtbl[idx] = value;
+    return(0);
+}
+
+/* getreg():
+ * Retrieve the value of the specified register.
+ */
+int
+<A NAME="getreg">getreg</A>(char *name,ulong *value)
+{
+    int idx;
+
+    if ((idx = <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#regidx>regidx</A>(name)) == -1)
+        return(-1);
+    
+    *value = regtbl[idx];
+    return(0);
+}
+
+/* showregs():
+ * Dump the content of the register cache in a tabular format
+ * showing the entry in the regnames[] array and the corresponding
+ * entry in the regtbl[] array.
+ */
+void
+<A NAME="showregs">showregs</A>(void)
+{
+    int i, j;
+
+    for(i=0;i&lt;REGTOT;) {
+        for(j=0;((j&lt;4) && (i&lt;REGTOT));j++,i++)
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%6s=0x%08lx ",regnames[i],regtbl[i]);
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("\n");
+    }
+}
+
+/* reginit():
+ * Clear the register cache.
+ */
+void
+<A NAME="reginit">reginit</A>(void)
+{
+    int i;
+
+    for(i=0;i&lt;REGTOT;i++)
+        regtbl[i] = 0;
+}
+
+char *RegHelp[] = {
+    "Display/modify content of monitor's register cache",
+    "-[v:] [regname] [value]",
+    "Options:",
+    " -v {var} quietly load 'var' with register content",
+    0,
+};
+
+int
+<A NAME="Reg">Reg</A>(int argc,char *argv[])
+{
+    int     opt;
+    ulong   reg;
+    char    *varname, buf[32];
+
+    varname = (char *)0;
+    while((opt=<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#getopt>getopt</A>(argc,argv,"v:")) != -1) {
+        switch(opt) {
+        case 'v':
+            varname = optarg;
+            break;
+        default:
+            return(CMD_PARAM_ERROR);
+        }
+    }
+
+    if (argc == optind) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#showregs>showregs</A>();
+        return(CMD_SUCCESS);
+    }
+    else if (argc == optind + 1) {
+        if (<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#getreg>getreg</A>(argv[optind],&reg) != -1) {
+            <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#sprintf>sprintf</A>(buf,"0x%lx",reg);
+            if (varname)
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/env.c.html#setenv>setenv</A>(varname,buf);
+            else
+                <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/mprintf.c.html#printf>printf</A>("%s = %s\n",argv[optind],buf);
+        }
+    }
+    else if (argc == optind + 1) {
+        <A HREF=FILE:/TOP_DIRNAME/src/common/monitor/reg_cache.c.html#putreg>putreg</A>(argv[1],<A HREF=FILE:/TOP_DIRNAME/src/common/monitor/genlib.c.html#strtol>strtol</A>(argv[optind+2],(char **)0,0));
+    }
+    else {
+        return(CMD_PARAM_ERROR);
+    }
+    return(CMD_SUCCESS);
+}
+</HTML>
+</PRE>
+</BODY>
